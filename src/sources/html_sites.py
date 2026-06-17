@@ -102,8 +102,13 @@ def _clean_html(html: str, extra_selectors: list[str] | None = None) -> str:
 
     if extra_selectors:
         for sel in extra_selectors:
-            for tag in soup.select(sel):
-                tag.decompose()
+            try:
+                for tag in soup.select(sel):
+                    tag.decompose()
+            except Exception:
+                # malformed selector (e.g. Tailwind "md:hidden" reads as a
+                # pseudo-class) — skip it rather than abort the whole page
+                continue
 
     for tag in soup.find_all(["script", "style", "nav", "header", "footer", "aside", "noscript", "iframe"]):
         tag.decompose()
@@ -410,31 +415,39 @@ async def fetch_html_sites(
 
     for fetched in fetched_list:
         site = fetched["site"]
-        html = fetched.get("html", "")
+        # Per-site fault isolation: a parse error on one site (e.g. a malformed
+        # remove_selector) must not abort extraction for every other site.
+        try:
+            html = fetched.get("html", "")
 
-        if html:
-            # JSON-LD path first — avoids _clean_html + markdownify for complete sites
-            raw_list = _events_from_jsonld(html, site["url"], site["name"], _DATE_WINDOW_JSONLD)
-            if raw_list:
-                evts = _be(raw_list, site["url"], site["name"])
-                jsonld_events.extend(evts)
-                print(f"  [HTML] {site['name']}: {len(evts)} events [jsonld]")
-                continue
-            # JSON-LD insufficient — build LLM text blob now (lazy)
-            site_data = _html_to_site_data(site, html)
-        else:
-            # Browser fallback with pre-built markdown
-            pre_text = fetched.get("pre_text", "")
-            site_data = {
-                "name": site["name"],
-                "url": site["url"],
-                "text": pre_text,
-                "category_hint": site.get("category_hint", "other"),
-                "notes": site.get("notes", ""),
-                "must_determine_venue": site.get("must_determine_venue", False),
-            }
+            if html:
+                # JSON-LD path first — avoids _clean_html + markdownify for complete sites
+                raw_list = _events_from_jsonld(html, site["url"], site["name"], _DATE_WINDOW_JSONLD)
+                if raw_list:
+                    evts = _be(raw_list, site["url"], site["name"])
+                    jsonld_events.extend(evts)
+                    print(f"  [HTML] {site['name']}: {len(evts)} events [jsonld]")
+                    continue
+                # JSON-LD insufficient — build LLM text blob now (lazy)
+                site_data = _html_to_site_data(site, html)
+            else:
+                # Browser fallback with pre-built markdown
+                pre_text = fetched.get("pre_text", "")
+                site_data = {
+                    "name": site["name"],
+                    "url": site["url"],
+                    "text": pre_text,
+                    "category_hint": site.get("category_hint", "other"),
+                    "notes": site.get("notes", ""),
+                    "must_determine_venue": site.get("must_determine_venue", False),
+                }
 
-        llm_sites.append(site_data)
+            llm_sites.append(site_data)
+        except Exception as exc:
+            print(f"  [HTML] {site['name']}: parse failed — {exc}")
+            if errors is not None:
+                errors.append(site["name"])
+            continue
 
     ages = get_all_exhibition_ages([s["name"] for s in llm_sites])
     for s in llm_sites:
