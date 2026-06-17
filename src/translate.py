@@ -1,7 +1,7 @@
 """Batch translation of event description fields via LLM."""
 import json
 import re
-from .extract import _run_llm_async
+from .llm import run_llm
 
 
 async def translate_descriptions(events: list, target_lang: str = "ru") -> None:
@@ -18,7 +18,7 @@ async def translate_descriptions(events: list, target_lang: str = "ru") -> None:
         + json.dumps(items, ensure_ascii=False)
     )
 
-    raw = await _run_llm_async(prompt)
+    raw = await run_llm(prompt)
     m = re.search(r"\[.*\]", raw, re.DOTALL)
     if not m:
         return

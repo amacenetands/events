@@ -38,7 +38,7 @@ from src.dedup import (
     filter_unseen, mark_seen,
     load_cached_exhibitions, upsert_exhibitions, purge_expired_exhibitions,
 )
-from src.rank import pre_filter, rank_with_claude
+from src.rank import pre_filter, rank
 from src.digest import (
     generate_digest, save_digest,
     generate_family_digest, save_family_digest,
@@ -214,7 +214,7 @@ async def run(
         rest_events: list[Event] = []
         print(f"Skipping ranking — {len(ranked)} candidates ordered by score")
     else:
-        ranked = await rank_with_claude(candidates)
+        ranked = await rank(candidates)
         print(f"After Claude ranking: {len(ranked)} top picks")
         ranked_ids = {id(e) for e in ranked}
         rest_events = [e for e in candidates if id(e) not in ranked_ids]

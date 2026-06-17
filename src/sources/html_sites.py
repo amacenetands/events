@@ -13,7 +13,7 @@ import yaml
 from markdownify import markdownify
 
 from ..extract import extract_events_batch_async, extract_events_from_text
-from ..dedup import get_all_exhibition_ages, get_cached_html, save_html_cache, save_extraction
+from ..dedup import get_all_exhibition_ages, get_cached_html, save_html_cache
 from ..models import Event
 
 SITES_YAML = Path(__file__).parent.parent.parent / "sites.yaml"
@@ -97,11 +97,6 @@ def _clean_html(html: str, extra_selectors: list[str] | None = None) -> str:
 
     main = soup.find("main") or soup.find("article") or soup.find(id=re.compile(r"main|content", re.I))
     return str(main) if main else str(soup)
-
-
-def _extract_main(html: str) -> str:
-    m = re.search(r"<main[\s>].*?</main>", html, re.DOTALL | re.IGNORECASE)
-    return m.group() if m else html
 
 
 def _extract_jsonld(html: str) -> str:

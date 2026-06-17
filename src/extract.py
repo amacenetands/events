@@ -1,15 +1,15 @@
 """Claude CLI / Ollama extraction — parallel async batches, configurable backend."""
 import json
-import os
 import re
 import asyncio
 import subprocess
 from datetime import date
 from .models import Event
 from .dedup import get_cached_parse, get_html_fetched_at, save_parse_cache, save_extraction
+from .llm import run_llm, _CLAUDE_MODEL
 
 BATCH_SIZE = 3
-_MODEL = "claude-haiku-4-5-20251001"
+_MODEL = _CLAUDE_MODEL
 
 _DATE_SIGNAL = re.compile(
     r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec"
@@ -19,11 +19,6 @@ _DATE_SIGNAL = re.compile(
     r"|\d{4}-\d{2}-\d{2})\b",
     re.IGNORECASE,
 )
-
-_BACKEND = os.environ.get("EXTRACTION_BACKEND", "ollama").lower()
-_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:8b")
-_OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-_OLLAMA_CTX = int(os.environ.get("OLLAMA_CTX", "32768"))
 
 # Base schema — venue and url omitted; injected per-site or from known data
 _EVENT_SCHEMA = """\
@@ -157,45 +152,6 @@ def _parse_object(raw: str) -> dict[str, list[dict]]:
         return {}
 
 
-async def _run_claude_async(prompt: str) -> str:
-    proc = await asyncio.create_subprocess_exec(
-        "claude", "-p", prompt, "--model", _MODEL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=300)
-    return stdout.decode().strip()
-
-
-async def _run_ollama_async(prompt: str) -> str:
-    import httpx
-    payload = {
-        "model": _OLLAMA_MODEL,
-        "prompt": "/no_think\n" + prompt,
-        "stream": True,
-        "options": {"temperature": 0, "num_ctx": _OLLAMA_CTX},
-    }
-    chunks: list[str] = []
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=900.0)) as client:
-        async with client.stream("POST", f"{_OLLAMA_URL}/api/generate", json=payload) as r:
-            r.raise_for_status()
-            async for line in r.aiter_lines():
-                if line:
-                    try:
-                        chunks.append(json.loads(line).get("response", ""))
-                    except json.JSONDecodeError:
-                        pass
-    raw = "".join(chunks)
-    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
-    return raw
-
-
-async def _run_llm_async(prompt: str) -> str:
-    if _BACKEND == "ollama":
-        return await _run_ollama_async(prompt)
-    return await _run_claude_async(prompt)
-
-
 def _make_batch_prompt(sites_data: list[dict], today: str) -> str:
     parts = []
     for s in sites_data:
@@ -245,7 +201,7 @@ async def extract_events_batch_async(
     async def _run_batch(batch: list[dict]) -> list[Event]:
         try:
             prompt = _make_batch_prompt(batch, today)
-            raw = await _run_llm_async(prompt)
+            raw = await run_llm(prompt, timeout=900)
             parsed = _parse_object(raw)
             events = []
             for site in batch:
