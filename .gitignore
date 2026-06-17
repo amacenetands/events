@@ -1,0 +1,13 @@
+# secrets
+.env
+
+# python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# generated / intermediate data (regenerable)
+cache/
+output/
+.crawl4ai/
