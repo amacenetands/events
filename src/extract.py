@@ -5,7 +5,7 @@ import asyncio
 import subprocess
 from datetime import date
 from .models import Event
-from .dedup import get_cached_parse, get_html_fetched_at, save_parse_cache, save_extraction
+from .dedup import get_cached_parse, get_html_fetched_at, save_extraction
 from .llm import run_llm, _CLAUDE_MODEL
 
 BATCH_SIZE = 3
@@ -211,7 +211,6 @@ async def extract_events_batch_async(
                 site_events = _build_events(raw_list, site["url"], site["name"])
                 events.extend(site_events)
                 print(f"  [HTML] {site['name']}: {len(site_events)} events")
-                save_parse_cache(site["name"], raw_list)
                 save_extraction(site["name"], raw_list)
             return events
         except Exception as e:

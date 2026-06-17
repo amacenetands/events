@@ -1,84 +1,55 @@
 """
-JSON-backed persistence: seen events, exhibition cache, download cache, parse cache.
+SQLite-backed persistence: seen events, exhibition cache, html cache, parse/extraction cache.
 """
 import json
 import hashlib
-from datetime import date, datetime, timedelta
-from pathlib import Path
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from .models import Event
-
-CACHE_DIR = Path(__file__).parent.parent / "cache"
-DOWNLOAD_DIR = CACHE_DIR / "downloads"
-EXTRACTION_DIR = CACHE_DIR / "extractions"
+from .store import _conn, _now, _url_key
 
 EXHIBITION_TTL_DAYS = 21
 DOWNLOAD_TTL_DAYS = 3
 PARSE_TTL_DAYS = 3
 
-_SEEN_F = CACHE_DIR / "seen_events.json"
-_EXHB_F = CACHE_DIR / "exhibition_cache.json"
-_PARSE_F = CACHE_DIR / "parse_cache.json"
-_DLOAD_META_F = CACHE_DIR / "download_meta.json"
 
-
-def _site_slug(site_name: str) -> str:
-    import re
-    return re.sub(r"[^\w]+", "_", site_name.lower()).strip("_")
-
-
-def _ensure_cache() -> None:
-    CACHE_DIR.mkdir(exist_ok=True)
-    DOWNLOAD_DIR.mkdir(exist_ok=True)
-    EXTRACTION_DIR.mkdir(exist_ok=True)
-
-
-def _load(path: Path) -> dict:
-    if path.exists():
-        try:
-            return json.loads(path.read_text())
-        except Exception:
-            return {}
-    return {}
-
-
-def _save(path: Path, data: dict) -> None:
-    _ensure_cache()
-    path.write_text(json.dumps(data, indent=2))
-
-
-# ── seen events ──────────────────────────────────────────────────────────────
+# ── seen events ───────────────────────────────────────────────────────────────
 
 def filter_unseen(events: list[Event]) -> list[Event]:
-    data = _load(_SEEN_F)
     cutoff = (date.today() - timedelta(weeks=52)).isoformat()
-    data = {k: v for k, v in data.items() if v.get("seen_date", "") >= cutoff}
-    seen = set(data.keys())
+    rows = _conn.execute(
+        "SELECT fingerprint FROM event_state WHERE seen_date >= ?", (cutoff,)
+    ).fetchall()
+    seen = {r["fingerprint"] for r in rows}
     return [e for e in events if e.fingerprint() not in seen]
 
 
 def mark_seen(events: list[Event]) -> None:
-    data = _load(_SEEN_F)
     today = date.today().isoformat()
-    for e in events:
-        fp = e.fingerprint()
-        if fp not in data:
-            data[fp] = {"title": e.title, "seen_date": today}
-    _save(_SEEN_F, data)
+    with _conn:
+        for e in events:
+            _conn.execute(
+                """INSERT INTO event_state(fingerprint, seen_date) VALUES(?,?)
+                   ON CONFLICT(fingerprint) DO UPDATE SET seen_date=excluded.seen_date
+                   WHERE event_state.seen_date IS NULL""",
+                (e.fingerprint(), today),
+            )
 
 
 # ── exhibition cache ──────────────────────────────────────────────────────────
 
 def load_cached_exhibitions() -> list[Event]:
-    data = _load(_EXHB_F)
     today = date.today().isoformat()
+    rows = _conn.execute(
+        "SELECT event_json FROM event_state WHERE cached_until >= ? AND event_json IS NOT NULL",
+        (today,),
+    ).fetchall()
     events = []
-    for _fp, entry in data.items():
-        if entry.get("cached_until", "") >= today:
-            try:
-                events.append(Event(**json.loads(entry["event_json"])))
-            except Exception:
-                continue
+    for r in rows:
+        try:
+            events.append(Event(**json.loads(r["event_json"])))
+        except Exception:
+            continue
     return events
 
 
@@ -86,27 +57,32 @@ def upsert_exhibitions(events: list[Event], ttl_days: int = EXHIBITION_TTL_DAYS)
     exhibitions = [e for e in events if not e.is_one_off]
     if not exhibitions:
         return
-    data = _load(_EXHB_F)
     cached_until = (date.today() + timedelta(days=ttl_days)).isoformat()
-    for e in exhibitions:
-        data[e.fingerprint()] = {
-            "event_json": e.model_dump_json(),
-            "source": e.source,
-            "cached_until": cached_until,
-        }
-    _save(_EXHB_F, data)
+    with _conn:
+        for e in exhibitions:
+            _conn.execute(
+                """INSERT INTO event_state(fingerprint, cached_until, source, event_json)
+                   VALUES(?,?,?,?)
+                   ON CONFLICT(fingerprint) DO UPDATE SET
+                       cached_until=excluded.cached_until,
+                       source=excluded.source,
+                       event_json=excluded.event_json""",
+                (e.fingerprint(), cached_until, e.source, e.model_dump_json()),
+            )
 
 
 def get_all_exhibition_ages(sources: list[str]) -> dict[str, int]:
-    data = _load(_EXHB_F)
+    rows = _conn.execute(
+        "SELECT source, cached_until FROM event_state WHERE cached_until IS NOT NULL"
+    ).fetchall()
     today = date.today()
     source_set = set(sources)
     ages: dict[str, int] = {}
-    for entry in data.values():
-        src = entry.get("source", "")
+    for r in rows:
+        src = r["source"] or ""
         if src not in source_set or src in ages:
             continue
-        cached_until_str = entry.get("cached_until", "")
+        cached_until_str = r["cached_until"]
         if not cached_until_str:
             continue
         cached_until = date.fromisoformat(cached_until_str)
@@ -116,101 +92,100 @@ def get_all_exhibition_ages(sources: list[str]) -> dict[str, int]:
 
 
 def purge_expired_exhibitions() -> None:
-    data = _load(_EXHB_F)
     today = date.today().isoformat()
-    data = {k: v for k, v in data.items() if v.get("cached_until", "") >= today}
-    _save(_EXHB_F, data)
+    with _conn:
+        _conn.execute(
+            """UPDATE event_state SET cached_until=NULL, source=NULL, event_json=NULL
+               WHERE cached_until < ?""",
+            (today,),
+        )
+        _conn.execute(
+            "DELETE FROM event_state WHERE seen_date IS NULL AND cached_until IS NULL"
+        )
 
 
-# ── download cache ────────────────────────────────────────────────────────────
-
-def _url_key(url: str) -> str:
-    return hashlib.sha256(url.encode()).hexdigest()[:24]
-
+# ── html download cache ───────────────────────────────────────────────────────
 
 def get_cached_html(url: str, force: bool = False) -> Optional[str]:
     if force:
         return None
-    meta = _load(_DLOAD_META_F)
-    key = _url_key(url)
-    entry = meta.get(key)
-    if not entry:
+    row = _conn.execute(
+        "SELECT html, fetched_at FROM scrapes WHERE url_key=?", (_url_key(url),)
+    ).fetchone()
+    if not row:
         return None
-    fetched_at = datetime.fromisoformat(entry["fetched_at"])
-    if datetime.utcnow() - fetched_at > timedelta(days=DOWNLOAD_TTL_DAYS):
+    fetched_at = datetime.fromisoformat(row["fetched_at"])
+    if datetime.now(timezone.utc) - fetched_at > timedelta(days=DOWNLOAD_TTL_DAYS):
         return None
-    html_path = DOWNLOAD_DIR / f"{key}.html"
-    if not html_path.exists():
-        return None
-    return html_path.read_text(encoding="utf-8")
+    return row["html"]
 
 
 def save_html_cache(url: str, html: str, site_name: str = "") -> None:
-    _ensure_cache()
-    key = _url_key(url)
-    meta = _load(_DLOAD_META_F)
-    meta[key] = {"url": url, "site_name": site_name, "fetched_at": datetime.utcnow().isoformat()}
-    _save(_DLOAD_META_F, meta)
-    (DOWNLOAD_DIR / f"{key}.html").write_text(html, encoding="utf-8")
+    content_hash = hashlib.sha256(html.encode()).hexdigest()[:16]
+    with _conn:
+        _conn.execute(
+            """INSERT OR REPLACE INTO scrapes(url_key, url, site_name, html, content_hash, fetched_at)
+               VALUES(?,?,?,?,?,?)""",
+            (_url_key(url), url, site_name, html, content_hash, _now()),
+        )
 
-
-# ── parse cache ───────────────────────────────────────────────────────────────
 
 def get_html_fetched_at(url: str) -> Optional[str]:
-    meta = _load(_DLOAD_META_F)
-    entry = meta.get(_url_key(url))
-    return entry.get("fetched_at") if entry else None
+    row = _conn.execute(
+        "SELECT fetched_at FROM scrapes WHERE url_key=?", (_url_key(url),)
+    ).fetchone()
+    return row["fetched_at"] if row else None
 
 
-def get_cached_parse(site_name: str, force: bool = False, fetched_at: str | None = None) -> Optional[list[dict]]:
+# ── parse / extraction cache ──────────────────────────────────────────────────
+
+def get_cached_parse(
+    site_name: str, force: bool = False, fetched_at: str | None = None
+) -> Optional[list[dict]]:
     if force:
         return None
-    data = _load(_PARSE_F)
-    entry = data.get(site_name)
-    if not entry:
+    row = _conn.execute(
+        "SELECT events_json, extracted_at FROM extractions WHERE site_name=?",
+        (site_name,),
+    ).fetchone()
+    if not row:
         return None
-    cached_at_str = entry["cached_at"]
-    cached_at = datetime.fromisoformat(cached_at_str)
-    if datetime.utcnow() - cached_at > timedelta(days=PARSE_TTL_DAYS):
+    extracted_at = datetime.fromisoformat(row["extracted_at"])
+    if datetime.now(timezone.utc) - extracted_at > timedelta(days=PARSE_TTL_DAYS):
         return None
-    if fetched_at and fetched_at > cached_at_str:
+    if fetched_at and fetched_at > row["extracted_at"]:
         return None
     try:
-        return json.loads(entry["events_json"])
+        return json.loads(row["events_json"])
     except Exception:
         return None
 
 
-def save_parse_cache(site_name: str, events: list[dict]) -> None:
-    data = _load(_PARSE_F)
-    data[site_name] = {
-        "events_json": json.dumps(events),
-        "cached_at": datetime.utcnow().isoformat(),
-    }
-    _save(_PARSE_F, data)
-
-
-# ── extraction store (permanent, per-site) ────────────────────────────────────
-
-def save_extraction(site_name: str, raw_events: list[dict]) -> None:
-    """Persist all LLM-extracted events for a site. No TTL — permanent audit log."""
-    _ensure_cache()
-    path = EXTRACTION_DIR / f"{_site_slug(site_name)}.json"
-    data = {
-        "site_name": site_name,
-        "extracted_at": datetime.utcnow().isoformat(),
-        "event_count": len(raw_events),
-        "events": raw_events,
-    }
-    path.write_text(json.dumps(data, indent=2))
+def save_extraction(
+    site_name: str, raw_events: list[dict], content_hash: str | None = None
+) -> None:
+    """Persist LLM-extracted events for a site. Serves both parse-cache and extraction-store roles."""
+    with _conn:
+        _conn.execute(
+            """INSERT OR REPLACE INTO extractions(site_name, content_hash, events_json, extracted_at, event_count)
+               VALUES(?,?,?,?,?)""",
+            (site_name, content_hash, json.dumps(raw_events), _now(), len(raw_events)),
+        )
 
 
 def load_extraction(site_name: str) -> Optional[dict]:
     """Load last extraction result for a site."""
-    path = EXTRACTION_DIR / f"{_site_slug(site_name)}.json"
-    if not path.exists():
+    row = _conn.execute(
+        "SELECT * FROM extractions WHERE site_name=?", (site_name,)
+    ).fetchone()
+    if not row:
         return None
     try:
-        return json.loads(path.read_text())
+        return {
+            "site_name": row["site_name"],
+            "extracted_at": row["extracted_at"],
+            "event_count": row["event_count"],
+            "events": json.loads(row["events_json"]),
+        }
     except Exception:
         return None
