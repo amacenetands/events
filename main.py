@@ -71,15 +71,16 @@ def _filter_date_window(events: list[Event], window: int) -> list[Event]:
 
 
 def _dedup_within_run(events: list[Event]) -> list[Event]:
+    # Dedup by fingerprint (title|venue|date) only. NOT by URL: single-venue
+    # sites emit many distinct events that all share the venue's listing-page
+    # URL (no per-event links), so URL-deduping collapsed them to one event.
+    # True cross-source duplicates share a fingerprint, so nothing is lost.
     seen_fp: set[str] = set()
-    seen_url: set[str] = set()
     unique = []
     for e in events:
         fp = e.fingerprint()
-        url = e.url.rstrip("/")
-        if fp not in seen_fp and url not in seen_url:
+        if fp not in seen_fp:
             seen_fp.add(fp)
-            seen_url.add(url)
             unique.append(e)
     return unique
 
