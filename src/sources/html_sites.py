@@ -1,8 +1,9 @@
 """
-HTML site scraper with batched Claude extraction.
+HTML site scraper with batched LLM extraction.
 - js_required: false → httpx + markdownify (no browser)
 - js_required: true  → crawl4ai + playwright
-- Batches BATCH_SIZE sites per Claude call to reduce subprocess count.
+- Batches BATCH_SIZE sites per LLM call to reduce request count.
+- JSON-LD-complete sites skip markdownify entirely.
 """
 import asyncio
 import os
@@ -12,7 +13,7 @@ import httpx
 import yaml
 from markdownify import markdownify
 
-from ..extract import extract_events_batch_async, extract_events_from_text
+from ..extract import extract_events_batch_async
 from ..dedup import get_all_exhibition_ages, get_cached_html, save_html_cache
 from ..models import Event
 
@@ -55,6 +56,40 @@ _BOILERPLATE_PATTERNS = re.compile(
     r"social-share|share-button|follow-us|sidebar|widget|advertisement|promo",
     re.IGNORECASE,
 )
+
+# Event types recognised in JSON-LD — shared by _parse_jsonld_nodes, _extract_jsonld, _events_from_jsonld
+_JSONLD_EVENT_TYPES = (
+    "Event", "MusicEvent", "VisualArtsEvent", "ExhibitionEvent",
+    "TheaterEvent", "EducationEvent",
+)
+
+
+def _parse_jsonld_nodes(html: str) -> list[dict]:
+    """Regex-extract ld+json blocks from html and return matching event nodes.
+
+    Parses each <script type="application/ld+json"> block exactly once, walks
+    @graph arrays, and returns nodes whose @type matches any known event type.
+    Returns [] when no matching nodes found.
+    """
+    import json
+    blocks = re.findall(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        html, re.DOTALL | re.IGNORECASE,
+    )
+    nodes: list[dict] = []
+    for block in blocks:
+        try:
+            data = json.loads(block.strip())
+        except Exception:
+            continue
+        graph = data.get("@graph", [data]) if isinstance(data, dict) else [data]
+        for node in graph:
+            if not isinstance(node, dict):
+                continue
+            t = node.get("@type", "")
+            if t in _JSONLD_EVENT_TYPES or "Event" in str(t):
+                nodes.append(node)
+    return nodes
 
 
 def _clean_html(html: str, extra_selectors: list[str] | None = None) -> str:
@@ -100,138 +135,116 @@ def _clean_html(html: str, extra_selectors: list[str] | None = None) -> str:
 
 
 def _extract_jsonld(html: str) -> str:
-    import json
-    blocks = re.findall(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html, re.DOTALL | re.IGNORECASE)
+    """Build [STRUCTURED EVENT] text lines from JSON-LD blocks.
+
+    Delegates node extraction to _parse_jsonld_nodes so the ld+json blocks are
+    parsed only once.
+    """
     lines = []
-    for block in blocks:
-        try:
-            data = json.loads(block.strip())
-            graph = data.get("@graph", [data]) if isinstance(data, dict) else [data]
-            for node in graph:
-                if not isinstance(node, dict):
-                    continue
-                t = node.get("@type", "")
-                if t in ("Event", "MusicEvent", "VisualArtsEvent", "ExhibitionEvent", "TheaterEvent", "EducationEvent") or "Event" in str(t):
-                    name = node.get("name", "")
-                    start = node.get("startDate", "")
-                    end = node.get("endDate", "")
-                    desc = node.get("description", "")
-                    loc = ""
-                    if isinstance(node.get("location"), dict):
-                        loc = node["location"].get("name", "")
-                    url = node.get("url", "")
-                    price = ""
-                    if isinstance(node.get("offers"), dict):
-                        price = node["offers"].get("price", "")
-                    parts = [f"[STRUCTURED EVENT] {name}"]
-                    if start:
-                        parts.append(f"startDate: {start}")
-                    if end:
-                        parts.append(f"endDate: {end}")
-                    if loc:
-                        parts.append(f"location: {loc}")
-                    if desc:
-                        parts.append(f"description: {desc[:200]}")
-                    if url:
-                        parts.append(f"url: {url}")
-                    if price:
-                        parts.append(f"price: {price}")
-                    lines.append(" | ".join(parts))
-        except Exception:
-            continue
+    for node in _parse_jsonld_nodes(html):
+        name = node.get("name", "")
+        start = node.get("startDate", "")
+        end = node.get("endDate", "")
+        desc = node.get("description", "")
+        loc = ""
+        if isinstance(node.get("location"), dict):
+            loc = node["location"].get("name", "")
+        url = node.get("url", "")
+        price = ""
+        if isinstance(node.get("offers"), dict):
+            price = node["offers"].get("price", "")
+        parts = [f"[STRUCTURED EVENT] {name}"]
+        if start:
+            parts.append(f"startDate: {start}")
+        if end:
+            parts.append(f"endDate: {end}")
+        if loc:
+            parts.append(f"location: {loc}")
+        if desc:
+            parts.append(f"description: {desc[:200]}")
+        if url:
+            parts.append(f"url: {url}")
+        if price:
+            parts.append(f"price: {price}")
+        lines.append(" | ".join(parts))
     return "\n".join(lines)
 
 
 def _events_from_jsonld(html: str, source_url: str, source_name: str, date_window: int) -> list | None:
-    import json as _json
     from datetime import date as _date, timedelta
     from dateutil.parser import parse as _parse_date
 
     today = _date.today()
     cutoff = today + timedelta(days=date_window)
 
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html, re.DOTALL | re.IGNORECASE,
-    )
-    if not blocks:
+    nodes = _parse_jsonld_nodes(html)
+    if not nodes:
         return None
 
     raw_events = []
-    for block in blocks:
+    for node in nodes:
+        name = node.get("name", "").strip()
+        start_str = node.get("startDate", "")
+        if not name or not start_str:
+            continue
         try:
-            data = _json.loads(block.strip())
+            start_dt = _parse_date(start_str).date()
         except Exception:
             continue
-        graph = data.get("@graph", [data]) if isinstance(data, dict) else [data]
-        for node in graph:
-            if not isinstance(node, dict):
+
+        end_str = node.get("endDate", "")
+        end_dt = None
+        try:
+            end_dt = _parse_date(end_str).date() if end_str else None
+        except Exception:
+            pass
+
+        is_one_off = end_dt is None or end_dt == start_dt
+        if is_one_off:
+            if start_dt < today or start_dt > cutoff:
                 continue
-            t = node.get("@type", "")
-            if not (t in ("Event", "MusicEvent", "VisualArtsEvent", "ExhibitionEvent", "TheaterEvent", "EducationEvent") or "Event" in str(t)):
+        else:
+            if end_dt and end_dt < today:
                 continue
-            name = node.get("name", "").strip()
-            start_str = node.get("startDate", "")
-            if not name or not start_str:
-                continue
-            try:
-                start_dt = _parse_date(start_str).date()
-            except Exception:
+            if start_dt > cutoff:
                 continue
 
-            end_str = node.get("endDate", "")
-            end_dt = None
-            try:
-                end_dt = _parse_date(end_str).date() if end_str else None
-            except Exception:
-                pass
+        loc = ""
+        if isinstance(node.get("location"), dict):
+            loc = node["location"].get("name", "") or ""
+        url = node.get("url", source_url) or source_url
+        price = ""
+        offers = node.get("offers")
+        if isinstance(offers, dict):
+            p = offers.get("price", "")
+            currency = offers.get("priceCurrency", "")
+            price = f"{currency}{p}" if p else ""
+        desc = (node.get("description") or "")[:150] or None
+        time_str = None
+        try:
+            from datetime import datetime as _dt
+            parsed = _parse_date(start_str)
+            if parsed.hour or parsed.minute:
+                time_str = parsed.strftime("%H:%M")
+        except Exception:
+            pass
 
-            is_one_off = end_dt is None or end_dt == start_dt
-            if is_one_off:
-                if start_dt < today or start_dt > cutoff:
-                    continue
-            else:
-                if end_dt and end_dt < today:
-                    continue
-                if start_dt > cutoff:
-                    continue
-
-            loc = ""
-            if isinstance(node.get("location"), dict):
-                loc = node["location"].get("name", "") or ""
-            url = node.get("url", source_url) or source_url
-            price = ""
-            offers = node.get("offers")
-            if isinstance(offers, dict):
-                p = offers.get("price", "")
-                currency = offers.get("priceCurrency", "")
-                price = f"{currency}{p}" if p else ""
-            desc = (node.get("description") or "")[:150] or None
-            time_str = None
-            try:
-                from datetime import datetime as _dt
-                parsed = _parse_date(start_str)
-                if parsed.hour or parsed.minute:
-                    time_str = parsed.strftime("%H:%M")
-            except Exception:
-                pass
-
-            raw_events.append({
-                "title": name,
-                "venue": loc or source_name,
-                "date": start_dt.isoformat(),
-                "end_date": end_dt.isoformat() if end_dt and not is_one_off else None,
-                "time": time_str,
-                "category": "other",
-                "is_one_off": is_one_off,
-                "is_kids": False,
-                "is_family": False,
-                "date_confirmed": True,
-                "url": url,
-                "description": desc,
-                "price": price or None,
-                "source": source_name,
-            })
+        raw_events.append({
+            "title": name,
+            "venue": loc or source_name,
+            "date": start_dt.isoformat(),
+            "end_date": end_dt.isoformat() if end_dt and not is_one_off else None,
+            "time": time_str,
+            "category": "other",
+            "is_one_off": is_one_off,
+            "is_kids": False,
+            "is_family": False,
+            "date_confirmed": True,
+            "url": url,
+            "description": desc,
+            "price": price or None,
+            "source": source_name,
+        })
 
     if not raw_events:
         return None
@@ -252,9 +265,10 @@ def _html_to_site_data(site: dict, html: str) -> dict:
         "category_hint": site.get("category_hint", "other"),
         "notes": site.get("notes", ""),
         "must_determine_venue": site.get("must_determine_venue", False),
-        "_raw_html": html,
     }
 
+
+# ── fetch helpers — return raw html paired with site dict ────────────────────
 
 async def _fetch_markdown_simple(
     client: httpx.AsyncClient,
@@ -262,17 +276,18 @@ async def _fetch_markdown_simple(
     sem: asyncio.Semaphore,
     force_download: bool = False,
 ) -> dict | None:
+    """Fetch html for a non-JS site. Returns {"site": site, "html": raw_html}."""
     async with sem:
         cached_html = get_cached_html(site["url"], force=force_download)
         if cached_html:
             print(f"  [HTML] {site['name']}: download cache hit")
-            return _html_to_site_data(site, cached_html)
+            return {"site": site, "html": cached_html}
         try:
             r = await client.get(site["url"], headers=HEADERS, follow_redirects=True, timeout=20)
             r.raise_for_status()
             html = r.text
             save_html_cache(site["url"], html, site_name=site["name"])
-            return _html_to_site_data(site, html)
+            return {"site": site, "html": html}
         except Exception as exc:
             print(f"  [HTML] {site['name']}: fetch failed — {exc}")
             return None
@@ -283,11 +298,18 @@ async def _fetch_markdown_browser(
     sem: asyncio.Semaphore,
     force_download: bool = False,
 ) -> dict | None:
+    """Fetch html for a JS-required site. Returns {"site": site, "html": raw_html}.
+
+    When crawl4ai yields no raw HTML (result.html empty), falls back to the
+    pre-built markdown string from result.markdown carried as a sentinel with
+    html="". Callers detect this via html="" and skip _html_to_site_data,
+    using the pre_text field instead.
+    """
     async with sem:
         cached_html = get_cached_html(site["url"], force=force_download)
         if cached_html:
             print(f"  [HTML] {site['name']}: download cache hit")
-            return _html_to_site_data(site, cached_html)
+            return {"site": site, "html": cached_html}
         try:
             _cache = os.environ.get("CRAWL4_AI_BASE_DIRECTORY", "/tmp")
             Path(_cache).mkdir(parents=True, exist_ok=True)
@@ -316,18 +338,11 @@ async def _fetch_markdown_browser(
             raw_html = result.html or ""
             if raw_html:
                 save_html_cache(site["url"], raw_html, site_name=site["name"])
-                return _html_to_site_data(site, raw_html)
+                return {"site": site, "html": raw_html}
             else:
+                # No raw HTML available — carry pre-built markdown as fallback
                 content = str(result.markdown) or ""
-                return {
-                    "name": site["name"],
-                    "url": site["url"],
-                    "text": content[:32000],
-                    "category_hint": site.get("category_hint", "other"),
-                    "notes": site.get("notes", ""),
-                    "must_determine_venue": site.get("must_determine_venue", False),
-                    "_raw_html": "",
-                }
+                return {"site": site, "html": "", "pre_text": content[:32000]}
         except Exception as exc:
             print(f"  [HTML/browser] {site['name']}: failed — {exc}")
             return None
@@ -348,13 +363,30 @@ async def fetch_html_sites(
             return []
         site = sites[0]
         if site.get("js_required"):
-            data = await _fetch_markdown_browser(site, asyncio.Semaphore(1), force_download=force_download)
+            fetched = await _fetch_markdown_browser(site, asyncio.Semaphore(1), force_download=force_download)
         else:
             async with httpx.AsyncClient() as client:
-                data = await _fetch_markdown_simple(client, site, asyncio.Semaphore(1), force_download=force_download)
-        if not data:
+                fetched = await _fetch_markdown_simple(client, site, asyncio.Semaphore(1), force_download=force_download)
+        if not fetched:
             return []
-        return extract_events_from_text(data["text"], data["url"], data["name"])
+        # JSON-LD first, fall through to LLM batch path
+        html = fetched.get("html", "")
+        if html:
+            jsonld_events_raw = _events_from_jsonld(html, site["url"], site["name"], 365)
+            if jsonld_events_raw:
+                from ..extract import _build_events as _be
+                return _be(jsonld_events_raw, site["url"], site["name"])
+            site_data = _html_to_site_data(site, html)
+        else:
+            site_data = {
+                "name": site["name"],
+                "url": site["url"],
+                "text": fetched.get("pre_text", ""),
+                "category_hint": site.get("category_hint", "other"),
+                "notes": site.get("notes", ""),
+                "must_determine_venue": site.get("must_determine_venue", False),
+            }
+        return await extract_events_batch_async([site_data], force_parse=force_parse)
 
     _DATE_WINDOW_JSONLD = 365  # wide window; pipeline-level Python filter narrows it
 
@@ -369,21 +401,40 @@ async def fetch_html_sites(
         br_tasks = [_fetch_markdown_browser(s, sem_br, force_download=force_download) for s in browser_sites]
         results = await asyncio.gather(*http_tasks, *br_tasks, return_exceptions=True)
 
-    sites_data = [r for r in results if isinstance(r, dict)]
-    print(f"  [HTML] Fetched {len(sites_data)}/{len(sites)} sites — batching into Claude calls")
+    fetched_list = [r for r in results if isinstance(r, dict)]
+    print(f"  [HTML] Fetched {len(fetched_list)}/{len(sites)} sites — batching into LLM calls")
 
     from ..extract import _build_events as _be
     jsonld_events: list[Event] = []
     llm_sites: list[dict] = []
-    for s in sites_data:
-        raw_html = s.pop("_raw_html", None)
-        raw_list = _events_from_jsonld(raw_html, s["url"], s["name"], _DATE_WINDOW_JSONLD) if raw_html else None
-        if raw_list:
-            evts = _be(raw_list, s["url"], s["name"])
-            jsonld_events.extend(evts)
-            print(f"  [HTML] {s['name']}: {len(evts)} events [jsonld]")
+
+    for fetched in fetched_list:
+        site = fetched["site"]
+        html = fetched.get("html", "")
+
+        if html:
+            # JSON-LD path first — avoids _clean_html + markdownify for complete sites
+            raw_list = _events_from_jsonld(html, site["url"], site["name"], _DATE_WINDOW_JSONLD)
+            if raw_list:
+                evts = _be(raw_list, site["url"], site["name"])
+                jsonld_events.extend(evts)
+                print(f"  [HTML] {site['name']}: {len(evts)} events [jsonld]")
+                continue
+            # JSON-LD insufficient — build LLM text blob now (lazy)
+            site_data = _html_to_site_data(site, html)
         else:
-            llm_sites.append(s)
+            # Browser fallback with pre-built markdown
+            pre_text = fetched.get("pre_text", "")
+            site_data = {
+                "name": site["name"],
+                "url": site["url"],
+                "text": pre_text,
+                "category_hint": site.get("category_hint", "other"),
+                "notes": site.get("notes", ""),
+                "must_determine_venue": site.get("must_determine_venue", False),
+            }
+
+        llm_sites.append(site_data)
 
     ages = get_all_exhibition_ages([s["name"] for s in llm_sites])
     for s in llm_sites:

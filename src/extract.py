@@ -1,8 +1,9 @@
-"""Claude CLI / Ollama extraction — parallel async batches, configurable backend."""
+"""Claude CLI / Ollama extraction — concurrent async batches, configurable backend."""
 import json
 import re
+import hashlib
 import asyncio
-import subprocess
+import os
 from datetime import date
 from .models import Event
 from .dedup import get_cached_parse, get_html_fetched_at, save_extraction
@@ -10,6 +11,20 @@ from .llm import run_llm, _CLAUDE_MODEL
 
 BATCH_SIZE = 3
 _MODEL = _CLAUDE_MODEL
+
+# Concurrency: default 1 for Ollama (single local model — parallelism just contends),
+# 3 for Claude. Override with LLM_CONCURRENCY env var.
+def _default_concurrency() -> int:
+    env_val = os.environ.get("LLM_CONCURRENCY")
+    if env_val is not None:
+        try:
+            return max(1, int(env_val))
+        except ValueError:
+            pass
+    backend = (os.environ.get("LLM_BACKEND") or os.environ.get("EXTRACTION_BACKEND", "ollama")).lower()
+    return 1 if backend == "ollama" else 3
+
+_CONCURRENCY = _default_concurrency()
 
 _DATE_SIGNAL = re.compile(
     r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec"
@@ -68,17 +83,6 @@ Each event:
 
 {sites}"""
 
-_SINGLE_PROMPT = """\
-Extract upcoming events from this venue page. Return ONLY a JSON array, no prose.
-
-Each event:
-{schema}
-
-{date_rules}
-
-Source: {source_name} | {source_url}
-{text}"""
-
 
 def _date_trim(text: str, max_chars: int = 6000) -> str:
     lines = text.splitlines()
@@ -96,6 +100,11 @@ def _content_fingerprint(text: str) -> str:
         return "\n".join(structured)
     date_lines = [l for l in lines if _DATE_SIGNAL.search(l)]
     return "\n".join(date_lines) if date_lines else text[:2000]
+
+
+def _text_hash(text: str) -> str:
+    """16-hex-char SHA-256 of the content fingerprint."""
+    return hashlib.sha256(_content_fingerprint(text).encode()).hexdigest()[:16]
 
 
 def _clean_text(text: str) -> str:
@@ -178,66 +187,67 @@ async def extract_events_batch_async(
     errors: list[str] | None = None,
     force_parse: bool = False,
 ) -> list[Event]:
+    """Extract events from site data dicts using the configured LLM backend.
+
+    Cache behaviour:
+    - Content-hash hit: cached result reused regardless of TTL when page content
+      is byte-identical to the stored fingerprint.
+    - TTL hit: cached result reused when within PARSE_TTL_DAYS and not stale vs
+      the last HTML download.
+    - Miss: LLM called, result stored with content hash.
+
+    Concurrency: bounded by _CONCURRENCY (1 for Ollama, 3 for Claude). Batches
+    run concurrently up to that limit; result order matches input order.
+    """
     today = date.today().isoformat()
 
     all_events: list[Event] = []
     uncached_sites: list[dict] = []
 
     for s in sites_data:
+        h = _text_hash(s["text"])
         fetched_at = get_html_fetched_at(s["url"])
-        raw_list = get_cached_parse(s["name"], force=force_parse, fetched_at=fetched_at)
-        if raw_list is not None:
+        cached = get_cached_parse(s["name"], force=force_parse, fetched_at=fetched_at, content_hash=h)
+        if cached is not None:
+            raw_list, hit_type = cached
             evts = _build_events(raw_list, s["url"], s["name"])
             all_events.extend(evts)
-            print(f"  [HTML] {s['name']}: {len(evts)} events [parse cache]")
+            print(f"  [HTML] {s['name']}: {len(evts)} events [{hit_type}]")
         else:
+            s["_text_hash"] = h  # carry hash through to save_extraction
             uncached_sites.append(s)
 
     if not uncached_sites:
         return all_events
 
     batches = [uncached_sites[i:i + BATCH_SIZE] for i in range(0, len(uncached_sites), BATCH_SIZE)]
+    sem = asyncio.Semaphore(_CONCURRENCY)
 
     async def _run_batch(batch: list[dict]) -> list[Event]:
-        try:
-            prompt = _make_batch_prompt(batch, today)
-            raw = await run_llm(prompt, timeout=900)
-            parsed = _parse_object(raw)
-            events = []
-            for site in batch:
-                raw_list = parsed.get(site["name"], [])
-                if not isinstance(raw_list, list):
-                    raw_list = []
-                site_events = _build_events(raw_list, site["url"], site["name"])
-                events.extend(site_events)
-                print(f"  [HTML] {site['name']}: {len(site_events)} events")
-                save_extraction(site["name"], raw_list)
-            return events
-        except Exception as e:
-            names = [s["name"] for s in batch]
-            print(f"  [HTML] batch FAILED ({', '.join(names)}): {e}")
-            if errors is not None:
-                errors.extend(names)
-            return []
+        async with sem:
+            try:
+                prompt = _make_batch_prompt(batch, today)
+                raw = await run_llm(prompt, timeout=900)
+                parsed = _parse_object(raw)
+                events = []
+                for site in batch:
+                    raw_list = parsed.get(site["name"], [])
+                    if not isinstance(raw_list, list):
+                        raw_list = []
+                    site_events = _build_events(raw_list, site["url"], site["name"])
+                    events.extend(site_events)
+                    print(f"  [HTML] {site['name']}: {len(site_events)} events")
+                    save_extraction(site["name"], raw_list, content_hash=site.get("_text_hash"))
+                return events
+            except Exception as e:
+                names = [s["name"] for s in batch]
+                print(f"  [HTML] batch FAILED ({', '.join(names)}): {e}")
+                if errors is not None:
+                    errors.extend(names)
+                return []
 
-    for batch in batches:
-        all_events.extend(await _run_batch(batch))
+    # Run batches concurrently (bounded by sem); gather preserves arg order.
+    results = await asyncio.gather(*[_run_batch(b) for b in batches])
+    for r in results:
+        all_events.extend(r)
     return all_events
-
-
-def extract_events_from_text(text: str, source_url: str, source_name: str) -> list[Event]:
-    """Single-site extraction (test-site mode)."""
-    today = date.today().isoformat()
-    prompt = _SINGLE_PROMPT.format(
-        schema=_EVENT_SCHEMA,
-        date_rules=_DATE_RULES.format(today=today, exhibition_hint=""),
-        source_name=source_name,
-        source_url=source_url,
-        text=_clean_text(text)[:10000],
-    )
-    result = subprocess.run(
-        ["claude", "-p", prompt, "--model", _MODEL],
-        capture_output=True, text=True, timeout=300,
-    )
-    raw = result.stdout.strip()
-    return _build_events(_parse_array(raw), source_url, source_name)

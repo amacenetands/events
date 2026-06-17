@@ -140,23 +140,44 @@ def get_html_fetched_at(url: str) -> Optional[str]:
 # ── parse / extraction cache ──────────────────────────────────────────────────
 
 def get_cached_parse(
-    site_name: str, force: bool = False, fetched_at: str | None = None
-) -> Optional[list[dict]]:
+    site_name: str,
+    force: bool = False,
+    fetched_at: str | None = None,
+    content_hash: str | None = None,
+) -> Optional[tuple[list[dict], str]]:
+    """Return (events_list, hit_type) on cache hit, or None on miss.
+
+    hit_type is one of: "content-hash", "parse cache".
+
+    Hit priority:
+    1. content_hash match — stored hash equals passed hash → cache hit regardless
+       of TTL or fetched_at (content provably unchanged).
+    2. TTL + fetched_at freshness — existing logic unchanged.
+    """
     if force:
         return None
     row = _conn.execute(
-        "SELECT events_json, extracted_at FROM extractions WHERE site_name=?",
+        "SELECT events_json, extracted_at, content_hash FROM extractions WHERE site_name=?",
         (site_name,),
     ).fetchone()
     if not row:
         return None
+
+    # Content-hash hit: skip TTL entirely
+    if content_hash is not None and row["content_hash"] == content_hash:
+        try:
+            return (json.loads(row["events_json"]), "content-hash")
+        except Exception:
+            return None
+
+    # Existing TTL + staleness logic
     extracted_at = datetime.fromisoformat(row["extracted_at"])
     if datetime.now(timezone.utc) - extracted_at > timedelta(days=PARSE_TTL_DAYS):
         return None
     if fetched_at and fetched_at > row["extracted_at"]:
         return None
     try:
-        return json.loads(row["events_json"])
+        return (json.loads(row["events_json"]), "parse cache")
     except Exception:
         return None
 
