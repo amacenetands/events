@@ -7,7 +7,16 @@ description: |
   dtonkonog@gmail.com.
 ---
 
-Run the London events digest:
+Crawl and query are now separate (see also the `events` skill for the interactive flow):
+
+```bash
+cd /Users/dtonkonog/code/london_events
+venv/bin/python main.py crawl --city london [--parse-only|--fetch-only|--force-download|--force-parse|--test-site "Name"]
+venv/bin/python main.py query --city london --when next:7 --audience family --kinds one_off,run --time any --dry-run
+# add --send to email (default prints only); --preset family|evening|daytime|museums|theatres|standard|moscow
+```
+
+Legacy one-shot (crawl cached sites then query with the preset; emails unless --dry-run):
 
 ```bash
 /Users/dtonkonog/code/london_events/run.sh 2>&1 | rtk log
@@ -49,4 +58,4 @@ Edit `/Users/dtonkonog/code/london_events/sites.yaml`:
 - **Email not sending**: check GMAIL_USER + GMAIL_APP_PASSWORD in `.env`
 - **Check dedup DB**: `sqlite3 /Users/dtonkonog/code/london_events/cache/memory.db "SELECT fingerprint, seen_date FROM event_state WHERE seen_date IS NOT NULL ORDER BY seen_date DESC LIMIT 20"`
 - **Reset seen events**: `sqlite3 /Users/dtonkonog/code/london_events/cache/memory.db "UPDATE event_state SET seen_date=NULL"`
-- **Storage**: one SQLite DB at `cache/memory.db` — tables `scrapes` (raw HTML), `extractions` (parsed LLM results), `event_state` (seen + exhibition tags). Raw caches regenerate on a 3-day TTL.
+- **Storage**: one SQLite DB at `cache/memory.db` — tables `scrapes` (raw HTML), `extractions` (parsed LLM results), `event_state` (seen history), `events` (latest crawl per city, one row per fingerprint + first_seen), `crawls` (freshness). Presets live in `pipelines.yaml` as saved filters (src/query.py `Filter`). Raw caches regenerate on a 3-day TTL.
