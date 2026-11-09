@@ -1,30 +1,26 @@
 #!/usr/bin/env python3
 """
-London events digest.
+London / Moscow events: crawl once, query many ways.
 
-Usage:
-  python main.py                        # full weekly run: fetch, save, email
-  python main.py --family               # family pipeline: 30-day window, 3-section digest
-  python main.py --daytime              # weekday daytime concerts pipeline
-  python main.py --dry-run              # no email, no dedup marking
-  python main.py --send-test            # email but skip dedup marking
-  python main.py --mask                 # mark events as seen after sending
-  python main.py --no-rank              # skip Claude ranking, include all one-off events
-  python main.py --no-dedup             # skip seen-events history filter
-  python main.py --date-window N        # override date window (default: 14 standard, 30 family/daytime)
-  python main.py --today                # filter to today only
-  python main.py --test-site "Name"     # test single site from sites.yaml
-  python main.py --museums-only         # museums pipeline only
-  python main.py --force-download       # bypass download cache, re-fetch all sites
-  python main.py --force-parse          # bypass parse cache, re-run LLM extraction
+  python main.py crawl --city london [--force-download --force-parse --fetch-only --parse-only --test-site NAME]
+  python main.py query --city london --when today --audience family --kinds one_off,run [--time evening]
+                       [--days weekday] [--category concert] [--new-only] [--rank|--no-rank]
+                       [--preset NAME] [--send] [--mask] [--russian] [--max-age-days 7] [--auto-crawl]
+
+Legacy flags still work (crawl cached sites, then query with the matching preset
+from pipelines.yaml; they SEND email unless --dry-run):
+  python main.py [--family|--evening|--daytime|--museums-only|--theatres|--tag moscow]
+                 [--today] [--date-window N] [--dry-run] [--no-rank] [--no-dedup] [--mask]
+                 [--fetch-only|--parse-only|--force-download|--force-parse|--test-site NAME]
 """
 import argparse
 import asyncio
 import os
-from dataclasses import dataclass
+import sys
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
 
+import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
@@ -34,494 +30,394 @@ os.environ["CRAWL4AI_BASE_DIRECTORY"] = _crawl4ai_dir
 Path(_crawl4ai_dir).mkdir(parents=True, exist_ok=True)
 
 from src.sources import API_SOURCES
-from src.sources.html_sites import fetch_html_sites
-from src.dedup import (
-    filter_unseen, mark_seen,
-    load_cached_exhibitions, upsert_exhibitions, purge_expired_exhibitions,
-)
-from src.rank import pre_filter, rank
-from src.digest import (
-    generate_digest, save_digest,
-    generate_family_digest, save_family_digest,
-    generate_daytime_digest, save_daytime_digest,
-)
+from src.sources.html_sites import fetch_html_sites, fetch_sites, parse_sites, configured_site_names
+from src.dedup import filter_unseen, mark_seen
+from src import rank as rankmod
+from src.classify import classify
+from src.digest import generate_digest_v2, coverage_summary, save_digest_v2
 from src.translate import translate_descriptions
 from src.email_sender import send_digest
 from src.models import Event
+from src.query import (Filter, query, describe, filter_from_dict, load_presets, preset_filter, parse_time_arg,
+                       resolve_when, city_today, city_now)
+from src import events_db, timing as _timing
+
+SITES_YAML = Path(__file__).parent / "sites.yaml"
+CITY_TAG = {"london": None, "moscow": "moscow"}   # sites.yaml pipeline arg per city
 
 
-# ---------------------------------------------------------------------------
-# Shared helpers (unchanged)
-# ---------------------------------------------------------------------------
+def _tags_by_source() -> dict[str, list[str]]:
+    with open(SITES_YAML) as fh:
+        sites = yaml.safe_load(fh).get("html_sites", [])
+    out = {}
+    for s in sites:
+        p = s.get("pipeline")
+        out[s["name"]] = [] if p is None else (list(p) if isinstance(p, list) else [p])
+    return out
 
-def _filter_date_window(events: list[Event], window: int) -> list[Event]:
-    from datetime import date as _date, timedelta
-    today = _date.today()
-    cutoff = today + timedelta(days=window)
-    result = []
+
+def _dedup_by_fingerprint(events: list[Event]) -> list[Event]:
+    """Within-run dedup by event_key (title|venue|date|time) so matinee + evening both survive.
+    (Name kept for callers; seen-history still uses Event.fingerprint().)"""
+    seen, out = set(), []
     for e in events:
-        if e.is_one_off:
-            if today <= e.date <= cutoff:
-                result.append(e)
-        else:
-            end = e.end_date or cutoff
-            if end >= today:
-                result.append(e)
-    return result
+        k = e.event_key()
+        if k not in seen:
+            seen.add(k)
+            out.append(e)
+    return out
 
 
-def _dedup_within_run(events: list[Event]) -> list[Event]:
-    # Dedup by fingerprint (title|venue|date) only. NOT by URL: single-venue
-    # sites emit many distinct events that all share the venue's listing-page
-    # URL (no per-event links), so URL-deduping collapsed them to one event.
-    # True cross-source duplicates share a fingerprint, so nothing is lost.
-    seen_fp: set[str] = set()
-    unique = []
+def _absolutize_urls(events: list[Event]) -> None:
+    """Ensure every event url is absolute http(s): join against the source site url."""
+    from urllib.parse import urljoin
+    with open(SITES_YAML) as fh:
+        base = {s["name"]: s["url"] for s in yaml.safe_load(fh).get("html_sites", [])}
     for e in events:
-        fp = e.fingerprint()
-        if fp not in seen_fp:
-            seen_fp.add(fp)
-            unique.append(e)
-    return unique
-
-
-def _crawl_summary(counts: dict[str, int]) -> str:
-    lines = ["", "---", "## Venues Parsed", ""]
-    total = sum(counts.values())
-    lines.append(f"_{len(counts)} venues · {total} events extracted_")
-    lines.append("")
-    lines.append("| Venue | Events |")
-    lines.append("|---|---|")
-    for venue, count in sorted(counts.items(), key=lambda x: -x[1]):
-        lines.append(f"| {venue} | {count} |")
-    return "\n".join(lines)
-
-
-def _emit_digest(
-    events: list[Event],
-    generate_fn: Callable,
-    save_fn: Callable[[str], Path],
-    dry_run: bool,
-    crawl_counts: dict[str, int] | None = None,
-) -> None:
-    digest = generate_fn(events)
-    if crawl_counts is not None:
-        digest += _crawl_summary(crawl_counts)
-    path = save_fn(digest)
-    print(f"Saved: {path}")
-    print("\n" + "=" * 40)
-    print(digest)
-    print("=" * 40)
-    send_digest(digest, dry_run=dry_run)
+        u = (e.url or "").strip()
+        if not u.startswith(("http://", "https://")):
+            b = base.get(e.source, "")
+            e.url = urljoin(b, u) if b else u
+            if not e.url.startswith(("http://", "https://")):
+                e.url = b or e.url
 
 
 # ---------------------------------------------------------------------------
-# PipelineSpec + assemble-result container
+# crawl
 # ---------------------------------------------------------------------------
 
-@dataclass(frozen=True)
-class PipelineSpec:
-    name: str                    # header printed, e.g. "London Events Digest"
-    pipeline_tag: str | None     # html_sites pipeline filter: None | "museums" | "family" | "daytime"
-    include_apis: bool           # whether to also gather API_SOURCES
-    default_window: int          # 14 / 30 / 3
-    save_fn: Callable            # save_digest / save_family_digest / save_daytime_digest
-    assemble: Callable           # (scraped, ctx) -> (events, generate_fn) | None
-
-
-@dataclass
-class _Ctx:
-    """Flags + runtime state passed to each assemble function."""
-    flags_dry_run: bool
-    flags_send_test: bool
-    flags_mask: bool
-    flags_no_rank: bool
-    flags_no_dedup: bool
-    flags_today_only: bool
-    flags_russian: bool
-    window: int
-    extraction_errors: list[str]
-
-
-# ---------------------------------------------------------------------------
-# Per-pipeline assemble functions
-# ---------------------------------------------------------------------------
-
-async def _assemble_standard(
-    scraped: list[Event],
-    ctx: _Ctx,
-) -> tuple[list[Event], Callable, dict] | None:
-    """Standard (London Events) pipeline core — verbatim logic from run()."""
-    window = ctx.window
-
-    crawl_counts: dict[str, int] = {}
-    for e in scraped:
-        crawl_counts[e.source] = crawl_counts.get(e.source, 0) + 1
-
-    print(f"\nRaw total: {len(scraped)} events")
-    all_events = _filter_date_window(scraped, window)
-    all_events = _dedup_within_run(all_events)
-    print(f"After date filter + dedup: {len(all_events)}")
-
-    all_one_offs = [e for e in all_events if e.is_one_off]
-    exhibitions = [e for e in all_events if not e.is_one_off]
-
-    one_offs = all_one_offs if ctx.flags_no_dedup else filter_unseen(all_one_offs)
-    print(f"After history dedup: {len(one_offs)} new one-offs, {len(exhibitions)} exhibitions")
-
-    if ctx.flags_today_only:
-        from datetime import date as _date
-        today = _date.today()
-        one_offs = [e for e in one_offs if e.date == today]
-        exhibitions = [e for e in exhibitions if e.date <= today <= (e.end_date or today)]
-        print(f"After today filter ({today}): {len(one_offs)} one-offs, {len(exhibitions)} exhibitions")
-
-    if not one_offs and not exhibitions:
-        return None
-
-    candidates = pre_filter(one_offs)
-    print(f"After scoring: {len(candidates)} candidates → Claude")
-
-    if ctx.flags_no_rank:
-        ranked = candidates
-        rest_events: list[Event] = []
-        print(f"Skipping ranking — {len(ranked)} candidates ordered by score")
-    else:
-        ranked = await rank(candidates)
-        print(f"After Claude ranking: {len(ranked)} top picks")
-        ranked_ids = {id(e) for e in ranked}
-        rest_events = [e for e in candidates if id(e) not in ranked_ids]
-
-    should_mask = ctx.flags_mask and not ctx.flags_dry_run and not ctx.flags_send_test
-    if should_mask:
-        mark_seen(one_offs)
-        print("Marked as seen in dedup DB")
-
-    lang = "ru" if ctx.flags_russian else "en"
-    if ctx.flags_russian:
-        print("Translating descriptions to Russian...")
-        await translate_descriptions(ranked + rest_events + exhibitions)
-
-    generate_fn = lambda events: generate_digest(events, rest=rest_events, exhibitions=exhibitions, lang=lang)
-    # crawl_counts built over ALL raw events before date filter — attach via closure
-    return (ranked, generate_fn, crawl_counts)
-
-
-async def _assemble_family(
-    scraped: list[Event],
-    ctx: _Ctx,
-) -> tuple[list[Event], Callable, dict] | None:
-    """Family pipeline core — verbatim logic from run_family()."""
-    window = ctx.window
-
-    # cached_exhibitions already loaded before sources were gathered;
-    # stashed in ctx via a field set by run_pipeline.
-    cached_exhibitions: list[Event] = ctx._family_cached_exhibitions  # type: ignore[attr-defined]
-    cached_fps = {e.fingerprint() for e in cached_exhibitions}
-
-    scraped = _filter_date_window(scraped, window)
-    scraped = [e for e in scraped if e.is_kids or e.is_family]
-    print(f"After date filter + family filter: {len(scraped)} events")
-
-    crawl_counts: dict[str, int] = {}
-    for e in scraped:
-        crawl_counts[e.source] = crawl_counts.get(e.source, 0) + 1
-
-    should_mask = ctx.flags_mask and not ctx.flags_dry_run and not ctx.flags_send_test
-    if should_mask:
-        upsert_exhibitions(scraped)
-        print("Updated exhibition cache")
-
-    scraped_one_offs = [e for e in scraped if e.is_one_off]
-    new_exhibitions = [e for e in scraped if not e.is_one_off and e.fingerprint() not in cached_fps]
-    new_exhibition_fps = {e.fingerprint() for e in new_exhibitions}
-    all_exhibitions = _dedup_within_run(new_exhibitions + cached_exhibitions)
-
-    unseen_one_offs = _dedup_within_run(scraped_one_offs if ctx.flags_no_dedup else filter_unseen(scraped_one_offs))
-    print(f"One-offs: {len(unseen_one_offs)} new · Exhibitions: {len(all_exhibitions)} total ({len(new_exhibitions)} new)")
-
-    if not unseen_one_offs and not all_exhibitions:
-        return None
-
-    if should_mask:
-        mark_seen(unseen_one_offs)
-
-    lang = "ru" if ctx.flags_russian else "en"
-    all_events_for_digest = unseen_one_offs + all_exhibitions
-    if ctx.flags_russian:
-        print("Translating descriptions to Russian...")
-        await translate_descriptions(all_events_for_digest)
-
-    extraction_errors = ctx.extraction_errors
-    generate_fn = lambda events: generate_family_digest(
-        events,
-        new_exhibition_fps=new_exhibition_fps,
-        failed_sites=extraction_errors or None,
-        lang=lang,
-    )
-    return (all_events_for_digest, generate_fn, crawl_counts)
-
-
-async def _assemble_daytime(
-    scraped: list[Event],
-    ctx: _Ctx,
-) -> tuple[list[Event], Callable, dict] | None:
-    """Daytime pipeline core — verbatim logic from run_daytime()."""
-    window = ctx.window
-
-    events = _filter_date_window(scraped, window)
-    events = [e for e in events if e.date.weekday() < 5 and (e.time is None or int(e.time.split(":")[0]) < 16)]
-    print(f"After date + weekday + daytime filter: {len(events)} events")
-
-    crawl_counts: dict[str, int] = {}
-    for e in events:
-        crawl_counts[e.source] = crawl_counts.get(e.source, 0) + 1
-
-    if not events:
-        return None
-
-    lang = "ru" if ctx.flags_russian else "en"
-    if ctx.flags_russian:
-        print("Translating descriptions to Russian...")
-        await translate_descriptions(events)
-
-    generate_fn = lambda evts: generate_daytime_digest(evts, date_window=window, lang=lang)
-    return (events, generate_fn, crawl_counts)
-
-
-# ---------------------------------------------------------------------------
-# Pipeline specs
-# ---------------------------------------------------------------------------
-
-SPEC_STANDARD = PipelineSpec(
-    name="London Events Digest",
-    pipeline_tag=None,           # overridden to "museums" when museums_only=True
-    include_apis=True,           # overridden to False when museums_only=True
-    default_window=14,
-    save_fn=save_digest,
-    assemble=_assemble_standard,
-)
-
-SPEC_FAMILY = PipelineSpec(
-    name="London Family Events Digest",
-    pipeline_tag="family",
-    include_apis=False,
-    default_window=30,
-    save_fn=save_family_digest,
-    assemble=_assemble_family,
-)
-
-SPEC_DAYTIME = PipelineSpec(
-    name="London Daytime Concerts Digest",
-    pipeline_tag="daytime",
-    include_apis=False,
-    default_window=3,
-    save_fn=save_daytime_digest,
-    assemble=_assemble_daytime,
-)
-
-
-# ---------------------------------------------------------------------------
-# Shared skeleton
-# ---------------------------------------------------------------------------
-
-async def run_pipeline(
-    spec: PipelineSpec,
+async def crawl(
+    city: str,
     *,
-    dry_run: bool = False,
-    send_test: bool = False,
-    mask: bool = False,
-    no_rank: bool = False,
-    no_dedup: bool = False,
-    today_only: bool = False,
-    test_site: str | None = None,
-    date_window: int | None = None,
     force_download: bool = False,
     force_parse: bool = False,
-    russian: bool = False,
-    # standard-only override flags (passed in by run() when museums_only=True)
-    _pipeline_tag_override: str | None = None,
-    _include_apis_override: bool | None = None,
-) -> None:
-    # 1. Header
-    print(spec.name)
-    print("=" * 40)
+    fetch_only: bool = False,
+    parse_only: bool = False,
+    test_site: str | None = None,
+    compare: bool = False,
+) -> int:
+    """Fetch + extract + classify ALL venues for city; persist to events table."""
+    t0 = _timing.now()
+    tag = CITY_TAG[city]
+    print(f"Crawl: {city}\n" + "=" * 40)
 
-    pipeline_tag = _pipeline_tag_override if _pipeline_tag_override is not None else spec.pipeline_tag
-    include_apis = _include_apis_override if _include_apis_override is not None else spec.include_apis
+    if fetch_only:
+        summary = await fetch_sites(pipeline=tag, test_site=test_site, force_download=force_download)
+        print(f"Fetch summary: {summary}")
+        return 0
 
-    # 2. Window
-    window = date_window or spec.default_window
-
-    # 2a. Family pre-fetch setup
-    cached_exhibitions: list[Event] = []
-    if spec is SPEC_FAMILY:
-        purge_expired_exhibitions()
-
-    # 3. test_site branch — distinct print format per pipeline
+    errors: list[str] = []
     if test_site:
-        print(f"Testing site: {test_site}")
-        events = await fetch_html_sites(test_site=test_site, force_download=force_download, force_parse=force_parse)
-        events = _filter_date_window(events, window)
-        if spec is SPEC_FAMILY:
-            events = [e for e in events if e.is_kids or e.is_family]
-            print(f"\nExtracted {len(events)} family events:\n")
-            for e in events:
-                print(f"  • {e.title} | {e.venue} | {e.date} | one_off={e.is_one_off} | kids={e.is_kids} | family={e.is_family}")
-        elif spec is SPEC_DAYTIME:
-            events = [e for e in events if e.date.weekday() < 5 and (e.time is None or int(e.time.split(":")[0]) < 16)]
-            print(f"\nExtracted {len(events)} daytime events:\n")
-            for e in events:
-                print(f"  • {e.title} | {e.venue} | {e.date} | {e.time} | {e.category}")
+        if parse_only:
+            evs = await parse_sites(test_site=test_site, pipeline=tag, force_parse=force_parse, compare=compare)
         else:
-            print(f"\nExtracted {len(events)} events:\n")
-            for e in events:
-                print(f"  • {e.title} | {e.venue} | {e.date} | {e.category} | one_off={e.is_one_off}")
-        return
+            evs = await fetch_html_sites(test_site=test_site, pipeline=tag, force_download=force_download, force_parse=force_parse, compare=compare)
+        evs = classify(evs)
+        print(f"\nExtracted {len(evs)} events from {test_site!r} (not persisted):\n")
+        for e in evs:
+            print(f"  • {e.title} | {e.venue} | {e.date}{'..' + str(e.end_date) if e.end_date else ''} | "
+                  f"{e.category} | kind={e.kind} | aud={e.audience} | min_age={e.min_age} | t={e.time}")
+        return len(evs)
 
-    # 4. Family: load cache after purge, before gather
-    if spec is SPEC_FAMILY:
-        cached_exhibitions = load_cached_exhibitions()
-        print(f"Loaded {len(cached_exhibitions)} cached exhibitions")
-        print(f"\nFetching from family sources ({window}-day window)...")
+    if parse_only:
+        html_coro = parse_sites(pipeline=tag, force_parse=force_parse, compare=compare, errors=errors)
     else:
-        print("\nFetching from all sources...")
-
-    # 5. Gather sources
-    extraction_errors: list[str] = []
-    fetch_kwargs: dict = dict(force_download=force_download, force_parse=force_parse)
-    if spec is SPEC_FAMILY:
-        fetch_kwargs["errors"] = extraction_errors
-
-    tasks = (
-        [src() for src in API_SOURCES] if include_apis else []
-    ) + [fetch_html_sites(pipeline=pipeline_tag, **fetch_kwargs)]
-
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
+        html_coro = fetch_html_sites(pipeline=tag, force_download=force_download, force_parse=force_parse,
+                                     compare=compare, errors=errors)
+    api = [src() for src in API_SOURCES] if city == "london" else []
+    results = await asyncio.gather(*api, html_coro, return_exceptions=True)
     scraped: list[Event] = []
     for r in results:
         if isinstance(r, Exception):
             print(f"  Source error: {r}")
         elif isinstance(r, list):
             scraped.extend(r)
+    if isinstance(results[-1], Exception):
+        print(f"WARNING: HTML source failed entirely ({results[-1]}) — not saving; keeping previous {city} events.")
+        return 0
 
-    # 6. Build ctx and call assemble
-    ctx = _Ctx(
-        flags_dry_run=dry_run,
-        flags_send_test=send_test,
-        flags_mask=mask,
-        flags_no_rank=no_rank,
-        flags_no_dedup=no_dedup,
-        flags_today_only=today_only,
-        flags_russian=russian,
-        window=window,
-        extraction_errors=extraction_errors,
-    )
-    if spec is SPEC_FAMILY:
-        ctx._family_cached_exhibitions = cached_exhibitions  # type: ignore[attr-defined]
-
-    result = await spec.assemble(scraped, ctx)
-
-    # 7. No-events early return — pipeline-specific message
-    if result is None:
-        if spec is SPEC_DAYTIME:
-            print("No daytime events found.")
-        else:
-            print("No events found.")
-        return
-
-    events, generate_fn, crawl_counts = result
-
-    # 8. Emit digest
-    _emit_digest(events, generate_fn, spec.save_fn, dry_run, crawl_counts=crawl_counts)
+    scraped = _dedup_by_fingerprint(classify(scraped))
+    _absolutize_urls(scraped)
+    today = city_today(Filter(city=city))
+    scraped = [e for e in scraped if (e.end_date or e.date) >= today]
+    if not scraped:
+        print("Crawl produced 0 current events — keeping previous events table.")
+        return 0
+    cid = events_db.save_crawl(city, scraped, _tags_by_source(), errors=errors,
+                              oldest_fetched_at=_oldest_fetched(tag))
+    print(f"Saved {len(scraped)} events for {city} (crawl {cid}); {len(errors)} sites with errors")
+    for n in errors[:15]:
+        print(f"  ! {n}")
+    secs = round(_timing.now() - t0, 1)
+    print(f"⏱ Total: {secs:.0f}s", flush=True)
+    _timing.log_runtime(stage="crawl", city=city, events=len(scraped), secs=secs)
+    return len(scraped)
 
 
 # ---------------------------------------------------------------------------
-# Public entry point (API-compatible with original run())
+# query
 # ---------------------------------------------------------------------------
 
-async def run(
-    dry_run: bool = False,
-    send_test: bool = False,
+def _oldest_fetched(tag):
+    """Oldest fetched_at among this crawl's pages (src.dedup.oldest_fetched_at); None if unavailable."""
+    try:
+        from src import dedup
+        fn = getattr(dedup, "oldest_fetched_at", None)
+        if fn is None:
+            return None
+        with open(SITES_YAML) as fh:
+            sites = yaml.safe_load(fh).get("html_sites", [])
+        names = set(configured_site_names(tag))
+        r = fn([s["url"] for s in sites if s["name"] in names])
+        return r.isoformat() if hasattr(r, "isoformat") else (str(r) if r else None)
+    except Exception:
+        return None
+
+
+def _age_str(age: float) -> str:
+    return f"{age * 24:.0f}h" if age < 2 else f"{age:.1f}d"
+
+
+async def run_query(
+    f: Filter,
+    *,
+    preset: str | None = None,
+    send: bool = False,
     mask: bool = False,
-    no_rank: bool = False,
-    test_site: str | None = None,
-    museums_only: bool = False,
-    today_only: bool = False,
-    family: bool = False,
-    daytime: bool = False,
-    no_dedup: bool = False,
-    date_window: int | None = None,
-    force_download: bool = False,
-    force_parse: bool = False,
+    do_rank: bool | None = None,
+    llm_rank: bool = False,
+    top_n: int = rankmod.TOP_N,
     russian: bool = False,
-) -> None:
-    common = dict(
-        dry_run=dry_run,
-        send_test=send_test,
-        mask=mask,
-        no_rank=no_rank,
-        no_dedup=no_dedup,
-        today_only=today_only,
-        test_site=test_site,
-        date_window=date_window,
-        force_download=force_download,
-        force_parse=force_parse,
-        russian=russian,
-    )
+    max_age_days: float = 7,
+    auto_crawl: bool = False,
+    crawl_kwargs: dict | None = None,
+    quiet: bool = False,
+) -> list[Event]:
+    loaded = events_db.load_events(f.city)
+    today, now = city_today(f), city_now(f)
+    loaded.events = classify(loaded.events)   # re-apply deterministic rules so new classifier flags need no recrawl
+    age = events_db.age_days(loaded.crawled_at)
+    if age is None:
+        print(f"WARNING: no crawl for {f.city}. Run: venv/bin/python main.py crawl --city {f.city}")
+    elif age > max_age_days:
+        print(f"WARNING: {f.city} crawl is {_age_str(age)} old (> {max_age_days}d). "
+              f"Run: venv/bin/python main.py crawl --city {f.city}")
+    else:
+        print(f"Crawl: {f.city}, {_age_str(age)} old, {loaded.n_events} events")
+    if loaded.oldest_fetched_at is not None:
+        fage = events_db.age_days(loaded.oldest_fetched_at)
+        if fage is not None and fage > max_age_days:
+            print(f"WARNING: oldest page behind this crawl was fetched {_age_str(fage)} ago (> {max_age_days}d); "
+                  f"some venues may be stale. Run: venv/bin/python main.py crawl --city {f.city} --force-download")
+    if (age is None or age > max_age_days) and auto_crawl:
+        await crawl(f.city, **(crawl_kwargs or {}))
+        loaded = events_db.load_events(f.city)
 
-    if family:
-        await run_pipeline(SPEC_FAMILY, **common)
-        return
+    events = query(loaded.events, f, today=today, tags_by_source=loaded.tags_by_source, unseen=filter_unseen)
+    print(f"Filter: {describe(f, today)}\n  {len(loaded.events)} crawled → {len(events)} match")
 
-    if daytime:
-        await run_pipeline(SPEC_DAYTIME, **common)
-        return
+    ctx = rankmod.build_ctx(loaded.first_seen, loaded.events, today=today, now=now)
+    new_fps = ctx.new_fps
 
-    # Standard pipeline — museums_only alters pipeline_tag and include_apis
-    await run_pipeline(
-        SPEC_STANDARD,
-        **common,
-        _pipeline_tag_override="museums" if museums_only else None,
-        _include_apis_override=False if museums_only else None,
-    )
+    rank_on = (f.rank if do_rank is None else do_rank) or llm_rank
+    picks = reasons = scores = None
+    if rank_on:
+        res = await rankmod.rank_events(events, f, ctx, n=top_n, use_llm=llm_rank)
+        picks, reasons, scores = res.picks, res.reasons, res.scores
+        print(f"Ranked: {len(picks)} top picks of {len(scores)} candidates"
+              f"{' (LLM rerank)' if res.llm_used else ''}; all {len(events)} events kept")
+        for i, e in enumerate(picks, 1):
+            print(f"  {i:2}. {e.title[:60]} | {e.venue} | {e.date:%a %d %b}{' ' + e.time if e.time else ''}"
+                  f" | {e.category} | {reasons.get(e.fingerprint(), '')}")
+
+    if russian:
+        print("Translating descriptions to Russian...")
+        await translate_descriptions(events)
+
+    footer = ""
+    if f.coverage:
+        base = query(loaded.events, Filter(city=f.city, when=f.when, drop_religious=False, public_only=False,
+                                           include_online=True), today=today)
+        counts: dict[str, int] = {}
+        for e in base:
+            counts[e.source] = counts.get(e.source, 0) + 1
+        footer = coverage_summary(counts, configured_site_names(CITY_TAG[f.city]))
+
+    digest = generate_digest_v2(events, f, picks=picks, new_fps=new_fps, title=f.label, footer=footer,
+                               reasons=reasons, scores=scores, today=today, lang=f.lang)
+    slug = f"{preset or 'events'}_{f.city}"
+    path = save_digest_v2(digest, slug)
+    print(f"Saved: {path}")
+    if not quiet:
+        print("\n" + "=" * 40 + "\n" + digest + "\n" + "=" * 40)
+
+    if send:
+        send_digest(digest, dry_run=False, label=f.label or f"{f.city.capitalize()} Events")
+        if mask:
+            mark_seen([e for e in events if e.kind != "run"])
+            print("Marked as seen in dedup DB")
+    else:
+        print("[dry] not emailed (use --send)." + (" --mask ignored without --send." if mask else ""))
+    return events
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def _add_crawl_flags(p):
+    p.add_argument("--force-download", action="store_true")
+    p.add_argument("--force-parse", action="store_true")
+    p.add_argument("--fetch-only", action="store_true", help="fetch HTML to cache only")
+    p.add_argument("--parse-only", action="store_true", help="parse from cache only — no HTTP fetches")
+    p.add_argument("--test-site", metavar="NAME", help="extract one site, print, do not persist")
+    p.add_argument("--compare", action="store_true")
+
+
+def build_filter(args) -> Filter:
+    base = load_presets()[args.preset] if args.preset else {}
+    ov: dict = {}
+    if args.city:
+        ov["city"] = args.city
+    if args.when:
+        ov["when"] = args.when
+    if args.audience:
+        ov["audience"] = args.audience
+    if args.kinds:
+        ov["kinds"] = args.kinds
+    if args.time:
+        ov["time"] = args.time
+    if args.strict_time:
+        ov["strict_time"] = True
+    if args.days:
+        ov["days"] = args.days
+    if args.category:
+        ov["categories"] = args.category
+    if args.venue:
+        ov["venues"] = args.venue
+    if args.venue_tag:
+        ov["venue_tags"] = args.venue_tag
+    if args.min_age_max is not None:
+        ov["min_age_max"] = args.min_age_max
+    if args.new_only:
+        ov["new_only"] = True
+    if args.keep_religious:
+        ov["drop_religious"] = False
+    if args.include_private:
+        ov["public_only"] = False
+    if args.include_online:
+        ov["include_online"] = True
+    if (ov.get("city") or base.get("city")) == "moscow" and "lang" not in base:
+        ov["lang"] = "ru"          # Moscow digests default to RU headings
+    f = filter_from_dict(base, **ov)
+    resolve_when(f.when)   # validate early
+    return f
+
+
+def cmd_query(argv):
+    p = argparse.ArgumentParser(prog="main.py query")
+    p.add_argument("--preset")
+    p.add_argument("--city", choices=list(CITY_TAG))
+    p.add_argument("--when", help="today|tomorrow|weekend|next:N (N days incl. today)|range:YYYY-MM-DD..YYYY-MM-DD")
+    p.add_argument("--audience", choices=["any", "family", "kids", "adult"])
+    p.add_argument("--kinds", help="comma list of one_off,run,recurring")
+    p.add_argument("--time", help="any | morning,afternoon,evening | daytime")
+    p.add_argument("--strict-time", action="store_true", help="drop events without a time when --time set")
+    p.add_argument("--days", choices=["any", "weekday", "weekend"])
+    p.add_argument("--category", help="comma list: concert,theatre,exhibition,talk,workshop,tour,film,comedy,festival,other")
+    p.add_argument("--venue", help="comma list of venue names")
+    p.add_argument("--venue-tag", help="comma list of sites.yaml tags (museums, theatres, family...)")
+    p.add_argument("--min-age-max", type=int)
+    p.add_argument("--new-only", action="store_true", help="skip one-offs already sent (history)")
+    p.add_argument("--keep-religious", action="store_true")
+    p.add_argument("--include-private", action="store_true", help="keep school/members/trade/private-hire events")
+    p.add_argument("--include-online", action="store_true", help="keep webinar/livestream-only events")
+    p.add_argument("--rank", action=argparse.BooleanOptionalAction, default=None)
+    p.add_argument("--llm-rank", action="store_true", help="LLM rerank of top candidates (implies --rank)")
+    p.add_argument("--top", type=int, default=rankmod.TOP_N, help="number of top picks")
+    p.add_argument("--send", action="store_true", help="email the digest (default: print only)")
+    p.add_argument("--dry-run", action="store_true", help="explicit no-send (default)")
+    p.add_argument("--mask", action="store_true", help="mark shown one-offs as seen (needs --send)")
+    p.add_argument("--russian", action="store_true")
+    p.add_argument("--max-age-days", type=float, default=7)
+    p.add_argument("--auto-crawl", action="store_true")
+    p.add_argument("--parse-only", action="store_true", help="with --auto-crawl: parse cached html only")
+    p.add_argument("--quiet", action="store_true", help="don't print the digest body")
+    a = p.parse_args(argv)
+    f = build_filter(a)
+    asyncio.run(run_query(
+        f, preset=a.preset, send=a.send and not a.dry_run, mask=a.mask, do_rank=a.rank, llm_rank=a.llm_rank, top_n=a.top, russian=a.russian,
+        max_age_days=a.max_age_days, auto_crawl=a.auto_crawl,
+        crawl_kwargs=dict(parse_only=a.parse_only), quiet=a.quiet,
+    ))
+
+
+def cmd_crawl(argv):
+    p = argparse.ArgumentParser(prog="main.py crawl")
+    p.add_argument("--city", choices=list(CITY_TAG), default="london")
+    _add_crawl_flags(p)
+    a = p.parse_args(argv)
+    asyncio.run(crawl(a.city, force_download=a.force_download, force_parse=a.force_parse,
+                      fetch_only=a.fetch_only, parse_only=a.parse_only, test_site=a.test_site, compare=a.compare))
+
+
+def legacy(argv):
+    p = argparse.ArgumentParser(description="Events digest (legacy flags → crawl + query)")
+    p.add_argument("--dry-run", action="store_true", help="no email, no dedup marking")
+    p.add_argument("--send-test", action="store_true", help="send email WITHOUT marking events seen (overrides --mask)")
+    p.add_argument("--include-private", action="store_true", help="keep school/members/trade/private-hire events")
+    p.add_argument("--include-online", action="store_true", help="keep webinar/livestream-only events")
+    p.add_argument("--mask", action="store_true", help="mark events as seen after sending")
+    p.add_argument("--no-rank", action="store_true")
+    p.add_argument("--museums-only", action="store_true")
+    p.add_argument("--today", action="store_true", help="today only (overrides the preset window)")
+    p.add_argument("--family", action="store_true")
+    p.add_argument("--daytime", action="store_true")
+    p.add_argument("--evening", action="store_true")
+    p.add_argument("--theatres", action="store_true")
+    p.add_argument("--no-dedup", action="store_true")
+    p.add_argument("--date-window", type=int, metavar="N")
+    p.add_argument("--russian", action="store_true")
+    p.add_argument("--tag", metavar="NAME", help="named preset (e.g. moscow)")
+    _add_crawl_flags(p)
+    a = p.parse_args(argv)
+
+    name = a.tag or next((n for n, on in [("family", a.family), ("daytime", a.daytime), ("evening", a.evening),
+                                          ("theatres", a.theatres), ("museums", a.museums_only)] if on), "standard")
+    ov: dict = {}
+    if a.today:
+        ov["when"] = "today"
+    elif a.date_window:
+        ov["when"] = f"next:{a.date_window}"
+    if a.no_dedup:
+        ov["new_only"] = False
+    if a.include_private:
+        ov["public_only"] = False
+    if a.include_online:
+        ov["include_online"] = True
+    f = preset_filter(name, **ov)
+    ck = dict(force_download=a.force_download, force_parse=a.force_parse, fetch_only=a.fetch_only,
+              parse_only=a.parse_only, test_site=a.test_site, compare=a.compare)
+
+    async def go():
+        n = await crawl(f.city, **ck)
+        if a.fetch_only or a.test_site:
+            return
+        if n == 0 and events_db.load_events(f.city).n_events == 0:
+            return
+        await run_query(f, preset=name, send=not a.dry_run, mask=a.mask and not a.dry_run and not a.send_test,
+                        do_rank=False if a.no_rank else None, russian=a.russian, max_age_days=1e9)
+    asyncio.run(go())
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="London events digest")
-    parser.add_argument("--dry-run", action="store_true", help="no email, no dedup marking")
-    parser.add_argument("--send-test", action="store_true", help="email but skip dedup marking")
-    parser.add_argument("--mask", action="store_true", help="mark events as seen after sending (default: off)")
-    parser.add_argument("--no-rank", action="store_true", help="skip Claude ranking, use all one-off events")
-    parser.add_argument("--museums-only", action="store_true", help="museums pipeline only")
-    parser.add_argument("--today", action="store_true", help="filter to today only")
-    parser.add_argument("--family", action="store_true", help="family pipeline")
-    parser.add_argument("--daytime", action="store_true", help="weekday daytime concerts pipeline")
-    parser.add_argument("--test-site", metavar="NAME", help="test single site from sites.yaml")
-    parser.add_argument("--no-dedup", action="store_true", help="skip seen-events filter, show all events")
-    parser.add_argument("--date-window", type=int, metavar="N", help="date window in days (default: 14 standard, 30 family/daytime)")
-    parser.add_argument("--force-download", action="store_true", help="bypass download cache, re-fetch all sites")
-    parser.add_argument("--force-parse", action="store_true", help="bypass parse cache, re-run LLM extraction")
-    parser.add_argument("--russian", action="store_true", help="generate digest in Russian (venues stay in English)")
-    args = parser.parse_args()
-
-    asyncio.run(run(
-        dry_run=args.dry_run,
-        send_test=args.send_test,
-        mask=args.mask,
-        no_rank=args.no_rank,
-        test_site=args.test_site,
-        museums_only=args.museums_only,
-        today_only=args.today,
-        family=args.family,
-        daytime=args.daytime,
-        no_dedup=args.no_dedup,
-        date_window=args.date_window,
-        force_download=args.force_download,
-        force_parse=args.force_parse,
-        russian=args.russian,
-    ))
+    argv = sys.argv[1:]
+    if argv and argv[0] == "query":
+        cmd_query(argv[1:])
+    elif argv and argv[0] == "crawl":
+        cmd_crawl(argv[1:])
+    else:
+        legacy(argv)
 
 
 if __name__ == "__main__":

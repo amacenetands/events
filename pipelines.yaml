@@ -1,0 +1,76 @@
+# Saved filters (presets). Crawl is decoupled from query: `main.py crawl --city X`
+# extracts ALL venues for a city into the events table; presets are just
+# filters applied at query time (`main.py query --preset family`, or legacy
+# flags like `main.py --family`).
+#
+# Keys = src/query.py Filter fields (time -> time_of_day). Extra hints:
+#   rank, lang, label, coverage, tz, public_only (default true: hides school/members/trade events),
+#   include_online (default false). when next:N = N days including today.
+
+presets:
+  standard:
+    label: "London Events"
+    city: london
+    when: "next:14"
+    kinds: [one_off, run, recurring]
+    new_only: true
+    rank: true
+    coverage: true
+
+  family:
+    label: "London Family Events"
+    city: london
+    audience: family
+    when: "next:30"
+    kinds: [one_off, run, recurring]
+    new_only: true
+    rank: false
+
+  evening:
+    label: "London Evening Events"
+    city: london
+    when: "next:7"
+    kinds: [one_off]
+    time: [evening]
+    strict_time: true
+    new_only: true
+    coverage: true
+
+  daytime:
+    label: "London Daytime Concerts"
+    city: london
+    when: "next:3"
+    days: weekday
+    time: [morning, afternoon]
+    strict_time: true
+    kinds: [one_off, recurring]
+    coverage: true
+
+  museums:
+    label: "London Museums Events"
+    city: london
+    when: "next:14"
+    venue_tags: [museums]
+    drop_religious: false
+    new_only: true
+    rank: true
+    coverage: true
+
+  theatres:
+    label: "London Theatres"
+    city: london
+    when: "next:14"
+    venue_tags: [theatres]
+    new_only: true
+    rank: true
+    coverage: true
+
+  moscow:
+    label: "Moscow Events"
+    city: moscow
+    when: "next:14"
+    drop_religious: false
+    new_only: true
+    rank: true
+    coverage: true
+    lang: ru
