@@ -1,0 +1,12 @@
+# Personal taste profile for ranking (src/rank.py). Edit freely; all keys optional.
+interests: [science talk, lecture, classical, chamber music, orchestra, hands-on, workshop, family concert]
+avoid: [club night, walking tour, guided tour, pub crawl, quiz night, speed dating]
+kids_ages: [6, 9]
+category_weights:     # added to score per category
+  talk: 1.0
+  concert: 1.0
+  workshop: 0.5
+  exhibition: 0.5
+  tour: -1.0
+  comedy: -0.5
+notes: Prefer one-off, high-quality events at established venues; family-friendly on weekends.
