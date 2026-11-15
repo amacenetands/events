@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from dataclasses import dataclass
 
 from .models import Event
@@ -11,6 +11,7 @@ from .store import _conn, _now
 from .query import is_banned_url
 
 CRAWL_RETENTION_DAYS = 90
+PRUNE_GRACE_DAYS = 1           # rows whose last day is before today - this are deleted on save
 _DDL = """
 CREATE TABLE IF NOT EXISTS events (
     city         TEXT NOT NULL,
@@ -81,13 +82,51 @@ def _errored(sources: set[str], errors: list[str]) -> set[str]:
                                       for er in errors)}
 
 
+def _today(city: str) -> date:
+    """Today in the city's timezone."""
+    from .query import Filter, city_today
+    return city_today(Filter(city=city))
+
+
+def _last_day(d: dict) -> date | None:
+    """Last day of a stored event (None = keep: open run / open weekly series / TBC)."""
+    if d.get("date_undetermined"):
+        return None                                   # TBC rows: no reliable date to expire on
+    end = d.get("end_date")
+    if end:
+        return date.fromisoformat(str(end)[:10])
+    kind = d.get("kind") or "one_off"
+    if kind == "run" or (kind == "recurring" and d.get("byday")):
+        return None
+    return date.fromisoformat(str(d["date"])[:10]) if d.get("date") else None
+
+
+def prune_past(city: str, today: date | None = None) -> int:
+    """Delete the city's rows that ended before today - PRUNE_GRACE_DAYS. Returns rows deleted."""
+    init_db()
+    cut = (today or _today(city)) - timedelta(days=PRUNE_GRACE_DAYS)
+    dead = []
+    for r in _conn.execute("SELECT event_key, event_json FROM events WHERE city=?", (city,)):
+        try:
+            last = _last_day(json.loads(r["event_json"]))
+        except Exception:
+            continue
+        if last is not None and last < cut:
+            dead.append(r["event_key"])
+    with _conn:
+        _conn.executemany("DELETE FROM events WHERE city=? AND event_key=?", [(city, k) for k in dead])
+    return len(dead)
+
+
 def save_crawl(city: str, events: list[Event], tags_by_source: dict[str, list[str]],
-               errors: list[str] | None = None, oldest_fetched_at: str | None = None) -> str:
+               errors: list[str] | None = None, oldest_fetched_at: str | None = None,
+               stats: dict | None = None, today: date | None = None) -> str:
     """Merge this crawl into the city's rows.
 
     Rows are replaced only for sources that produced events AND did not error this crawl.
     Sources that errored (events merged in, old rows kept), came back empty/thin or were not
     crawled keep their previous rows. first_seen is preserved per fingerprint.
+    Then rows that ended before yesterday (city tz) are pruned; count in stats["pruned"].
     """
     init_db()
     errors = errors or []
@@ -116,6 +155,10 @@ def save_crawl(city: str, events: list[Event], tags_by_source: dict[str, list[st
                 (city, k, fp, e.source, e.model_dump_json(),
                  json.dumps(tags_by_source.get(e.source, [])), old.get(fp, now), now, crawl_id),
             )
+    pruned = prune_past(city, today)
+    if stats is not None:
+        stats["pruned"] = pruned
+    with _conn:
         total = _conn.execute("SELECT COUNT(*) FROM events WHERE city=?", (city,)).fetchone()[0]
         _conn.execute("INSERT INTO crawls(crawl_id,city,crawled_at,n_events,oldest_fetched_at) VALUES(?,?,?,?,?)",
                       (crawl_id, city, now, total, oldest_fetched_at))

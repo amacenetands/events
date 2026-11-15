@@ -24,10 +24,10 @@ class Filter:
     kinds: frozenset = ALL_KINDS
     audience: str = "any"                      # any | family | kids | adult
     min_age_max: int | None = None             # keep events with min_age None or <= this
-    when: str = "next:14"                      # today|tomorrow|weekend|next:N|range:A..B
+    when: str = "next:14"                      # today|tomorrow|weekend|this-week|next-week|next:N|range:A..B
     time_of_day: frozenset = frozenset()       # subset of TIME_BUCKETS; empty = any
     strict_time: bool = False                  # True: events without a time are dropped when time_of_day set
-    days: str = "any"                          # any | weekday | weekend
+    days: str = "any"                          # any | weekday | weekend | mon..sun[,..]
     categories: frozenset = frozenset()
     venues: frozenset = frozenset()            # lowercase venue/source names
     venue_tags: frozenset = frozenset()        # sites.yaml pipeline tags (e.g. museums)
@@ -79,6 +79,11 @@ def resolve_when(when: str, today: date | None = None) -> tuple[date, date]:
     w = (when or "").strip().lower()
     if w == "today":
         return today, today
+    if w in ("this-week", "week"):
+        return today, today + timedelta(days=6 - today.weekday())
+    if w == "next-week":
+        mon = today + timedelta(days=7 - today.weekday())
+        return mon, mon + timedelta(days=6)
     if w == "tomorrow":
         d = today + timedelta(days=1)
         return d, d
@@ -100,7 +105,7 @@ def resolve_when(when: str, today: date | None = None) -> tuple[date, date]:
         if e < s:
             raise ValueError(f"range end before start: {when!r}")
         return s, e
-    raise ValueError(f"bad --when {when!r} (today|tomorrow|weekend|next:N|range:YYYY-MM-DD..YYYY-MM-DD)")
+    raise ValueError(f"bad --when {when!r} (today|tomorrow|weekend|this-week|next-week|next:N|range:YYYY-MM-DD..YYYY-MM-DD)")
 
 
 def parse_time_arg(v) -> frozenset:
@@ -159,35 +164,86 @@ def infer_buckets(e: Event) -> frozenset | None:
 
 # ── predicates ───────────────────────────────────────────────────────────────
 
-def _span(e: Event) -> tuple[date, date | None]:
-    """(start, end) of the event; end None = open-ended."""
-    if e.kind == "run" or (e.kind == "recurring" and e.end_date):
-        return e.date, e.end_date
-    return e.date, e.date
+_WD_NAMES = {n: i for i, ns in enumerate((
+    ("mon", "monday", "пн"), ("tue", "tues", "tuesday", "вт"), ("wed", "wednesday", "ср"),
+    ("thu", "thur", "thurs", "thursday", "чт"), ("fri", "friday", "пт"), ("sat", "saturday", "сб"),
+    ("sun", "sunday", "вс"))) for n in ns}
 
 
-def _overlaps(e: Event, start: date, end: date) -> bool:
-    s, en = _span(e)
-    return s <= end and (en is None or en >= start)
+def _is_open_series(e: Event) -> bool:
+    """Open-ended weekly series ("Every Saturday"): recurring with weekdays and no end.
+    Contract: recurring + byday = series; recurring + byday None = one dated instance."""
+    return e.kind == "recurring" and e.end_date is None and bool(e.byday)
+
+
+def sessions_uncertain(e: Event) -> bool:
+    """Multi-day listing whose session days are unknown (range only): matched as every day."""
+    return e.kind != "one_off" and not e.byday and not e.sessions_known
+
+
+def _spec(e: Event, today: date | None = None):
+    """Event -> DateSpec for normalize.occurrences (None: single dated instance)."""
+    from .normalize import DateSpec
+    if e.kind == "one_off" or (e.kind == "recurring" and not e.byday):
+        return None
+    start = e.date
+    if not e.start_known and today is not None:
+        start = min(start, today)                     # "until X": on now
+    return DateSpec(kind="run", start=start, end=e.end_date,
+                    byday=frozenset(e.byday) if e.byday else None, instances=(), times=(),
+                    sessions_known=e.sessions_known, start_known=e.start_known,
+                    inconsistent=e.date_inconsistent, raw=e.raw_date or "")
+
+
+def event_days(e: Event, start: date, end: date, *, today: date | None = None,
+               max_n: int = 400) -> list[date]:
+    """Concrete dates the event happens on inside [start, end].
+
+    one_off / dated recurring instance -> [date]; run or series with byday -> those weekdays
+    between date and end_date (open-ended when end_date is None); run without byday -> every
+    day (see sessions_uncertain() for the 'check days' flag). `today`: start_known=False
+    events count as on from today."""
+    if end < start:
+        return []
+    spec = _spec(e, today)
+    if spec is None:
+        return [e.date] if start <= e.date <= end else []
+    from .normalize import occurrences
+    return occurrences(spec, start, end, max_n=max_n)
+
+
+def _overlaps(e: Event, start: date, end: date, today: date | None = None) -> bool:
+    return bool(event_days(e, start, end, today=today, max_n=1))
+
+
+def parse_days(days: str) -> frozenset[int] | None:
+    """'any' -> None; 'weekday' | 'weekend' | 'fri' | 'sat,sun' -> weekday set (0=Mon)."""
+    out: set[int] = set()
+    for tok in str(days or "any").lower().replace(" ", "").split(","):
+        if tok in ("", "any"):
+            continue
+        if tok in ("weekday", "weekdays"):
+            out.update(range(5))
+        elif tok in ("weekend", "weekends"):
+            out.update((5, 6))
+        elif tok.rstrip("s") in _WD_NAMES or tok in _WD_NAMES:
+            out.add(_WD_NAMES.get(tok, _WD_NAMES.get(tok.rstrip("s"))))
+        else:
+            raise ValueError(f"bad days {days!r} (any|weekday|weekend|mon..sun[,..])")
+    return frozenset(out) or None
 
 
 def _day_ok(d: date, days: str) -> bool:
-    return days == "any" or (d.weekday() >= 5) == (days == "weekend")
+    wd = parse_days(days)
+    return wd is None or d.weekday() in wd
 
 
-def _days_ok(e: Event, days: str, start: date, end: date) -> bool:
-    if days == "any":
+def _days_ok(e: Event, days, start: date, end: date, today: date | None = None) -> bool:
+    """days: filter string or a pre-parsed weekday set (None = any)."""
+    wd = parse_days(days) if isinstance(days, str) else days
+    if wd is None:
         return True
-    s, en = _span(e)
-    lo, hi = max(s, start), min(en or end, end)
-    d = lo
-    for _ in range(14):
-        if d > hi:
-            return False
-        if _day_ok(d, days):
-            return True
-        d += timedelta(days=1)
-    return True
+    return any(d.weekday() in wd for d in event_days(e, start, end, today=today))
 
 
 def _audience_ok(e: Event, f: Filter) -> bool:
@@ -218,6 +274,7 @@ def query(
     """Apply Filter to events. Pure (history dedup only via the injected `unseen`)."""
     today = today or city_today(f)
     start, end = resolve_when(f.when, today)
+    wd = parse_days(f.days)                           # validate once (raises even with no events)
     cats = {c.lower() for c in f.categories}
     venues = {v.lower() for v in f.venues}
     out: list[Event] = []
@@ -225,9 +282,11 @@ def query(
     for e in events:
         if e.kind not in f.kinds:
             continue
-        if not _overlaps(e, start, end):
+        lo = max(start, today)                        # past days never match
+        if not _overlaps(e, lo, end, today):
             continue
-        if e.date < today and (e.kind == "one_off" or (e.kind == "recurring" and e.end_date is None)):
+        if e.date < today and (e.kind == "one_off" or (e.kind == "recurring" and e.end_date is None)) \
+                and not _is_open_series(e):
             continue                                  # past one-offs never pass
         if e.kind in ("run", "recurring") and e.end_date and e.end_date < today:
             continue
@@ -256,8 +315,10 @@ def query(
                 if not e.time and stats is not None:
                     stats["untimed_hidden"] = stats.get("untimed_hidden", 0) + 1
                 continue
-        if not _days_ok(e, f.days, start, end):
+        if not _days_ok(e, wd, lo, end, today):
             continue
+        if stats is not None and sessions_uncertain(e):
+            stats["check_days"] = stats.get("check_days", 0) + 1
         out.append(e)
     if f.drop_religious:
         from .filters import drop_religious_services
@@ -286,7 +347,7 @@ def describe(f: Filter, today: date | None = None) -> str:
     if f.time_of_day:
         parts.append("+".join(b for b in TIME_BUCKETS if b in f.time_of_day) + (" (timed only)" if f.strict_time else ""))
     if f.days != "any":
-        parts.append(f.days + "s only")
+        parts.append(f.days + "s only" if f.days in ("weekday", "weekend") else f"days: {f.days}")
     if f.categories:
         parts.append("categories: " + ", ".join(sorted(f.categories)))
     if f.venues:

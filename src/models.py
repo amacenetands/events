@@ -103,7 +103,7 @@ class Event(BaseModel):
     @property
     def is_one_off(self) -> bool:
         # a recurring series expanded to dated instances (no end_date) acts as one-off downstream
-        return self.kind == "one_off" or (self.kind == "recurring" and self.end_date is None)
+        return self.kind == "one_off" or (self.kind == "recurring" and self.end_date is None and not self.byday)
 
     @property
     def is_kids(self) -> bool:

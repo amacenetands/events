@@ -117,10 +117,9 @@ def _first_on_or_after(spec: DateSpec, day: date) -> date:
 
 
 def _instances(spec: DateSpec, today: date) -> list[dict[str, Any]]:
-    byday = sorted(spec.byday) if spec.byday else None
-    label = _recurrence_label(spec.byday)
+    label = _recurrence_label(spec.byday)       # display only; instances carry byday=None
     days = [d for d in spec.instances if d >= today][:MAX_INSTANCES]
-    return [dict(date=d, kind="recurring", recurrence=label, byday=byday) for d in days]
+    return [dict(date=d, kind="recurring", recurrence=label, byday=None) for d in days]
 
 
 def _series(spec: DateSpec, cfg: VenueConfig, today: date) -> dict[str, Any]:
@@ -133,6 +132,9 @@ def _series(spec: DateSpec, cfg: VenueConfig, today: date) -> dict[str, Any]:
         sessions_known = sessions_known or byday is not None
     if spec.end and spec.start and spec.end <= spec.start:
         return dict(date=spec.start, kind="one_off", start_known=spec.start_known)
+    if spec.kind == "recurring" and not byday:      # repeat rule without weekdays: no occurrences -> TBC
+        return dict(date=max(spec.start or today, today), kind="one_off", start_known=spec.start_known,
+                    date_undetermined=True)
     start = spec.start or today
     if spec.end is None or spec.start is None:
         start = max(start, today)

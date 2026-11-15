@@ -25,6 +25,7 @@ def db(monkeypatch):
     c.row_factory = sqlite3.Row
     monkeypatch.setattr(events_db, "_conn", c)
     monkeypatch.setattr(events_db, "_ready", False)
+    monkeypatch.setattr(events_db, "_today", lambda city: TODAY)   # freeze past-row pruning
     return c
 
 

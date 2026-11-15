@@ -41,6 +41,9 @@ W_AVOID = -3.0             # title/description hits a profile `avoid` phrase
 W_PRICEY = -4.0            # ticket/course price >= PRICEY_GBP
 PRICEY_GBP = 100
 W_INTEREST = 1.0           # title hits a profile `interests` phrase
+W_CHECK_DAYS = -2.5        # run > CHECK_DAYS_SPAN days with unknown session days (range-only listing)
+CHECK_DAYS_SPAN = 7
+W_SOLD_OUT = -20.0         # every session sold out (also excluded from candidates/digest)
 TOP_N = 12
 MAX_PER_VENUE = 2
 MAX_PER_CATEGORY = 4
@@ -152,6 +155,11 @@ def score_parts(e: Event, f, ctx: RankCtx) -> dict[str, float]:
         p["timed"] = W_HAS_TIME
     if e.date_undetermined:
         p["undetermined"] = W_UNDETERMINED
+    if (e.kind != "one_off" and not e.byday and not e.sessions_known
+            and (e.end_date is None or (e.end_date - e.date).days > CHECK_DAYS_SPAN)):
+        p["check days"] = W_CHECK_DAYS
+    if e.sold_out:
+        p["sold out"] = W_SOLD_OUT
     if e.kind == "one_off":
         p["one-off"] = W_ONE_OFF
     elif e.kind == "run":
@@ -186,8 +194,8 @@ def reason(e: Event, f, ctx: RankCtx) -> str:
 
 
 def candidates(events: list[Event]) -> list[Event]:
-    """Events eligible for picks: dated one-offs and runs (recurring instances excluded)."""
-    return [e for e in events if not e.date_undetermined
+    """Events eligible for picks: dated one-offs and runs (recurring instances excluded; sold out excluded)."""
+    return [e for e in events if not e.date_undetermined and not e.sold_out
             and (e.kind in ("one_off", "run") or (e.kind == "recurring" and e.end_date))]
 
 
@@ -237,8 +245,12 @@ def _when(e: Event, single_day: bool, today: date | None) -> str:
         d = "" if single_day else e.date.strftime("%a%d%b")
         return f"{d} {e.time or ''}".strip() or "-"
     w = f"to {e.end_date.strftime('%d%b')}" if e.end_date else "open"
-    if e.recurrence:
-        w = f"{e.recurrence[:20]} {w}"
+    from .digest import days_label
+    long_range = e.end_date is None or (e.end_date - e.date).days > CHECK_DAYS_SPAN
+    lab = (days_label(e.byday) or ("check days" if not e.sessions_known and long_range else "")
+           or (e.recurrence or "")[:20])
+    if lab:
+        w = f"{lab} {w}"
     if today and e.end_date and 0 <= (e.end_date - today).days <= CLOSING_DAYS:
         w += " last"
     return w

@@ -31,14 +31,16 @@ _STR = {
            "none": "No events match these filters.", "errors": "Extraction errors", "new": "NEW",
            "until": "until", "from": "from", "closing": "closing soon", "more": "more",
            "n_one": "one-off", "n_rec": "recurring", "n_runs": "runs/exhibitions", "n_tbc": "dates TBC",
-           "kids": "kids", "family": "family", "adults": "adults"},
+           "kids": "kids", "family": "family", "adults": "adults",
+           "sold": "Sold out (check returns)", "n_sold": "sold out"},
     "ru": {"today": "Сегодня", "tomorrow": "Завтра", "top": "Лучшее", "also": "Ещё",
            "one_off": "Разовые события", "recurring": "Регулярные", "runs": "Выставки",
            "tbc": "Дата уточняется", "tbc_note": "Не удалось подтвердить даты — проверьте по ссылке.",
            "none": "События не найдены.", "errors": "Ошибки извлечения", "new": "НОВОЕ",
            "until": "до", "from": "с", "closing": "скоро закрывается", "more": "ещё",
            "n_one": "разовых", "n_rec": "регулярных", "n_runs": "выставок/показов", "n_tbc": "дата уточняется",
-           "kids": "дети", "family": "семья", "adults": "взрослым"},
+           "kids": "дети", "family": "семья", "adults": "взрослым",
+           "sold": "Билетов нет (следите за возвратами)", "n_sold": "билетов нет"},
 }
 
 
@@ -47,18 +49,18 @@ def _t(lang: str, key: str) -> str:
 
 
 def _dfmt(d: date, lang: str = "en", fmt: str = "short") -> str:
-    """short: 'Sat 14 Nov' | long: 'Saturday 14 Nov' | day: '14 Nov' | full: '08 November 2026'."""
+    """short: 'Sat 14 Nov' | long: 'Saturday 14 Nov' | day: '14 Nov' | full: '8 November 2026'."""
     if lang == "ru":
         mon = _RU_MONTHS[d.month - 1]
         return {"short": f"{_RU_DOW_S[d.weekday()]} {d.day} {mon}", "long": f"{_RU_DOW[d.weekday()]} {d.day} {mon}",
                 "day": f"{d.day} {mon}", "full": f"{d.day} {mon} {d.year}"}[fmt]
-    return {"short": d.strftime("%a %d %b"), "long": d.strftime("%A %d %b"), "day": d.strftime("%d %b"),
-            "full": d.strftime("%d %B %Y")}[fmt]
+    return {"short": d.strftime("%a %d %b"), "long": d.strftime("%A %d %b"), "day": f"{d.day} {d.strftime('%b')}",
+            "full": f"{d.day} {d:%B %Y}"}[fmt]
 
 
-def _save(content: str, prefix: str) -> Path:
+def _save(content: str, prefix: str, today: date | None = None) -> Path:
     OUTPUT_DIR.mkdir(exist_ok=True)
-    path = OUTPUT_DIR / f"{prefix}_{date.today().isoformat()}.md"
+    path = OUTPUT_DIR / f"{prefix}_{(today or date.today()).isoformat()}.md"
     path.write_text(content)
     return path
 
@@ -114,15 +116,75 @@ def _day_label(d: date, today: date, lang: str = "en") -> str:
     return _dfmt(d, lang, "long")
 
 
+# ── schedule label ───────────────────────────────────────────────────────────
+
+_EN_DOW_S = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+_EN_DOW_PL = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"]
+_RU_DOW_PL = ["по понедельникам", "по вторникам", "по средам", "по четвергам", "по пятницам",
+              "по субботам", "по воскресеньям"]
+_SCHED = {"en": {"daily": "daily", "and": " & ", "until": "until", "from": "from", "check": "check days"},
+          "ru": {"daily": "ежедневно", "and": " и ", "until": "до", "from": "с", "check": "уточняйте дни"}}
+
+
+def days_label(byday, lang: str = "en") -> str:
+    """Weekday set -> 'Fridays' | 'Sat & Sun' | 'Mon–Fri' | 'Tue, Thu & Sat' | 'daily' (RU variants)."""
+    days = sorted(set(byday or ()))
+    if not days:
+        return ""
+    ru = lang == "ru"
+    st = _SCHED["ru" if ru else "en"]
+    if len(days) == 7:
+        return st["daily"]
+    if len(days) == 1:
+        return (_RU_DOW_PL if ru else _EN_DOW_PL)[days[0]]
+    names = _RU_DOW_S if ru else _EN_DOW_S
+    for r in days:                                     # rotation that makes the set contiguous
+        rot = sorted(days, key=lambda d: (d - r) % 7)
+        if [(d - r) % 7 for d in rot] == list(range(len(rot))):
+            if len(rot) >= 3:
+                return f"{names[rot[0]]}–{names[rot[-1]]}"
+            return st["and"].join(names[d] for d in rot)
+    if len(days) == 2:
+        return st["and"].join(names[d] for d in days)
+    return ", ".join(names[d] for d in days[:-1]) + st["and"] + names[days[-1]]
+
+
+def schedule_label(e: Event, today: date, lang: str = "en") -> str:
+    """Deterministic schedule text from byday/time/dates (never the raw recurrence string):
+    'Fridays 19:30' · 'Sat & Sun until 4 Jan' · 'daily until 7 Dec' · 'from 21 Nov until 19 Dec · check days'.
+    one_off -> its time ('' if none). 'from' only when a known start is still ahead."""
+    lang = "ru" if lang == "ru" else "en"
+    st = _SCHED[lang]
+    if e.kind == "one_off":
+        return e.time or ""
+    head = " ".join(x for x in (days_label(e.byday, lang), e.time or "") if x)
+    bits = [head] if head else []
+    if e.start_known and e.date > today and e.end_date != e.date:
+        bits.append(f"{st['from']} {_dfmt(e.date, lang, 'full' if e.date.year != today.year else 'day')}")
+    if e.end_date:
+        far = (e.end_date - today).days > 183 or e.end_date.year != today.year
+        bits.append(f"{st['until']} {_dfmt(e.end_date, lang, 'full' if far else 'day')}")
+    out = " ".join(bits)
+    if not e.byday and not e.sessions_known:
+        out = f"{out} · {st['check']}" if out else st["check"]
+    return out
+
+
 def _one_off_line(e: Event, new: bool, lang: str = "en") -> str:
     bits = [_esc(e.venue)] + ([e.time] if e.time else []) + ([_esc(e.price)] if e.price else [])
     new_tag = f" **{_t(lang, 'new')}**" if new else ""
     return f"- {_link(e)}{_badge(e, lang)}{new_tag} — {' · '.join(bits)}{_desc(e)}"
 
 
-def _recurring_line(group: list[Event], new: bool, lang: str = "en") -> str:
+def _recurring_line(group: list[Event], new: bool, lang: str = "en", today: date | None = None) -> str:
     group = sorted(group, key=lambda x: x.date)
     e = group[0]
+    if len(group) == 1 and e.byday and e.end_date is None and today is not None:   # open weekly series
+        new_tag = f" **{_t(lang, 'new')}**" if new else ""
+        price = f" · {_esc(e.price)}" if e.price else ""
+        lab = schedule_label(e, today, lang)
+        return (f"- {_link(e)}{_badge(e, lang)}{new_tag} — {_esc(e.venue)}{f' · {_esc(lab)}' if lab else ''}"
+                f"{price}{_closing(e, today, lang)}{_desc(e)}")
     by_month: list[str] = []
     shown = group[:6]
     for (_y, _m), g in _groupby(shown, key=lambda x: (x.date.year, x.date.month)):
@@ -138,18 +200,28 @@ def _recurring_line(group: list[Event], new: bool, lang: str = "en") -> str:
     return f"- {_link(e)}{_badge(e, lang)}{new_tag} — {_esc(e.venue)} · {'; '.join(by_month)}{more}{tail}"
 
 
+def _closing(e: Event, today: date, lang: str = "en") -> str:
+    return f" · **{_t(lang, 'closing')}**" if e.end_date and e.date <= today and 0 <= (e.end_date - today).days <= 7 else ""
+
+
+def _sold_line(evs: list[Event], lang: str = "en") -> list[str]:
+    """One collapsed line for sold-out events of a section (they are never picks)."""
+    if not evs:
+        return []
+    names = sorted({_link(e) for e in evs}, key=str.lower)
+    return [f"- _{_t(lang, 'sold')}: {' · '.join(names)}_"]
+
+
 def _run_line(e: Event, today: date, new: bool, lang: str = "en") -> str:
-    if e.end_date:
-        far = (e.end_date - today).days > 183 or e.end_date.year != today.year
-        when = f"{_t(lang, 'until')} {_dfmt(e.end_date, lang, 'full' if far else 'short')}"
-    else:
+    lab = schedule_label(e, today, lang)
+    if not e.end_date and e.start_known and e.date <= today:      # open-ended, already on
         yr = e.date.year != today.year
-        when = f"{_t(lang, 'from')} {_dfmt(e.date, lang, 'full' if yr else 'day')}"
-    soon = f" · **{_t(lang, 'closing')}**" if e.end_date and e.date <= today and 0 <= (e.end_date - today).days <= 7 else ""
-    extra = f" · {_esc(e.recurrence)}" if e.recurrence else ""
+        lab = f"{_t(lang, 'from')} {_dfmt(e.date, lang, 'full' if yr else 'day')}" + (f" · {lab}" if lab else "")
+    when = f" · {_esc(lab)}" if lab else ""
+    soon = _closing(e, today, lang)
     new_tag = f" **{_t(lang, 'new')}**" if new else ""
     price = f" · {_esc(e.price)}" if e.price else ""
-    return f"- {_link(e)}{_badge(e, lang)}{new_tag} — {_esc(e.venue)} · {when}{extra}{price}{soon}{_desc(e)}"
+    return f"- {_link(e)}{_badge(e, lang)}{new_tag} — {_esc(e.venue)}{when}{price}{soon}{_desc(e)}"
 
 
 def coverage_summary(counts: dict[str, int], all_sites: list[str]) -> str:
@@ -184,6 +256,15 @@ def generate_digest_v2(
     reasons = reasons or {}
     scores = scores or {}
     is_new = lambda e: e.fingerprint() in new_fps  # noqa: E731
+    sold = [e for e in events if e.sold_out]                  # sold out: never picks, one line per section
+    n_all = len(events)
+    events = [e for e in events if not e.sold_out]
+    if picks:
+        picks = [e for e in picks if not e.sold_out]
+    sold_tbc = [e for e in sold if e.date_undetermined]
+    sold_one = [e for e in sold if not e.date_undetermined and e.kind == "one_off"]
+    sold_rec = [e for e in sold if not e.date_undetermined and e.kind == "recurring" and e.end_date is None]
+    sold_run = [e for e in sold if e not in sold_tbc and e not in sold_one and e not in sold_rec]
 
     tbc = [e for e in events if e.date_undetermined]
     dated = [e for e in events if not e.date_undetermined]
@@ -204,7 +285,8 @@ def generate_digest_v2(
     else:
         desc = describe(f, today)
     stats = (f"_{len(one_offs)} {_t(lang, 'n_one')} · {len(groups)} {_t(lang, 'n_rec')} · "
-             f"{len(runs)} {_t(lang, 'n_runs')}{f' · {len(tbc)} {_t(lang, 'n_tbc')}' if tbc else ''}_")
+             f"{len(runs)} {_t(lang, 'n_runs')}{f' · {len(tbc)} {_t(lang, 'n_tbc')}' if tbc else ''}"
+             f"{f' · {len(sold)} {_t(lang, 'n_sold')}' if sold else ''}_")
     lines = [f"# {_esc(title or f.label or ('События' if lang == 'ru' else 'Events'))} — {_dfmt(today, lang, 'full')}", "", f"_{desc}_", "", stats, ""]
 
     if picks:
@@ -218,9 +300,9 @@ def generate_digest_v2(
         pick_ids = {id(e) for e in picks}
         one_offs = [e for e in one_offs if id(e) not in pick_ids]
         runs = [e for e in runs if id(e) not in pick_ids]
-        if one_offs:
+        if one_offs or sold_one:
             lines += [f"## {_t(lang, 'also')}", ""]
-    elif one_offs:
+    elif one_offs or sold_one:
         lines += [f"## {_t(lang, 'one_off')}", ""]
     for d, grp in _groupby(one_offs, key=lambda e: e.date):
         lines += [f"### {_day_label(d, today, lang)}", ""]
@@ -228,12 +310,15 @@ def generate_digest_v2(
             grp = sorted(grp, key=lambda e: -scores.get(e.fingerprint(), 0))
         lines += [_one_off_line(e, is_new(e), lang) for e in grp]
         lines.append("")
+    if sold_one:
+        lines += _sold_line(sold_one, lang) + [""]
 
-    if rec_lines:
+    if rec_lines or sold_rec:
         lines += [f"## {_t(lang, 'recurring')}", ""]
-        lines += [_recurring_line(g, any(is_new(x) for x in g), lang) for g in rec_lines]
+        lines += [_recurring_line(g, any(is_new(x) for x in g), lang, today) for g in rec_lines]
+        lines += _sold_line(sold_rec, lang)
         lines.append("")
-    if runs:
+    if runs or sold_run:
         n_runs = len(runs)
         if n_runs > RUNS_CAP:
             def _rk(e):
@@ -246,12 +331,14 @@ def generate_digest_v2(
         lines += [_run_line(e, today, is_new(e), lang) for e in runs]
         if n_runs > len(runs):
             lines.append(f"- _+{n_runs - len(runs)} {_t(lang, 'more')}_")
+        lines += _sold_line(sold_run, lang)
         lines.append("")
-    if tbc:
+    if tbc or sold_tbc:
         lines += [f"## {_t(lang, 'tbc')}", "", f"_{_t(lang, 'tbc_note')}_", ""]
         lines += [f"- {_link(e)}{_badge(e, lang)} — {_esc(e.venue)}" for e in sorted(tbc, key=lambda e: (e.venue.lower(), e.title.lower()))]
+        lines += _sold_line(sold_tbc, lang)
         lines.append("")
-    if not events:
+    if not n_all:
         lines.append(f"_{_t(lang, 'none')}_")
     if failed_sites:
         lines += ["", "---", f"## {_t(lang, 'errors')}", ""] + [f"- {_esc(n)}" for n in failed_sites]
@@ -259,5 +346,9 @@ def generate_digest_v2(
     return out + footer
 
 
-def save_digest_v2(content: str, slug: str) -> Path:
-    return _save(content, slug)
+def save_digest_v2(content: str, slug: str, city: str | None = None, today: date | None = None) -> Path:
+    """Filename dated by `today`, else today in `city`'s timezone, else local date."""
+    if today is None and city:
+        from .query import Filter, city_today
+        today = city_today(Filter(city=city))
+    return _save(content, slug, today)
