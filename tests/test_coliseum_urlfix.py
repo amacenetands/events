@@ -1,6 +1,7 @@
 import json, datetime as dt
 from src.sources.adapters import get_adapter
-from src.extract import _fix_urls
+from src.models import RawEvent
+from src.sources.llm_source import fill_urls
 
 
 def test_coliseum_one_rec_per_production():
@@ -11,7 +12,9 @@ def test_coliseum_one_rec_per_production():
     assert len(recs) == 1 and recs[0].title == "Tosca" and recs[0].url == "/events/tosca/"
 
 
-def test_fix_urls_uses_card_link():
-    raw = [{"title": "Foo Gig", "url": "https://x.org/ev/"}, {"title": "Bar", "url": "https://x.org/b"}]
-    out = _fix_urls(raw, "Foo Gig | 1 Dec -> /ev/foo-gig\nBar | 2 Dec -> /ev/bar", "https://x.org/ev")
-    assert out[0]["url"] == "/ev/foo-gig" and out[1]["url"] == "https://x.org/b"
+def test_fill_urls_uses_card_link():
+    raws = [RawEvent(title="Foo Gig", url="https://x.org/ev/"), RawEvent(title="Bar", url="https://x.org/b"),
+            RawEvent(title="Baz Night")]
+    text = "Foo Gig | 1 Dec -> /ev/foo-gig\nBar | 2 Dec -> /ev/bar\nBaz Night | 3 Dec -> /ev/baz"
+    out = fill_urls(raws, text, "https://x.org/ev")
+    assert [r.url for r in out] == ["https://x.org/ev/foo-gig", "https://x.org/b", "https://x.org/ev/baz"]

@@ -1,0 +1,266 @@
+{
+ "today": "2026-11-15",
+ "jsonld": {
+  "aldwych": [
+   [
+    "Sinatra The Musical",
+    "2026-11-10",
+    "2027-04-10",
+    null,
+    "https://secure.lovetheatre.com/book/1HU76-sinatra-the-musical/"
+   ]
+  ],
+  "apollo": [
+   [
+    "Derren Brown: Only Human",
+    "2026-10-10",
+    "2027-01-30",
+    null,
+    "https://theapollotheatre.co.uk/tickets/derren-brown-only-human/"
+   ],
+   [
+    "Nerdy Prudes Must Die",
+    "2027-02-06",
+    "2027-03-07",
+    null,
+    "https://theapollotheatre.co.uk/tickets/nerdy-prudes-must-die/"
+   ],
+   [
+    "Potted Panto",
+    "2026-12-06",
+    "2027-01-03",
+    null,
+    "https://theapollotheatre.co.uk/tickets/potted-panto/"
+   ]
+  ],
+  "bach_to_baby": [
+   [
+    "Twas the Night Before Christmas / Bach to Baby Festive Family Concert",
+    "2026-11-21",
+    null,
+    "11:00",
+    "https://www.bachtobaby.com/ealing-music-concerts-for-baby-and-family"
+   ]
+  ],
+  "camden_peoples": [
+   [
+    "An Evening with Camden Youth Theatre",
+    "2026-12-01",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Boys Beware (WIP)",
+    "2026-11-25",
+    "2026-11-26",
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Camden Meeple's Theatre: Board Game Day",
+    "2026-12-05",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Hot Gay Xmas Shit",
+    "2026-12-03",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Self and Other Fictions An Anthology",
+    "2026-12-08",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "This Offers No Solutions (WIP)",
+    "2026-11-24",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Trans People Are Awful Trans + Night",
+    "2026-11-18",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Tripping Out (WIP)",
+    "2026-11-20",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "TwitchKitsch",
+    "2026-12-04",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "VV Showdown",
+    "2026-12-02",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Vincent",
+    "2027-01-14",
+    "2027-01-23",
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "Washed Ashore (WIP)",
+    "2026-11-24",
+    null,
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ],
+   [
+    "White Gold",
+    "2026-11-25",
+    "2026-11-28",
+    null,
+    "https://cptheatre.co.uk/Whats-On"
+   ]
+  ],
+  "conway_hall": [
+   [
+    "Edward Lloyd",
+    "2026-11-18",
+    null,
+    "13:10",
+    "https://www.conwayhall.org.uk/whats-on/event/edward-lloyd/"
+   ],
+   [
+    "Raphael Wallfisch & Simon Callaghan",
+    "2026-11-15",
+    null,
+    "18:30",
+    "https://www.conwayhall.org.uk/whats-on/event/raphael-wallfisch-simon-callaghan-3/"
+   ],
+   [
+    "Ruth Rogers & Martin Cousin",
+    "2026-11-29",
+    null,
+    "18:30",
+    "https://www.conwayhall.org.uk/whats-on/event/halcyon-quartet-3/"
+   ],
+   [
+    "Ryelandt Trio",
+    "2026-12-13",
+    null,
+    "18:30",
+    "https://www.conwayhall.org.uk/whats-on/event/ryelandt-trio/"
+   ],
+   [
+    "The Golden Fountain",
+    "2026-12-05",
+    null,
+    "19:30",
+    "https://www.conwayhall.org.uk/whats-on/event/the-golden-fountain/"
+   ],
+   [
+    "Tippett Quartet",
+    "2026-12-06",
+    null,
+    "18:30",
+    "https://www.conwayhall.org.uk/whats-on/event/tippett-quartet/"
+   ],
+   [
+    "Winter Carols by Candlelight",
+    "2026-12-10",
+    null,
+    "19:00",
+    "https://www.conwayhall.org.uk/whats-on/event/winter-carols-by-candlelight-2/"
+   ],
+   [
+    "Woolf Quartet",
+    "2026-11-22",
+    null,
+    "18:30",
+    "https://www.conwayhall.org.uk/whats-on/event/woolf-quartet/"
+   ]
+  ],
+  "garrick": [
+   [
+    "Black Is The Color Of My Voice",
+    "2027-01-11",
+    "2027-01-18",
+    null,
+    "https://thegarricktheatre.co.uk/tickets/black-is-the-color-of-my-voice/"
+   ],
+   [
+    "One Day – The Musical",
+    "2026-11-17",
+    "2027-03-14",
+    null,
+    "https://thegarricktheatre.co.uk/tickets/one-day-the-musical/"
+   ]
+  ],
+  "lyric": [
+   [
+    "A Christmas Carol: Live Reading",
+    "2026-12-07",
+    null,
+    null,
+    "https://thelyrictheatre.co.uk/tickets/a-christmas-carol-live-reading/"
+   ],
+   [
+    "Daniel Foxx: How Lovely",
+    "2027-06-07",
+    null,
+    null,
+    "https://thelyrictheatre.co.uk/tickets/daniel-foxx-how-lovely/"
+   ],
+   [
+    "HADESTOWN",
+    "2024-02-10",
+    "2027-06-27",
+    null,
+    "https://thelyrictheatre.co.uk/tickets/hadestown/"
+   ],
+   [
+    "Room on the Broom Live On Stage",
+    "2026-11-27",
+    "2027-01-03",
+    null,
+    "https://thelyrictheatre.co.uk/tickets/room-on-the-broom-live-on-stage/"
+   ],
+   [
+    "West End Musical Christmas",
+    "2026-12-14",
+    null,
+    null,
+    "https://thelyrictheatre.co.uk/tickets/west-end-musical-christmas-3/"
+   ]
+  ]
+ },
+ "adapter": {
+  "orange_tree": [
+   [
+    "Constanze at St Mary Magdalene Church",
+    "2026-11-27"
+   ],
+   [
+    "Cranford",
+    "2026-11-16"
+   ],
+   [
+    "Cranford",
+    "2026-11-17"
+   ]
+  ]
+ }
+}

@@ -15,7 +15,6 @@ from pipelines.yaml; they SEND email unless --dry-run):
 """
 import argparse
 import asyncio
-import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -24,12 +23,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-_crawl4ai_dir = os.environ.get("CRAWL4AI_BASE_DIRECTORY", "/tmp/.crawl4ai")
-os.environ["CRAWL4AI_BASE_DIRECTORY"] = _crawl4ai_dir
-Path(_crawl4ai_dir).mkdir(parents=True, exist_ok=True)
-
 from src.sources import api_sources_for
-from src.sources.html_sites import fetch_html_sites, fetch_sites, parse_sites, configured_site_names, _load_sites
+from src.sources.html_sites import crawl_sites, configured_site_names
 from src.dedup import filter_unseen, mark_seen
 from src import rank as rankmod
 from src.classify import classify
@@ -93,58 +88,50 @@ async def crawl(
     fetch_only: bool = False,
     parse_only: bool = False,
     test_site: str | None = None,
-    compare: bool = False,
 ) -> int:
-    """Fetch + extract + classify ALL venues for city; persist to events table."""
+    """Fetch (stale pages only, unless forced) + parse + classify venues for city; persist
+    to the events table. test_site: only that venue, events printed, nothing persisted."""
     t0 = _timing.now()
     tag = _city_tag(city)
     print(f"Crawl: {city}\n" + "=" * 40)
 
-    if fetch_only:
-        summary = await fetch_sites(pipeline=tag, test_site=test_site, force_download=force_download)
-        print(f"Fetch summary: {summary}")
-        return 0
-
     errors: list[str] = []
-    if test_site:
-        if parse_only:
-            evs = await parse_sites(test_site=test_site, pipeline=tag, force_parse=force_parse, compare=compare)
-        else:
-            evs = await fetch_html_sites(test_site=test_site, pipeline=tag, force_download=force_download, force_parse=force_parse, compare=compare)
-        evs = classify(evs)
-        print(f"\nExtracted {len(evs)} events from {test_site!r} (not persisted):\n")
-        for e in evs:
-            print(f"  • {e.title} | {e.venue} | {e.date}{'..' + str(e.end_date) if e.end_date else ''} | "
-                  f"{e.category} | kind={e.kind} | aud={e.audience} | min_age={e.min_age} | t={e.time}")
-        return len(evs)
-
-    if parse_only:
-        html_coro = parse_sites(pipeline=tag, force_parse=force_parse, compare=compare, errors=errors)
-    else:
-        html_coro = fetch_html_sites(pipeline=tag, force_download=force_download, force_parse=force_parse,
-                                     compare=compare, errors=errors)
-    api = [src() for src in api_sources_for(_config.get_city(city).api_sources)]   # cities.yaml
-    results = await asyncio.gather(*api, html_coro, return_exceptions=True)
+    sites = crawl_sites(pipeline=tag, test_site=test_site, force_download=force_download,
+                        force_parse=force_parse, fetch_only=fetch_only, parse_only=parse_only, errors=errors)
+    if fetch_only:
+        await sites
+        return 0
+    api = [] if test_site else [src() for src in api_sources_for(_config.get_city(city).api_sources)]   # cities.yaml
+    results = await asyncio.gather(*api, sites, return_exceptions=True)
     scraped: list[Event] = []
-    for r in results:
+    for r in results[:-1]:
         if isinstance(r, Exception):
             print(f"  Source error: {r}")
         elif isinstance(r, list):
-            scraped.extend(r)
+            scraped.extend(classify(r))      # API events; html events are classified in crawl_sites
     if isinstance(results[-1], Exception):
         print(f"WARNING: HTML source failed entirely ({results[-1]}) — not saving; keeping previous {city} events.")
         return 0
+    frs = results[-1].frs
+    scraped.extend(results[-1].events)
 
     scraped = [e for e in scraped if not is_banned_url(e.url)]
-    scraped = _dedup_by_fingerprint(classify(scraped))
+    scraped = _dedup_by_fingerprint(scraped)
     _absolutize_urls(scraped)
     today = city_today(Filter(city=city))
     scraped = [e for e in scraped if (e.end_date or e.date) >= today]
+    if test_site:
+        print(f"\nExtracted {len(scraped)} events from {test_site!r} (not persisted):\n")
+        for e in scraped:
+            print(f"  • {e.title} | {e.venue} | {e.date}{'..' + str(e.end_date) if e.end_date else ''} | "
+                  f"t={e.time} | {e.price or '-'} | {e.category} | kind={e.kind} | aud={e.audience} | "
+                  f"min_age={e.min_age} | {e.url}")
+        return len(scraped)
     if not scraped:
         print("Crawl produced 0 current events — keeping previous events table.")
         return 0
     cid = events_db.save_crawl(city, scraped, _tags_by_source(), errors=errors,
-                              oldest_fetched_at=_oldest_fetched(tag))
+                              oldest_fetched_at=_oldest_fetched(frs, scraped))
     print(f"Saved {len(scraped)} events for {city} (crawl {cid}); {len(errors)} sites with errors")
     for n in errors[:15]:
         print(f"  ! {n}")
@@ -182,17 +169,11 @@ def _stale_venues(events, max_age_days: float) -> list[tuple[str, float]]:
         return []
 
 
-def _oldest_fetched(tag):
-    """Oldest fetched_at among this crawl's pages (src.dedup.oldest_fetched_at); None if unavailable."""
-    try:
-        from src import dedup
-        fn = getattr(dedup, "oldest_fetched_at", None)
-        if fn is None:
-            return None
-        r = fn([s["url"] for s in _load_sites(tag)])
-        return r.isoformat() if hasattr(r, "isoformat") else (str(r) if r else None)
-    except Exception:
-        return None
+def _oldest_fetched(frs: dict, events: list[Event]) -> str | None:
+    """Oldest page fetch among venues that produced events this crawl (ISO), else None."""
+    used = {e.source for e in events}
+    ats = [fr.fetched_at for name, fr in frs.items() if name in used and fr.fetched_at]
+    return min(ats).isoformat() if ats else None
 
 
 def _age_str(age: float) -> str:
@@ -297,8 +278,7 @@ def _add_crawl_flags(p):
     p.add_argument("--force-parse", action="store_true")
     p.add_argument("--fetch-only", action="store_true", help="fetch HTML to cache only")
     p.add_argument("--parse-only", action="store_true", help="parse from cache only — no HTTP fetches")
-    p.add_argument("--test-site", metavar="NAME", help="extract one site, print, do not persist")
-    p.add_argument("--compare", action="store_true")
+    p.add_argument("--test-site", metavar="NAME", help="only this venue: fetch if stale, parse, print, do not persist")
 
 
 def build_filter(args) -> Filter:
@@ -394,7 +374,7 @@ def cmd_crawl(argv):
     _add_crawl_flags(p)
     a = p.parse_args(argv)
     asyncio.run(crawl(a.city, force_download=a.force_download, force_parse=a.force_parse,
-                      fetch_only=a.fetch_only, parse_only=a.parse_only, test_site=a.test_site, compare=a.compare))
+                      fetch_only=a.fetch_only, parse_only=a.parse_only, test_site=a.test_site))
 
 
 def legacy(argv):
@@ -433,7 +413,7 @@ def legacy(argv):
         ov["include_online"] = True
     f = preset_filter(name, **ov)
     ck = dict(force_download=a.force_download, force_parse=a.force_parse, fetch_only=a.fetch_only,
-              parse_only=a.parse_only, test_site=a.test_site, compare=a.compare)
+              parse_only=a.parse_only, test_site=a.test_site)
 
     async def go():
         n = await crawl(f.city, **ck)

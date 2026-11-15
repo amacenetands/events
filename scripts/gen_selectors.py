@@ -27,7 +27,8 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.sources.html_sites import _clean_html, _extract_jsonld, HEADERS
+from src.fetch.headers import HEADERS
+from src.sources.reduce import _clean_html
 
 SITES_YAML = Path(__file__).parent.parent / "sites.yaml"
 CONCURRENCY = 6
@@ -96,25 +97,12 @@ HTML skeleton:
 async def _fetch_site_browser(site: dict, sem: asyncio.Semaphore) -> dict | None:
     async with sem:
         try:
-            import os
-            from pathlib import Path as _Path
-            os.environ.setdefault("CRAWL4_AI_BASE_DIRECTORY", "/tmp")
-            _Path("/tmp").mkdir(parents=True, exist_ok=True)
-            from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig
-            from crawl4ai.async_configs import CacheMode
-            browser_cfg = BrowserConfig(headless=True)
-            cfg = CrawlerRunConfig(
-                js_code="window.scrollTo(0, document.body.scrollHeight);",
-                delay_before_return_html=5.0,
-                page_timeout=30000,
-                cache_mode=CacheMode.BYPASS,
-            )
-            async with AsyncWebCrawler(config=browser_cfg, verbose=False) as crawler:
-                result = await crawler.arun(url=site["url"], config=cfg)
-            if not result.success or not result.html:
-                print(f"  SKIP {site['name']}: browser crawl failed")
+            from src.fetch.browser import fetch_browser
+            fr = await fetch_browser(site["url"], stealth=False, wait_for=None, remove_selectors=[], delay=5.0)
+            if not fr.body:
+                print(f"  SKIP {site['name']}: browser fetch {fr.status.value} ({fr.note})")
                 return None
-            raw = result.html
+            raw = fr.body
             clean = _clean_html(raw, extra_selectors=site.get("remove_selectors"))
             md = markdownify(clean, heading_style="ATX", strip=["script", "style", "nav", "footer"])
             md = "\n".join(l for l in md.splitlines() if l.strip())
@@ -235,7 +223,11 @@ async def run(venue_filter: str | None, dry_run: bool, threshold: int, js_sites:
             sites = [s for s in sites if venue_filter.lower() in s["name"].lower()]
         sem = asyncio.Semaphore(2)  # limit concurrent browser instances
         tasks = [_fetch_site_browser(s, sem) for s in sites]
-        results = await asyncio.gather(*tasks)
+        try:
+            results = await asyncio.gather(*tasks)
+        finally:
+            from src.fetch.browser import close_browser
+            await close_browser()
     else:
         sites = [s for s in all_sites if not s.get("skip") and not s.get("js_required")]
         if venue_filter:

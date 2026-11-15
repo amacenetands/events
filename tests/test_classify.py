@@ -1,9 +1,6 @@
 import datetime as dt
 from src.models import Event
 from src.classify import classify
-from src.sources.adapters import Rec
-from src.sources.reduce import rec_to_event
-from src.sources.html_sites import _jsonld_class
 
 
 def ev(title="X", d="2026-12-01", **kw):
@@ -59,37 +56,6 @@ def test_time_fill():
     assert classify([ev("Gig 7.30pm")])[0].time == "19:30"
     assert classify([ev("Gig", description="Tickets £10.50")])[0].time is None
     assert classify([ev("Gig", time="20:00", description="at 7pm")])[0].time == "20:00"
-
-
-def test_jsonld_types():
-    c = _jsonld_class({"@type": "MusicEvent", "name": "a"})
-    assert c["category"] == "concert"
-    c = _jsonld_class({"@type": "ChildrensEvent", "name": "a"})
-    assert c["audience"] == "kids"
-    c = _jsonld_class({"@type": "EducationEvent", "name": "Pottery workshop", "typicalAgeRange": "8-12"})
-    assert c["category"] == "workshop" and c["min_age"] == 8 and c["audience"] == "kids"
-    c = _jsonld_class({"@type": "Event", "name": "a", "eventSchedule": {"repeatFrequency": "P1W", "byDay": "Saturday"}})
-    assert c["kind"] == "recurring" and "Saturday" in c["recurrence"]
-    assert _jsonld_class({"@type": "ScreeningEvent", "name": "a"})["category"] == "film"
-
-
-SITE = {"name": "S", "url": "http://s.com", "category_hint": "other"}
-TODAY = dt.date(2026, 11, 1)
-
-
-def test_rec_multi_date():
-    evs = rec_to_event(Rec(title="Tour", date="Sat 5 Dec, Sat 12 Dec, Sat 19 Dec"), SITE, TODAY)
-    assert len(evs) == 3 and all(e.kind == "recurring" for e in evs)
-    assert [e.date.day for e in evs] == [5, 12, 19]
-    evs = rec_to_event(Rec(title="Tour", date="5 Dec, 12 Dec"), SITE, TODAY)
-    assert len(evs) == 2 and all(e.kind == "one_off" for e in evs)
-
-
-def test_rec_true_range():
-    evs = rec_to_event(Rec(title="Expo", date="5 Dec 2026 - 20 Feb 2027"), SITE, TODAY)
-    assert len(evs) == 1 and evs[0].kind == "run" and evs[0].end_date == dt.date(2027, 2, 20)
-    evs = rec_to_event(Rec(title="Expo", date="Closes 17 Jan 2027"), SITE, TODAY)
-    assert evs[0].kind == "run" and evs[0].date == TODAY
 
 
 def test_baby_driver_not_kids_but_baby_class_is():

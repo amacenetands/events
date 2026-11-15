@@ -101,7 +101,7 @@ def test_max_links_cap(cache):
 def test_no_links_reported(cache):
     cfg = CFG.model_copy(update={"follow": CFG.follow.model_copy(update={"link_pattern": r"/nomatch/"})})
     raws, ctx = _run(date(2026, 11, 1), cfg)
-    assert raws == [] and ctx.errors == ["Barbican: follow-links found 0 detail URLs"]
+    assert raws == [] and not ctx.errors and ctx.stats["follow_links.no_links"] == 1
 
 
 def test_blocked_detail_not_cached(cache):
@@ -173,3 +173,19 @@ def test_redirected_detail_keeps_final_url(cache):
             return await get_source("follow_links").records(CFG, listing, ctx)
     (r,) = asyncio.run(go())
     assert (r.title, r.url) == ("NAZA", target)
+
+
+def test_offline_reads_cached_detail_pages_only(cache):
+    url = "https://www.barbican.org.uk/whats-on/2026/event/naza"
+    cache[url] = (FIX / PAGES["naza"]).read_text()
+    seen: list[str] = []
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(_handler(seen))) as http:
+            ctx = SourceCtx(http=http, today=date(2026, 11, 1), window_days=365, city=get_city("london"),
+                            offline=True)
+            return await get_source("follow_links").records(CFG, LISTING, ctx), ctx
+    raws, ctx = asyncio.run(go())
+    assert seen == [] and not ctx.errors
+    assert [r.url for r in raws] == [url]
+    assert ctx.stats["follow_links.offline_uncached"] >= 17

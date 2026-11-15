@@ -1,4 +1,4 @@
-"""jsonld source: node parsing, offers/eventSchedule mapping, and parity with the old html_sites path.
+"""jsonld source: node parsing, offers/eventSchedule mapping, and recorded expected outputs.
 Fixtures: tests/fixtures/sources/jsonld_*.html (scripts/record_source_fixtures.py, ld+json blocks only)."""
 import asyncio
 import json
@@ -143,49 +143,42 @@ def test_relative_url_resolved_against_fetch_url():
     assert r.url == "https://moved.example.org/e/a"
 
 
-def test_not_ok_fetch_returns_nothing():
-    fr = FetchResult(FetchStatus.BLOCKED, body=(FIX / "jsonld_apollo.html").read_text())
-    assert asyncio.run(get_source("jsonld").records(CFG, fr, _ctx())) == []
+def test_body_used_whatever_the_status():
+    fr = FetchResult(FetchStatus.BLOCKED, body=(FIX / "jsonld_apollo.html").read_text())   # fallback body
+    assert asyncio.run(get_source("jsonld").records(CFG, fr, _ctx()))
+    assert asyncio.run(get_source("jsonld").records(CFG, FetchResult(FetchStatus.BLOCKED), _ctx())) == []
     assert asyncio.run(get_source("jsonld").records(CFG, None, _ctx())) == []
 
 
-# ── parity with the legacy path (html_sites._events_from_jsonld + extract._build_events) ──
-# TODAY is frozen for both paths. New-only events (by title) are listed: the old path skipped
-# top-level JSON arrays (ATG) and blocks with raw control characters.
+def test_listing_url_filled_from_unique_anchor():
+    node = {"@type": "Event", "name": "Woolf Quartet", "startDate": "2026-11-22T18:30", "url": CFG.url}
+    page = _page(node) + ('<a href="/concerts/woolf-quartet/">Woolf Quartet</a>'
+                          '<a href="/concerts/other/">Other</a><a href="/whats-on/">Woolf Quartet</a>')
+    (r,) = _records(page)
+    assert r.url == "https://example.org/concerts/woolf-quartet/"
+    twice = page + '<a href="/concerts/woolf-quartet-2/">Woolf Quartet</a>'
+    assert _records(twice)[0].url == CFG.url                 # ambiguous: left alone
+
+
+# ── recorded expected outputs (tests/fixtures/sources/expected_events.json) ──
+# Recorded once via this path at TODAY (2026-11-15); the legacy-path parity check this
+# replaces found 0 events lost (only ATG top-level arrays / control-char blocks gained).
 PARITY = {
-    "conway_hall": ("Conway Hall", {"The Golden Fountain"}),
-    "camden_peoples": ("Camden People's Theatre", set()),
-    "apollo": ("Apollo Theatre", set()),
-    "garrick": ("Garrick Theatre", set()),
-    "lyric": ("Lyric Theatre", set()),
-    "bach_to_baby": ("Bach to Baby Ealing", set()),
-    "aldwych": ("Aldwych Theatre", {"Sinatra The Musical"}),
+    "conway_hall": "Conway Hall", "camden_peoples": "Camden People's Theatre", "apollo": "Apollo Theatre",
+    "garrick": "Garrick Theatre", "lyric": "Lyric Theatre", "bach_to_baby": "Bach to Baby Ealing",
+    "aldwych": "Aldwych Theatre",
 }
-
-
-class _FrozenDate(date):
-    @classmethod
-    def today(cls):
-        return cls(TODAY.year, TODAY.month, TODAY.day)
+EXPECTED = json.loads((FIX / "expected_events.json").read_text())
 
 
 def _key(e):
-    return (e.title, e.date, e.end_date, e.time, e.url)
+    return [e.title, e.date.isoformat(), e.end_date.isoformat() if e.end_date else None, e.time, e.url]
 
 
 @pytest.mark.parametrize("slug", sorted(PARITY))
-def test_parity_with_legacy_jsonld(slug, monkeypatch):
-    import datetime as datetime_mod
-    from src import extract
-    from src.sources.html_sites import _events_from_jsonld
-    name, new_only = PARITY[slug]
-    cfg = next(v for v in all_venues() if v.name == name)
+def test_matches_recorded_output(slug):
+    assert EXPECTED["today"] == TODAY.isoformat()
+    cfg = next(v for v in all_venues() if v.name == PARITY[slug])
     html = (FIX / f"jsonld_{slug}.html").read_text()
-    with monkeypatch.context() as m:       # legacy code calls date.today() internally
-        m.setattr(datetime_mod, "date", _FrozenDate)
-        m.setattr(extract, "date", _FrozenDate)
-        old = {_key(e) for e in extract._build_events(_events_from_jsonld(html, cfg.url, cfg.name, 365) or [],
-                                                      cfg.url, cfg.name)}
-    new = {_key(e) for e in build_events(raws_from_html(html, cfg, cfg.url), cfg, _ctx())}
-    assert old <= new, f"lost vs legacy: {sorted(old - new)}"
-    assert {k[0] for k in new - old} <= new_only, f"unexpected new: {sorted(new - old)}"
+    got = sorted(_key(e) for e in build_events(_records(html, cfg), cfg, _ctx()))   # incl. anchor URL fill
+    assert got == EXPECTED["jsonld"][slug]

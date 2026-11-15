@@ -449,3 +449,29 @@ def test_eventbrite_org_from_url_and_dominant_links():
     html = ('<a href="https://www.eventbrite.co.uk/o/foo-11111111">x</a>' * 3
             + '<a href="https://www.eventbrite.co.uk/o/bar-22222222">y</a>')
     assert detect_platform(html) == ("eventbrite_org", "11111111")
+
+
+# ── timed-entry collapse / add-ons (2a-ii review) ────────────────────────────
+
+def _slot(day: str, t: str, price: str | None = "From £18", so=None):
+    from src.models import RawEvent as _R
+    return _R(title="Ghost Tour", date_text=day, time_text=t, price_text=price, sold_out=so, source_kind="spektrix")
+
+
+def test_collapse_timed_entry_slots():
+    from datetime import date as _d, timedelta as _td
+    days = [(_d(2026, 11, 16) + _td(days=i)).isoformat() for i in range(0, 21) if i % 7 in (0, 2)]   # Mon + Wed
+    slots = [_slot(d, t, "From £10" if d == days[1] and t == "10:00" else "From £18") for d in days
+             for t in ("10:00", "12:00", "14:00")]
+    (one,) = S.collapse_slots(slots)
+    assert (one.date_text, one.end_text, one.recurrence_text, one.time_text, one.price_text) == (
+        days[0], days[-1], "Mondays, Wednesdays", "", "From £10")
+    assert S.collapse_slots([_slot("2026-11-16", "19:30"), _slot("2026-11-17", "19:30")]) is None   # real shows
+    daily = [_slot((_d(2026, 11, 16) + _td(days=i)).isoformat(), "11:00", so=True) for i in range(15)]
+    (d,) = S.collapse_slots(daily)
+    assert d.recurrence_text is None and d.sold_out is True
+
+
+def test_parking_addons():
+    assert S.is_addon({"name": "Blue Badge Parking"}) and S.is_addon({"name": "Car Park"})
+    assert S.is_addon({"name": "Parking"}) and not S.is_addon({"name": "Parking Lot"})

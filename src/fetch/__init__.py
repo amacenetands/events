@@ -46,7 +46,7 @@ from .types import FetchResult, FetchStatus, is_blocked_page, visible_text
 
 __all__ = [
     "FetchResult", "FetchStatus", "is_blocked_page", "visible_text",
-    "FETCHERS", "Fetcher", "fetch_venue", "fetch_all", "HostThrottle",
+    "FETCHERS", "Fetcher", "fetch_venue", "fetch_all", "HostThrottle", "cached_result", "cached_results",
 ]
 
 HOST_GAP = 1.0                     # s between fetch starts on one host (default)
@@ -243,3 +243,32 @@ async def fetch_all(venues: list, *, client: httpx.AsyncClient | None, force: bo
             from .browser import close_browser
             await close_browser()
     return {v.name: out[v.name] for v in uniq if v.name in out}
+
+
+def cached_result(cfg, today: date | None = None) -> FetchResult:
+    """The stored scrape as a FetchResult, no network (--parse-only): NOT_MODIFIED with the
+    last good body, BLOCKED when the stored body is a bot wall, EMPTY when nothing is stored.
+    `api` mode venues get OK with an empty body (API sources fetch for themselves)."""
+    from .. import store
+    url = cfg.resolved_url((today or date.today()).year)
+    if cfg.fetch.mode == "api":
+        return FetchResult(FetchStatus.OK, body="", url=url, note="api")
+    row = store.get_scrape(url)
+    if not row or not row.get("html"):
+        return FetchResult(FetchStatus.EMPTY, url=url, note="no stored page (run crawl without --parse-only)")
+    at = _parse_ts(row["fetched_at"])
+    final = row.get("final_url") or url
+    if is_blocked_page(row["html"]):
+        return FetchResult(FetchStatus.BLOCKED, url=final, fetched_at=at, note="stored page is a bot wall")
+    return FetchResult(FetchStatus.NOT_MODIFIED, body=row["html"], url=final, fetched_at=at,
+                       etag=row.get("etag"), last_modified=row.get("last_modified"),
+                       note=f"stored page from {row['fetched_at']}")
+
+
+def cached_results(venues: list, today: date | None = None) -> dict[str, FetchResult]:
+    """{cfg.name: cached_result(cfg)} for venues (first of duplicate names wins)."""
+    out: dict[str, FetchResult] = {}
+    for v in venues:
+        if v.name not in out:
+            out[v.name] = cached_result(v, today)
+    return out

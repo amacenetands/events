@@ -2,9 +2,14 @@
 
 - `records()` MAY raise; callers (parse_sites) always go through `safe_records`, which
   turns an exception into `ctx.stats["<kind>.raised"]` + one `ctx.errors` line and [].
-- Fetch fills `FetchResult.body` from the cache on NOT_MODIFIED, so a source treats any
-  `fr.ok and fr.body` the same way. Resolve relative links against `fr.url` (post-redirect)
-  when set, else the venue's listing URL.
+- Page sources read `fr.body` whenever it is non-empty, whatever `fr.status`: fetch fills
+  it from the cache on NOT_MODIFIED and serves the last good body on BLOCKED/ERROR
+  (parse_sites then flags the venue "stale page"). `api` mode is OK with an empty body.
+  Resolve relative links with `base_url(cfg, fr, ctx)` (post-redirect `fr.url`, else listing).
+- `ctx.errors` is for real failures only (a source raised, partial data, dead API): any
+  entry makes save_crawl merge the venue's rows instead of replacing them. Benign
+  outcomes ("0 records, next source") go to `ctx.stats`.
+- `ctx.offline` (--parse-only): no network — API sources return [], detail pages from cache only.
 - Sources never filter by date; `build.build_events` drops past events.
 """
 from __future__ import annotations
@@ -25,6 +30,8 @@ class SourceCtx:
     stats: dict[str, int] = field(default_factory=dict)   # free-form counters, e.g. "spektrix.events_failed"
     errors: list[str] = field(default_factory=list)       # "<venue>: <what>"
     force: bool = False                                    # bypass cached detail pages (re-download)
+    force_parse: bool = False                              # bypass the LLM extraction cache
+    offline: bool = False                                  # --parse-only: no network except the LLM
 
 @runtime_checkable
 class Source(Protocol):
@@ -37,7 +44,7 @@ def register_source(src: Source) -> Source:
     return src
 
 
-_BUILTIN_MODULES = ("jsonld", "adapter_source", "follow_links")
+_BUILTIN_MODULES = ("jsonld", "adapter_source", "follow_links", "llm_source")
 _OPTIONAL_MODULES = ("spektrix",)     # owned elsewhere; may be mid-edit
 _loaded = False
 

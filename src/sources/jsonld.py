@@ -8,11 +8,12 @@ from typing import Any, Iterator
 from ..config import VenueConfig
 from ..fetch.types import FetchResult
 from ..models import RawEvent, clean_text
+from ..normalize.urls import anchor_lines, match_title_url
 from .base import SourceCtx, base_url, register_source
 
-__all__ = ["JsonLdSource", "event_nodes", "node_to_raw", "raws_from_html"]
+__all__ = ["JsonLdSource", "event_nodes", "node_to_raw", "raws_from_html", "fill_listing_urls"]
 
-# Same type filter as html_sites._JSONLD_EVENT_TYPES / _parse_jsonld_nodes.
+# schema.org Event types recognised in ld+json blocks.
 EVENT_TYPES = frozenset({
     "Event", "MusicEvent", "VisualArtsEvent", "ExhibitionEvent", "TheaterEvent", "EducationEvent",
     "ChildrensEvent", "ScreeningEvent", "ComedyEvent", "DanceEvent", "Festival", "SocialEvent",
@@ -195,14 +196,33 @@ def raws_from_html(html: str, cfg: VenueConfig, base: str = "", currency: str = 
     return [r for r in (node_to_raw(n, cfg, base, currency) for n in event_nodes(html)) if r is not None]
 
 
+def fill_listing_urls(raws: list[RawEvent], html: str, base: str, listing: set[str],
+                      pattern: str | None = None) -> list[RawEvent]:
+    """Records whose url is missing or the listing page take the page's unique anchor for
+    their title (plan §1.3: nearest per-event link)."""
+    norm = {u.rstrip("/") for u in listing if u}
+    todo = [r for r in raws if not r.url or r.url.rstrip("/") in norm]
+    if not todo:
+        return raws
+    lines = anchor_lines(html)
+    out = []
+    for r in raws:
+        if r in todo and (u := match_title_url(r.title, lines, base, pattern=pattern)):
+            r = r.model_copy(update={"url": u})
+        out.append(r)
+    return out
+
+
 class JsonLdSource:
     """Pure: parses the fetched listing page only."""
     kind = "jsonld"
 
     async def records(self, cfg: VenueConfig, fr: FetchResult | None, ctx: SourceCtx) -> list[RawEvent]:
-        if fr is None or not fr.ok or not fr.body:
+        if fr is None or not fr.body:
             return []
-        out = raws_from_html(fr.body, cfg, base_url(cfg, fr, ctx), ctx.city.currency)
+        base = base_url(cfg, fr, ctx)
+        out = fill_listing_urls(raws_from_html(fr.body, cfg, base, ctx.city.currency), fr.body, base,
+                                {base, cfg.resolved_url(ctx.today.year)}, cfg.fix.url_pattern)
         ctx.stats["jsonld.records"] = ctx.stats.get("jsonld.records", 0) + len(out)
         return out
 

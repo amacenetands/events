@@ -38,7 +38,8 @@ from ..config import VenueConfig
 from ..fetch.headers import HEADERS
 from ..fetch.types import FetchResult
 from ..models import RawEvent, clean_text
-from .base import SourceCtx, register_source
+from ..normalize.urls import anchor_lines, match_title_url
+from .base import SourceCtx, base_url, register_source
 
 log = logging.getLogger(__name__)
 
@@ -177,7 +178,7 @@ def fingerprint(html: str | None, url: str = "") -> str | None:
 # Always an add-on, whatever the venue programmes.
 _ADDON_GENERIC = re.compile(
     r"\b(headsets?|listening device|vouchers?|gift (?:cards?|vouchers?|memberships?)|"
-    r"packages?|secure my booking|test event)\b", re.I)
+    r"packages?|secure my booking|test event|blue badge|car park(?:ing)?|parking (?:space|permit|pass|ticket|voucher)s?)\b|^\W*parking\W*$", re.I)
 # Add-on only when the rest of the name is a sibling show's title ("<Show> Programme").
 _ADDON_SUFFIX = re.compile(
     r"^\W*(?:(?:and|&|\+|with)\W+)?(?:programmes?|programs?|playtexts?|play ?texts?|scripts?|"
@@ -368,6 +369,44 @@ def instance_to_raw(ev: dict[str, Any], inst: dict[str, Any],
     )
 
 
+# Timed-entry / daily-slot events (exhibitions, tours): more sessions than this on one
+# day, or in the whole window, collapse into one run RawEvent.
+SLOTS_PER_DAY = 2
+SLOTS_PER_WINDOW = 14
+_WD_PLURAL = ("Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays")
+_AMOUNT = re.compile(r"£\s*(\d+(?:\.\d+)?)")
+
+
+def _price_key(p: str | None) -> float:
+    if not p:
+        return float("inf")
+    if p.strip().lower() == "free":
+        return 0.0
+    m = _AMOUNT.search(p)
+    return float(m.group(1)) if m else float("inf")
+
+
+def collapse_slots(raws: list[RawEvent]) -> list[RawEvent] | None:
+    """One run RawEvent for an event's sessions when they look like timed-entry slots
+    (> SLOTS_PER_DAY on a day or > SLOTS_PER_WINDOW in all); None = keep per-session."""
+    days = sorted({r.date_text for r in raws if r.date_text})
+    per_day: dict[str, int] = {}
+    for r in raws:
+        per_day[r.date_text or ""] = per_day.get(r.date_text or "", 0) + 1
+    if not days or (max(per_day.values()) <= SLOTS_PER_DAY and len(raws) <= SLOTS_PER_WINDOW):
+        return None
+    wds = sorted({date.fromisoformat(d).weekday() for d in days})
+    price = min((r.price_text for r in raws if r.price_text), key=_price_key, default=None)
+    so = [r.sold_out for r in raws]
+    first = raws[0]
+    return [first.model_copy(update=dict(
+        date_text=days[0], end_text=days[-1] if days[-1] != days[0] else None,
+        recurrence_text=", ".join(_WD_PLURAL[w] for w in wds) if len(wds) < 7 else None,
+        time_text="", price_text=price,
+        sold_out=True if so and all(x is True for x in so) else (False if any(x is False for x in so) else None),
+    ))]
+
+
 # ── HTTP ─────────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -378,6 +417,7 @@ class SpektrixStats:
     events_failed: int = 0
     instances: int = 0
     status_calls: int = 0
+    collapsed: int = 0            # events whose timed-entry slots became one run
     bulk: bool = False
     base: str | None = None
     errors: list[str] = field(default_factory=list)
@@ -568,11 +608,19 @@ async def fetch_events(client: str | SpektrixClient, *, http: httpx.AsyncClient,
         by_event = await _per_event_instances(http, stats.base, events, s, e, stats,
                                               delay=delay, timeout=timeout)
     now = now if now is not None else datetime.now()
-    pairs = [p for ev in events for p in _to_raws(ev, by_event.get(ev["id"], ()), s, e, now, stats)]
+    per_event = [_to_raws(ev, by_event.get(ev["id"], ()), s, e, now, stats) for ev in events]
+    pairs = [p for ps in per_event for p in ps]
     if check_availability:
         await _fill_status(http, stats.base, pairs, stats, delay, status_cap)
     stats.instances = len(pairs)
-    return [r for r, _ in pairs]
+    out: list[RawEvent] = []
+    for ps in per_event:
+        raws = [r for r, _ in ps]
+        one = collapse_slots(raws) if raws else None
+        if one is not None:
+            stats.collapsed += 1
+        out.extend(one if one is not None else raws)
+    return out
 
 
 def _safe_map(fn, events: list[dict[str, Any]], stats: SpektrixStats) -> list[RawEvent]:
@@ -587,6 +635,22 @@ def _safe_map(fn, events: list[dict[str, Any]], stats: SpektrixStats) -> list[Ra
 
 
 # ── Source registry entry ────────────────────────────────────────────────────
+
+def _fill_urls(raws: list[RawEvent], html: str, base: str) -> list[RawEvent]:
+    """Empty webUrl: the listing page's unique anchor for the title, else '' (build -> listing)."""
+    if all(r.url for r in raws):
+        return raws
+    lines, memo = anchor_lines(html), {}
+    out = []
+    for r in raws:
+        if not r.url:
+            if r.title not in memo:
+                memo[r.title] = match_title_url(r.title, lines, base)
+            if memo[r.title]:
+                r = r.model_copy(update={"url": memo[r.title]})
+        out.append(r)
+    return out
+
 
 def client_for_venue(cfg: VenueConfig, html: str | None) -> SpektrixClient | None:
     """`adapter: {kind: spektrix, client: X[, domain: D]}` wins; else fingerprint the page."""
@@ -605,15 +669,19 @@ class SpektrixSource:
 
     async def records(self, cfg: VenueConfig, fr: FetchResult | None, ctx: SourceCtx) -> list[RawEvent]:
         try:
-            sc = client_for_venue(cfg, fr.body if fr is not None else None)
+            body = fr.body if fr is not None and fr.body else None
+            sc = client_for_venue(cfg, body)
             if sc is None:
+                return []
+            if ctx.offline:
+                ctx.stats["spektrix.offline"] = ctx.stats.get("spektrix.offline", 0) + 1
                 return []
             st = SpektrixStats()
             out = await fetch_events(sc, http=ctx.http, start=ctx.today,
                                      end=ctx.today + timedelta(days=ctx.window_days),
                                      stats=st, **self.fetch_kw)
             self._report(cfg, st, ctx)
-            return out
+            return _fill_urls(out, body, base_url(cfg, fr, ctx)) if body else out
         except Exception as e:                               # noqa: BLE001 — never break a crawl
             ctx.stats["spektrix.crashed"] = ctx.stats.get("spektrix.crashed", 0) + 1
             ctx.errors.append(f"{cfg.name}: spektrix {type(e).__name__}: {e}"[:300])
@@ -621,7 +689,7 @@ class SpektrixSource:
 
     @staticmethod
     def _report(cfg: VenueConfig, st: SpektrixStats, ctx: SourceCtx) -> None:
-        for k in ("events_seen", "events_dropped", "events_failed", "instances", "status_calls"):
+        for k in ("events_seen", "events_dropped", "events_failed", "instances", "status_calls", "collapsed"):
             ctx.stats[f"spektrix.{k}"] = ctx.stats.get(f"spektrix.{k}", 0) + getattr(st, k)
         if st.base is None:
             ctx.stats["spektrix.dead_clients"] = ctx.stats.get("spektrix.dead_clients", 0) + 1

@@ -2,7 +2,7 @@
 
   venv/bin/python scripts/record_source_fixtures.py
 
-Writes tests/fixtures/sources/: jsonld_<slug>.html (ld+json blocks only), follow_barbican_*.html
+Writes tests/fixtures/sources/: jsonld_<slug>.html (ld+json blocks; + <a> tags for WITH_ANCHORS), follow_barbican_*.html
 (listing anchors + 2 detail pages without scripts/styles), adapter_<slug>.html (the adapter's
 script/cards, item list cut to a few records) and manifest.json {recorded_on, files}.
 """
@@ -17,6 +17,9 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.normalize.urls import anchor_lines  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 DB = ROOT / "cache" / "memory.db"
 OUT = ROOT / "tests" / "fixtures" / "sources"
@@ -27,6 +30,16 @@ JSONLD_VENUES = {
     "apollo": "Apollo Theatre", "garrick": "Garrick Theatre", "lyric": "Lyric Theatre",
     "bach_to_baby": "Bach to Baby Ealing",
 }
+WITH_ANCHORS = {"conway_hall"}
+
+
+def _slim_anchor(line: str) -> str:
+    """'text -> href' (normalize.urls.anchor_lines) back to a bare <a> (per-event link matching)."""
+    import html as _h
+    text, href = line.rsplit(" -> ", 1)
+    return f'<a href="{_h.escape(href)}">{_h.escape(text)}</a>'
+
+
 BARBICAN_LISTING = "https://www.barbican.org.uk/whats-on"
 BARBICAN_DETAILS = ("naza", "ensemble-pygmalion-mozarts-great-mass")
 _LD = re.compile(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>.*?</script>', re.S | re.I)
@@ -60,8 +73,10 @@ def _write(name: str, text: str, files: list[str]) -> None:
 
 def _jsonld(conn: sqlite3.Connection, files: list[str]) -> None:
     for slug, site in JSONLD_VENUES.items():
-        blocks = _LD.findall(_html(conn, site=site))
-        _write(f"jsonld_{slug}.html", _page("\n".join(blocks)), files)
+        html = _html(conn, site=site)
+        blocks = _LD.findall(html)
+        anchors = [_slim_anchor(ln) for ln in anchor_lines(html)] if slug in WITH_ANCHORS else []
+        _write(f"jsonld_{slug}.html", _page("\n".join(blocks + anchors)), files)
 
 
 def _strip(html: str) -> BeautifulSoup:

@@ -15,7 +15,7 @@ Y = dt.date.today().year + 1
 def _site(name="Chunky", n=3):
     chunks = [f"Show {i} line | 5 March {Y}" for i in range(n)]
     return {"name": name, "url": "https://c.org/", "text": "\n".join(chunks), "chunks": chunks,
-            "category_hint": "other", "notes": "", "must_determine_venue": False}
+            "category_hint": "other", "hint": "", "must_determine_venue": False}
 
 
 def _patch(monkeypatch, handler):
@@ -24,7 +24,7 @@ def _patch(monkeypatch, handler):
     monkeypatch.setattr(ex, "run_llm", fake_run_llm)
     monkeypatch.setattr(ex, "save_extraction", lambda *a, **k: saved.append((a, k)))
     monkeypatch.setattr(ex, "get_cached_parse", lambda *a, **k: None)
-    monkeypatch.setattr(ex, "get_html_fetched_at", lambda u: None)
+    monkeypatch.setattr(ex.timing, "log_runtime", lambda **k: None)
     monkeypatch.setattr(ex, "current_model_label", lambda: "deepseek")
     monkeypatch.setattr(ex, "BATCH_SIZE", 1)
     monkeypatch.setattr(ex, "_CONCURRENCY", 1)
@@ -36,8 +36,16 @@ saved: list = []
 
 
 def _ev(title):
-    return {"title": title, "date": f"{Y}-03-05", "time": None, "category": "other", "is_one_off": True,
-            "is_kids": False, "is_family": False, "date_confirmed": True}
+    return {"title": title, "date_text": f"5 March {Y}", "time_text": None}
+
+
+class _R:
+    def __init__(self, d):
+        self.title = d["title"]
+
+
+def _flat(res: dict) -> list:
+    return [_R(d) for ds in res.values() for d in ds]
 
 
 def test_failed_chunk_keeps_other_chunks(monkeypatch):
@@ -48,9 +56,9 @@ def test_failed_chunk_keeps_other_chunks(monkeypatch):
         return json.dumps({"Chunky": [_ev(f"Event {i}")]})
     _patch(monkeypatch, handler)
     errors: list[str] = []
-    evs = asyncio.run(ex.extract_events_batch_async([_site()], errors=errors))
+    evs = _flat(asyncio.run(ex.extract_raw_batch_async([_site()], errors=errors)))
     assert sorted(e.title for e in evs) == ["Event 0", "Event 2"]
-    assert errors == ["Chunky (chunk 2/3 failed)"]
+    assert errors == [("Chunky", "chunk 2/3 failed")]
     assert not saved   # partial result must not be cached
 
 
@@ -67,7 +75,7 @@ def test_multi_chunk_zero_events_retried(monkeypatch):
     s["chunks"] = [c + f" | {7 + i} March {Y}" for i, c in enumerate(s["chunks"])]   # >=3 distinct future dates
     s["text"] = "\n".join(s["chunks"])
     errors: list[str] = []
-    evs = asyncio.run(ex.extract_events_batch_async([s], errors=errors))
+    evs = _flat(asyncio.run(ex.extract_raw_batch_async([s], errors=errors)))
     assert [e.title for e in evs] == ["Found by retry"] and not errors
     assert calls.count("claude") == 3
 
@@ -97,7 +105,7 @@ def test_chunk_done_idempotent_and_finalize_crash_recovers(monkeypatch):
             raise RuntimeError("db locked")
     monkeypatch.setattr(ex, "save_extraction", flaky_save)
     errors: list[str] = []
-    evs = asyncio.run(ex.extract_events_batch_async([_site()], errors=errors))
+    evs = _flat(asyncio.run(ex.extract_raw_batch_async([_site()], errors=errors)))
     assert sorted(e.title for e in evs) == ["Event 0", "Event 1", "Event 2"]
     assert not errors
 
@@ -110,6 +118,6 @@ def test_chunked_qwen_empty_upgraded_to_haiku(monkeypatch):
         return json.dumps({"Chunky": [_ev("Haiku found")]}) if backend == "claude" else "{}"
     _patch(monkeypatch, handler)
     monkeypatch.setattr(ex, "current_model_label", lambda: "qwen")
-    evs = asyncio.run(ex.extract_events_batch_async([_site()]))
+    evs = _flat(asyncio.run(ex.extract_raw_batch_async([_site()])))
     assert [e.title for e in evs] == ["Haiku found"]
     assert calls.count("claude") == 3

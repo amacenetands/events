@@ -127,9 +127,12 @@ async def _detail_html(url: str, cfg: VenueConfig, ctx: SourceCtx,
                        sem: asyncio.Semaphore) -> tuple[str, str] | None:
     """(html, final url) from cache, else fetched (and cached when it is a real page).
     Failures are counted in stats only (`follow_links.http_404`, `.fetch_error`, `.blocked`)."""
-    cached = _cache_get(url, ctx.force)
+    cached = _cache_get(url, ctx.force and not ctx.offline)
     if cached:
         return cached, url
+    if ctx.offline:
+        _bump(ctx, "follow_links.offline_uncached")
+        return None
     async with sem:
         try:
             r = await ctx.http.get(url, headers=HEADERS, follow_redirects=True, timeout=TIMEOUT)
@@ -151,13 +154,13 @@ class FollowLinksSource:
     kind = "follow_links"
 
     async def records(self, cfg: VenueConfig, fr: FetchResult | None, ctx: SourceCtx) -> list[RawEvent]:
-        if fr is None or not fr.ok or not fr.body:
+        if fr is None or not fr.body:
             return []
         pattern = (cfg.follow.link_pattern if cfg.follow else None) or DEFAULT_PATTERN
         cap = cfg.follow.max if cfg.follow else LEGACY_MAX_LINKS
         links = event_links(fr.body, base_url(cfg, fr, ctx), pattern)[:cap]
         if not links:
-            ctx.errors.append(f"{cfg.name}: follow-links found 0 detail URLs")
+            _bump(ctx, "follow_links.no_links")
             return []
         sem = asyncio.Semaphore(MAX_CONCURRENT)
         missing: list[str] = []
@@ -176,7 +179,7 @@ class FollowLinksSource:
         out = [r for r in await asyncio.gather(*(one(u) for u in links)) if r is not None]
         ctx.stats["follow_links.pages"] = ctx.stats.get("follow_links.pages", 0) + len(links)
         ctx.stats["follow_links.records"] = ctx.stats.get("follow_links.records", 0) + len(out)
-        if missing:
+        if missing and not ctx.offline:
             ctx.errors.append(f"{cfg.name}: follow-links {len(missing)}/{len(links)} detail pages unavailable "
                               f"(see follow_links.* stats)")
         return out

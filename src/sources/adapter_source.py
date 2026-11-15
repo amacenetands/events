@@ -47,7 +47,7 @@ def raws_from_html(html: str, cfg: VenueConfig, ctx: SourceCtx, base: str = "") 
     finally:
         _SITE_HOST.reset(token)
     if not recs:
-        ctx.errors.append(f"{cfg.name}: adapter {adapter.kind!r} found 0 records")
+        ctx.stats["adapter.no_records"] = ctx.stats.get("adapter.no_records", 0) + 1
         return []
     if not all(r.date and _parses(r, cfg, ctx) for r in recs):
         ctx.stats["adapter.unparsed_venues"] = ctx.stats.get("adapter.unparsed_venues", 0) + 1
@@ -60,7 +60,7 @@ class AdapterSource:
     kind = "adapter"
 
     async def records(self, cfg: VenueConfig, fr: FetchResult | None, ctx: SourceCtx) -> list[RawEvent]:
-        if fr is None or not fr.ok or not fr.body:
+        if fr is None or not fr.body:
             return []
         out = raws_from_html(fr.body, cfg, ctx, base_url(cfg, fr, ctx))
         ctx.stats["adapter.records"] = ctx.stats.get("adapter.records", 0) + len(out)

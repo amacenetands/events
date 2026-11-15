@@ -2,7 +2,8 @@
 from .dates import DateSpec, occurrences, parse_date_specs, parse_date_text, weekday_of
 from .prices import find_price, parse_price_text
 from .times import all_times, parse_time_text
-from .urls import pick_event_url
+from .urls import anchor_lines, match_title_url, pick_event_url
 
 __all__ = ["DateSpec", "parse_date_text", "parse_date_specs", "weekday_of", "occurrences", "parse_time_text",
-           "all_times", "parse_price_text", "find_price", "pick_event_url"]
+           "all_times", "parse_price_text", "find_price", "pick_event_url",
+           "anchor_lines", "match_title_url"]

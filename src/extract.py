@@ -1,22 +1,26 @@
-"""Claude CLI / Ollama extraction — concurrent async batches, configurable backend."""
+"""LLM extraction engine for the `llm` source: reduced page text -> RawEvent strings.
+
+Concurrent async batches over the configured backend, per-site parse cache, chunking,
+split-on-truncation, weak-model upgrade and empty-result retry. No date logic here:
+the model copies strings; sources/build.py normalises them.
+"""
 import json
 import re
 import hashlib
 import asyncio
 import os
 from datetime import date
-from .models import Event
-from .dedup import get_cached_parse, get_html_fetched_at, save_extraction, _TRUSTED_EMPTY_MODELS
-from .llm import run_llm, _CLAUDE_MODEL, current_model_label
+from .models import RawEvent
+from .dedup import get_cached_parse, save_extraction
+from .llm import run_llm, current_model_label
+from .normalize.urls import fold
 from . import timing
-
-_MODEL = _CLAUDE_MODEL
 
 
 def _default_batch_size() -> int:
     """Sites per LLM call. 1 for the Claude CLI: multi-site prompts dilute
     attention and haiku silently returns [] for some sites (e.g. Café Oto
-    yielded 12 alone, 0 in a 3-site batch). Ollama keeps 3 to cut request count.
+    yielded 12 alone, 0 in a 3-site batch). Ollama 1, DeepSeek 3 (see below).
     Override with EXTRACTION_BATCH_SIZE."""
     env = os.environ.get("EXTRACTION_BATCH_SIZE")
     if env:
@@ -44,14 +48,14 @@ BATCH_CHAR_BUDGET = int(os.environ.get("BATCH_CHAR_BUDGET", "12000"))
 
 # Parse-cache versioning — folded into the content hash so logic changes that do
 # NOT alter the input text still invalidate cached extractions. Bump
-# EXTRACT_VERSION on _build_events / post-processing changes; _PROMPT_VERSION is
+# EXTRACT_VERSION on to_raws / post-processing changes; _PROMPT_VERSION is
 # derived automatically from the prompt below, so editing the schema/date-rules
 # busts the cache on its own. Per-site `cache_version` in sites.yaml busts one
 # venue. See _text_hash.
-EXTRACT_VERSION = "7"  # 7: kind/audience/min_age/recurrence schema + classify post-pass; 6: reducer + chunked units
+EXTRACT_VERSION = "8"  # 8: raw-string RawEvent schema (normalize does dates); 7: kind/audience schema; 6: reducer + chunks
 
-# Concurrency: default 1 for Ollama (single local model — parallelism just contends),
-# 3 for Claude. Override with LLM_CONCURRENCY env var.
+# Concurrent LLM calls: 1 for Ollama (single local model — parallelism just contends) and
+# the Claude CLI (rate limits), 5 for DeepSeek. Override with LLM_CONCURRENCY.
 def _default_concurrency() -> int:
     env_val = os.environ.get("LLM_CONCURRENCY")
     if env_val is not None:
@@ -60,9 +64,6 @@ def _default_concurrency() -> int:
         except ValueError:
             pass
     backend = (os.environ.get("LLM_BACKEND") or os.environ.get("EXTRACTION_BACKEND", "ollama")).lower()
-    # DeepSeek API: 5 concurrent calls — API handles parallelism well, each call
-    # carries 5 venues → 25 venues in-flight. Claude CLI: 1 — serial to avoid
-    # rate limits. Ollama: 1 — local model serial.
     if backend == "deepseek":
         return 5
     return 1
@@ -86,224 +87,220 @@ _DATE_SIGNAL = re.compile(
     re.IGNORECASE,
 )
 
-# Base schema — venue and url omitted; injected per-site or from known data
+
+# Raw-string schema: the model COPIES page strings; src/normalize turns them into dates/
+# times/prices deterministically (sources/build.py). Venue is added for aggregators.
 _EVENT_SCHEMA = """\
-  title        string
-  date         string   YYYY-MM-DD  — start/opening date (one-off: the single date it occurs)
-  end_date     string|null  YYYY-MM-DD — closing date. REQUIRED when kind=run; null otherwise
-  time         string|null  HH:MM 24h — start time. Look near the date: "7.30pm", "doors 19:00", "from 11am", "10:00-12:00" (use start). null only if truly absent; never write TBC
-  category     string   concert|theatre|exhibition|talk|workshop|tour|film|comedy|festival|other  (NOT "kids" — that is audience)
-  kind         string   one_off = single dated occurrence | run = exhibition/show/season with start AND end date | recurring = repeating series ("every Sat", weekly club, regular tours)
-  recurrence   string|null  only for kind=recurring, short: "Saturdays", "daily 11:00"
-  audience     string   kids = made FOR children (storytime, puppet show, "ages 3-7", under-5s) | family = children+adults together (family workshop, half-term, "(family)") | adult = 18+/late-night/wine/cocktail | all = general public (default)
-  min_age      int|null   youngest suitable age if stated ("ages 5+" -> 5, "under 5s" -> 0); else null
-  date_confirmed bool   true if date is a specific confirmed date found in text; false if estimated/inferred
-  description  string|null  one sentence max
-  price        string|null
-  url          string|null  the event's OWN page: copy the "-> /path" link on that event's line in the text (never the listing page itself); null if no such link"""
+  title           string   the event's name, copied verbatim
+  date_text       string|null  the event's date text EXACTLY as written, incl. ranges, lists and "On now"/"Ongoing": "Sat 22 Nov", "Fri 21 Nov – Sun 7 Dec", "Until 4 Jan", "5, 12 & 19 Dec", "19 ноября"
+  end_text        string|null  closing date as written, ONLY when shown apart from date_text ("Closes 4 Jan")
+  time_text       string|null  start time(s) as written ("7.30pm", "Doors 19:00", "Tue–Sat 7pm, Sat 2.30pm")
+  price_text      string|null  price as written ("£15 / £10 conc", "Free", "From £12")
+  recurrence_text string|null  repeat rule as written ("Every Friday", "Saturdays", "Weekdays 10am")
+  url             string|null  the event's OWN link: copy the "-> /path" on that event's line exactly; null if none
+  desc            string|null  short description or subtitle copied from the text, max 200 characters
+  category_text   string|null  the page's own type label for the event ("Concert", "Exhibition", "Talk", "Family")
+  audience_text   string|null  stated audience ("Kids", "Family", "Adults only", "Under 5s")
+  age_text        string|null  stated age guidance ("18+", "Ages 5-11", "0-4 years")"""
 
-# Extra fields for aggregator sites where venue/url differ per event
-_VENUE_URL_FIELDS = """\
-  venue        string   — actual event location (not the aggregator site name)
-  url          string   — event-specific link"""
+_VENUE_FIELD = """\
+  venue           string   the actual event location as written (this site lists events at many venues)"""
 
-_DATE_RULES = """\
-Date rules (today is {today}):
-- OUTPUT CONTRACT — every event is EXACTLY one of:
-    (a) ONE-OFF (single day): kind=one_off, `date`=that day, end_date=null.
-    (b) RUN (exhibition, show, display, season): kind=run, `date`=start/opening, `end_date`=closing date. end_date is REQUIRED here — NEVER null.
-    (c) RECURRING series with listed dates: emit one kind=recurring event PER listed date (end_date=null, recurrence="Saturdays" etc.).
-  If an event spans multiple days you MUST capture its closing date — look for "until", "to", "till", "ends", "through", "runs", "–"/"—" date ranges (e.g. "17 Jun – 20 Sep", "until 4 Oct"). Do NOT collapse a multi-day run into a single date, and do NOT emit a multi-day event with end_date=null.
-- CONFIRMED DATE REQUIRED: only emit an event if you can find a specific date (e.g. "14 Jun", "Sunday 15 June") in the text. Set date_confirmed=true.
-- Extract ALL upcoming or currently-running events — do not filter by date range; include everything with a confirmed future or current date.
-- Skip events whose date is clearly in the past (before today).
-- [STRUCTURED EVENT] blocks at the top of the text contain machine-readable data — startDate/endDate are confirmed dates, treat them as date_confirmed=true. If startDate is in the past and endDate is in the future, treat as a currently-running ongoing event (kind=run, date=today, end_date=endDate).
-- Recurring/series events (e.g. "select Sundays", "every weekend", "Jun–Aug"): ONLY include if the text lists specific upcoming dates OR a [STRUCTURED EVENT] block confirms the date range. Emit one event per specific upcoming date, or if a confirmed series runs now through a future end_date, emit once as kind=run. If no specific dates, SKIP entirely.
-- Ongoing exhibitions/shows: kind=run, date=opening date (or today if already open and opening date not stated), end_date=closing date (REQUIRED — if no closing date is findable, do NOT emit it as a single-day event on today; search harder or skip). Set date_confirmed=true only if opening date is explicitly stated.
-- One-off events (talks, concerts, workshops, performances, previews): kind=one_off, date_confirmed=true.
-- Include ALL events regardless of time of day — daytime, evening, weekday, weekend.
-- Always capture the time when present anywhere near the event (title line, date line, description). time=null only if none is given. Never write TBC, unknown, or similar.
-- Return [] if no qualifying events.
-- Text may be in Russian. Month name mapping: января=01, февраля=02, марта=03, апреля=04, мая=05, июня=06, июля=07, августа=08, сентября=09, октября=10, ноября=11, декабря=12. Example: "19 июня 2026" → 2026-06-19. Numeric dates are DAY-first: 19.06.2026 = 19 June 2026 → 2026-06-19. Always output `date` and `end_date` as YYYY-MM-DD."""
+_RULES = """\
+Rules:
+- COPY strings verbatim from the text. Do NOT convert dates to ISO or any other format, do NOT compute, infer or complete dates, weekdays, years or end dates, and do NOT translate.
+- Text may be in Russian (or another language): copy those strings as-is, in the original language.
+- Times go in time_text, not date_text.
+- One object per event. When an event lists several dates or a range, put them all in date_text exactly as written; never split, expand or shorten them.
+- Include every event that has date text (including "On now" / "Ongoing") or a repeat rule, whether past, current or future (date filtering happens later).
+- Skip items with no date text and no repeat rule, and non-events (navigation, newsletters, venue hire, gift vouchers, membership).
+- Use null for anything not in the text; never write "TBC", "unknown" or a guess.
+- A site with no events gets []."""
+
+_INTRO_ONE = "Find the events listed in the text of a venue web page. Return ONLY a JSON object with the site name as its single key, no prose."
+_INTRO_MANY = "Find the events listed in the text of several venue web pages. Return ONLY a single JSON object keyed by site name, no prose."
 
 _BATCH_PROMPT = """\
-Extract upcoming events from MULTIPLE venue websites. Return ONLY a single JSON object keyed by site name, no prose.
+Today is {weekday} {today} (reference only: never use it to rewrite or complete dates).
+{intro}
 
 Format:
 {{
-  "Site Name 1": [ {{event}}, ... ],
-  "Site Name 2": [ {{event}}, ... ]
+  "Site Name": [ {{event}}, ... ]
 }}
 
-Each event:
+Each event (JSON keys):
 {schema}
 
-{date_rules}
+{rules}
 
 {sites}"""
 
-# Auto-derived from the prompt: any edit to schema / date-rules / batch template
-# changes this digest → cached extractions for LLM-path sites re-run once.
-_PROMPT_VERSION = hashlib.sha256(
-    (_EVENT_SCHEMA + _VENUE_URL_FIELDS + _DATE_RULES + _BATCH_PROMPT).encode()
-).hexdigest()[:8]
+_SITE_HEADER = "=== SITE: {name} | URL: {url} | Language: {lang}{cat} ==="
+_VENUE_NOTE = "[Extract also: venue (actual event location) for each event]"
+_HINT_NOTE = "[Venue note — context only; never copy dates/times/prices from it: {hint}]"
+_PART_NOTE = "[This is part {i} of {n} of the page; other parts are processed separately.]"
+
+# Auto-derived from the prompt: any edit to schema / rules / templates changes this
+# digest -> cached extractions for LLM-path sites re-run once.
+_PROMPT_VERSION = hashlib.sha256("\x00".join((
+    _EVENT_SCHEMA, _VENUE_FIELD, _RULES, _INTRO_ONE, _INTRO_MANY, _BATCH_PROMPT,
+    _SITE_HEADER, _VENUE_NOTE, _HINT_NOTE, _PART_NOTE)).encode()).hexdigest()[:8]
+
+DESC_MAX = 200
+_RAW_FIELDS = ("title", "date_text", "end_text", "time_text", "price_text", "recurrence_text", "url",
+               "desc", "venue", "category_text", "audience_text", "age_text")
+# Keys a model sometimes uses from older/other schemas -> RawEvent field.
+_ALIASES = {"name": "title", "date": "date_text", "dates": "date_text", "start_date": "date_text",
+            "end_date": "end_text", "end": "end_text", "time": "time_text", "times": "time_text",
+            "start_time": "time_text", "price": "price_text", "recurrence": "recurrence_text",
+            "link": "url", "href": "url", "ticket_url": "url", "booking_url": "url",
+            "description": "desc", "category": "category_text", "audience": "audience_text",
+            "age": "age_text", "min_age": "age_text", "location": "venue", "venue_name": "venue"}
+_NULLISH = {"", "null", "none", "n/a", "tbc", "tba", "unknown"}
+_DROP = object()
 
 
-def _prompt_text(s: dict) -> str:
-    """Text for one LLM unit. Reducer output (has "chunks") is already compact and
-    record-aligned, so it is sent whole; legacy raw text still gets date-trimmed."""
-    if s.get("chunks") is not None:
-        return s["text"]
-    return _date_trim(_clean_text(s["text"]), max_chars=6000)
+def _s(v):
+    """Model value -> stripped string; None for null-ish; _DROP for unusable (dict) values."""
+    if v is None:
+        return None
+    if isinstance(v, dict):
+        return _DROP
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (list, tuple)):
+        if any(isinstance(x, (dict, list)) for x in v):
+            return _DROP
+        v = ", ".join(str(x).strip() for x in v if x not in (None, ""))
+    v = str(v).strip()
+    return None if v.lower() in _NULLISH else v
 
 
-def _date_trim(text: str, max_chars: int = 6000) -> str:
-    # Keep date-bearing lines AND the few lines just before each: an event's
-    # title usually sits on the line(s) above its date. Keeping only date lines
-    # left the model with bare dates and no names → it emitted generic
-    # "Exhibition"/"Concert" placeholder titles. ctx_before recovers the titles.
-    lines = text.splitlines()
-    ctx_before = int(os.environ.get("DATE_TRIM_CTX", "2"))
-    keep: set[int] = set()
-    for i, l in enumerate(lines):
-        if l.startswith("[STRUCTURED EVENT]") or _DATE_SIGNAL.search(l):
-            for j in range(max(0, i - ctx_before), i + 1):
-                keep.add(j)
-    kept = [lines[i] for i in sorted(keep)]
-    result = "\n".join(kept)
-    if len(result) < len(text) * 0.05:
-        return text[:max_chars]
-    return result[:max_chars]
+def _bool(v) -> bool | None:
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str) and v.strip().lower() in ("true", "yes", "sold out", "soldout"):
+        return True
+    if isinstance(v, str) and v.strip().lower() in ("false", "no"):
+        return False
+    return None
+
+
+def to_raws(raw_list: list, stats: dict | None = None) -> list[RawEvent]:
+    """Model/cached dicts -> RawEvents (strings only; untitled or non-dict items dropped).
+    Dict-valued fields are dropped and counted in stats["llm.dropped_keys"]."""
+    out: list[RawEvent] = []
+    for d in raw_list or []:
+        if not isinstance(d, dict):
+            continue
+        f: dict[str, str | None] = {}
+        for k, v in d.items():
+            key = k if k in _RAW_FIELDS else _ALIASES.get(k)
+            if not key or f.get(key) is not None:
+                continue
+            val = _s(v)
+            if val is _DROP:
+                if stats is not None:
+                    stats["llm.dropped_keys"] = stats.get("llm.dropped_keys", 0) + 1
+                continue
+            f[key] = val
+        if not f.get("title"):
+            continue
+        if f.get("desc"):
+            f["desc"] = f["desc"][:DESC_MAX]
+        for k in ("category_text", "audience_text", "age_text"):
+            f[k] = f.get(k) or ""
+        out.append(RawEvent(**{k: f.get(k) for k in _RAW_FIELDS}, sold_out=_bool(d.get("sold_out")),
+                            source_kind="llm"))
+    return out
 
 
 def _content_fingerprint(text: str) -> str:
     lines = text.splitlines()
-    structured = [l for l in lines if l.startswith("[STRUCTURED EVENT]")]
-    if structured:
-        return "\n".join(structured)
     date_lines = [l for l in lines if _DATE_SIGNAL.search(l)]
     return "\n".join(date_lines) if date_lines else text[:2000]
 
 
-def _text_hash(text: str, site: dict | None = None) -> str:
-    """16-hex-char SHA-256 of (logic version + prompt version + content + per-site).
+def _site_block(s: dict) -> list[str]:
+    cat = s.get("category_hint") or "other"
+    out = [_SITE_HEADER.format(name=s["name"], url=s["url"], lang=s.get("lang") or "en",
+                               cat=f" | Category hint: {cat}" if cat != "other" else "")]
+    if s.get("must_determine_venue"):
+        out.append(_VENUE_NOTE)
+    if s.get("part"):
+        out.append(_PART_NOTE.format(i=s["part"][0], n=s["part"][1]))
+    if s.get("hint"):
+        out.append(_HINT_NOTE.format(hint=s["hint"]))
+    out += [s["text"], ""]
+    return out
 
-    Folding the version tokens in means a change to extraction logic or the
-    prompt invalidates cached parses even when the input text is byte-identical.
+
+def _text_hash(text: str, site: dict | None = None) -> str:
+    """16-hex-char SHA-256 of (logic version + prompt version + content + per-site header).
+
+    The version tokens and the site header (hint, category, venue flag, lang) mean a change
+    to extraction logic, prompt or venue config invalidates cached parses even when the
+    page text is byte-identical. `today` is deliberately not part of it.
     """
     parts = [EXTRACT_VERSION, _PROMPT_VERSION, _content_fingerprint(text)]
-    cv = (site or {}).get("cache_version")
-    if cv is not None:
-        parts.append(f"cv={cv}")
+    if site:
+        parts.append("\n".join(_site_block({**site, "text": "", "part": None})))
+        if site.get("cache_version") is not None:
+            parts.append(f"cv={site['cache_version']}")
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()[:16]
 
 
-def _clean_text(text: str) -> str:
-    text = re.sub(r'data:[^)"\s]+', '', text)
-    text = re.sub(r'!\[\]\([^)]*\)', '', text)
-    text = re.sub(r'(?mi)^.*(cookie|newsletter|sign.?in|log.?in|subscribe|©|\bfooter\b).*$', '', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
+_FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.I)
 
 
-_GENERIC_TITLE_RE = re.compile(
-    r"^(concert|event|show|performance|talk|exhibition|screening)\s*[-–]\s*\w{3}\s+\d",
-    re.IGNORECASE,
-)
+def _parse_object_strict(raw: str):
+    """JSON from a reply (code fences stripped): dict, or a bare list for one site.
 
-
-def _fix_urls(raw_list: list[dict], text: str, listing_url: str) -> list[dict]:
-    """Events whose url is missing or equals the listing page: use the per-card
-    '-> href' link from the reduced text on a line containing the event title."""
-    norm = lambda u: str(u or "").strip().rstrip("/")
-    links = []
-    for ln in (text or "").splitlines():
-        if " -> " in ln:
-            body, href = ln.rsplit(" -> ", 1)
-            href = href.strip()
-            if href and not href.startswith(("#", "javascript", "mailto")):
-                links.append((body.lower(), href))
-    if not links:
-        return raw_list
-    for e in raw_list:
-        u = e.get("url")
-        if u and u != "null" and norm(u) != norm(listing_url):
-            continue
-        t = str(e.get("title") or "").strip().lower()
-        if len(t) < 4:
-            continue
-        for body, href in links:
-            if t in body:
-                e["url"] = href
-                break
-    return raw_list
-
-
-def _build_events(raw_list: list[dict], source_url: str, source_name: str) -> list[Event]:
-    events = []
-    for item in raw_list:
-        title = item.get("title", "")
-        if _GENERIC_TITLE_RE.match(str(title)):
-            continue
-        if not item.get("url") or item["url"] in ("", "null"):
-            item["url"] = source_url
-        else:
-            from urllib.parse import urljoin
-            item["url"] = urljoin(source_url, str(item["url"]).strip())
-        if not item.get("venue") or item["venue"] in ("", "null"):
-            item["venue"] = source_name
-        item["source"] = source_name
-        is_ongoing = item.get("kind") == "run" or (not item.get("kind") and item.get("is_one_off") is False)
-        date_confirmed = item.pop("date_confirmed", True)
-        # Instead of dropping events we couldn't date, flag them so the digest
-        # can list them in a separate "exact dates undetermined" section.
-        #   - one-off with an unconfirmed/inferred date → date itself is a guess
-        #   - ongoing/multi-day with no valid closing date → range incomplete
-        undetermined = False
-        if is_ongoing:
-            ed, sd = item.get("end_date"), item.get("date")
-            if not ed or (isinstance(ed, str) and isinstance(sd, str) and ed <= sd):
-                undetermined = True
-                item["end_date"] = None
-        elif not date_confirmed:
-            undetermined = True
-        if not item.get("date"):
-            # truly no date — keep it (flagged) so it still surfaces
-            item["date"] = date.today().isoformat()
-            undetermined = True
-        item["date_undetermined"] = undetermined
-        try:
-            events.append(Event(**item))
-        except Exception as ex:
-            print(f"  [build] dropped invalid event {str(item.get('title'))[:40]!r}: {str(ex)[:80]}", flush=True)
-            continue
-    return events
-
-
-def _parse_object(raw: str) -> dict[str, list[dict]]:
-    m = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not m:
-        return {}
-    try:
-        return json.loads(m.group())
-    except json.JSONDecodeError:
-        return {}
-
-
-def _parse_object_strict(raw: str) -> dict[str, list[dict]]:
-    """Like _parse_object but distinguishes 'no events' from 'broken response'.
-
-    Returns {} only for a real (empty) JSON object. RAISES when the reply has no
-    JSON object at all (prose / refusal / empty) or the object is malformed
+    RAISES when the reply has no JSON at all (prose / refusal / empty) or it is malformed
     (truncated) — so the caller can retry/fall back instead of trusting a bogus 0.
     """
-    m = re.search(r"\{.*\}", raw or "", re.DOTALL)
+    txt = _FENCE.sub("", raw or "").strip()
+    try:
+        data = json.loads(txt)
+        if isinstance(data, (dict, list)):
+            return data
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r"\{.*\}", txt, re.DOTALL)
     if not m:
         raise ValueError(f"no JSON object in reply: {(raw or '')[:60]!r}")
     try:
         return json.loads(m.group())
     except json.JSONDecodeError as e:
         raise ValueError(f"malformed/truncated JSON object: {e}") from e
+
+
+def _fold_name(s: str) -> str:
+    return re.sub(r"[\"'«»]", "", fold(s))
+
+
+def _site_records(parsed, name: str, n_sites: int):
+    """This site's list from a reply; [] for an empty reply; None when the reply has
+    other keys but not this site (never cached as an empty)."""
+    if isinstance(parsed, list):
+        return parsed if n_sites == 1 else None
+    if not parsed:
+        return []
+    if name in parsed:
+        v = parsed[name]
+    elif n_sites == 1 and len(parsed) == 1:
+        v = next(iter(parsed.values()))
+    else:
+        key = next((k for k in parsed if _fold_name(k) == _fold_name(name)), None)
+        if key is None:
+            return None
+        v = parsed[key]
+    if v is None:
+        return []
+    if isinstance(v, dict):
+        return [v]
+    return v if isinstance(v, list) else None
 
 
 def _future_date_signals(text: str) -> int:
@@ -323,63 +320,69 @@ def _retry_target(model_label: str) -> tuple[str, str] | None:
     return ("claude", "haiku")
 
 
-def _make_batch_prompt(sites_data: list[dict], today: str) -> str:
-    parts = []
-    for s in sites_data:
-        parts.append(f"=== SITE: {s['name']} | URL: {s['url']} | Category hint: {s['category_hint']} ===")
-        if s.get("must_determine_venue"):
-            parts.append("[Extract also: venue (actual event location) and url (event-specific link) for each event]")
-        if s.get("notes"):
-            parts.append(f"[Note: {s['notes']}]")
-        parts.append(_prompt_text(s))
-        parts.append("")
+def _make_batch_prompt(sites_data: list[dict], today: date | str) -> str:
+    d = date.fromisoformat(today) if isinstance(today, str) else today
+    schema = _EVENT_SCHEMA + ("\n" + _VENUE_FIELD if any(s.get("must_determine_venue") for s in sites_data) else "")
     return _BATCH_PROMPT.format(
-        schema=_EVENT_SCHEMA,
-        date_rules=_DATE_RULES.format(today=today),
-        sites="\n".join(parts),
+        weekday=d.strftime("%A"), today=d.isoformat(), intro=_INTRO_ONE if len(sites_data) == 1 else _INTRO_MANY,
+        schema=schema, rules=_RULES, sites="\n".join(line for s in sites_data for line in _site_block(s)),
     )
 
 
-async def extract_events_batch_async(
+def cached_records(site: dict, force_parse: bool = False) -> tuple[list[dict], str] | None:
+    """(cached raw dicts, hit label) for a site dict, or None on a miss."""
+    return get_cached_parse(site["name"], force=force_parse, fetched_at=site.get("fetched_at"),
+                            content_hash=_text_hash(site["text"], site), model=current_model_label())
+
+
+Tagged = list[tuple[str, dict]]     # (site name, raw record dict)
+SiteError = tuple[str, str]         # (site name, what failed)
+
+
+def _tag(raw_list: list, name: str) -> Tagged:
+    return [(name, d) for d in raw_list if isinstance(d, dict)]
+
+
+async def extract_raw_batch_async(
     sites_data: list[dict],
-    errors: list[str] | None = None,
+    errors: list[SiteError] | None = None,
     force_parse: bool = False,
-    compare: bool = False,
-) -> list[Event]:
-    """Extract events from site data dicts using the configured LLM backend.
+    today: date | None = None,
+    sem: asyncio.Semaphore | None = None,
+) -> dict[str, list[dict]]:
+    """Raw record dicts per site name (to_raws() makes RawEvents) for site dicts {name, url,
+    text, chunks, category_hint, hint, lang, must_determine_venue, cache_version, fetched_at}.
 
-    Cache behaviour:
-    - Content-hash hit: cached result reused regardless of TTL when page content
-      is byte-identical to the stored fingerprint.
-    - TTL hit: cached result reused when within PARSE_TTL_DAYS and not stale vs
-      the last HTML download.
-    - Miss: LLM called, result stored with content hash.
-
-    Concurrency: bounded by _CONCURRENCY (1 for Ollama, 3 for Claude). Batches
-    run concurrently up to that limit; result order matches input order.
+    Cache: per site, keyed on _text_hash (content + versions + site header); a TTL hit is
+    accepted only for legacy unhashed rows. `errors` gets (name, "failed") when the whole
+    site failed, (name, "chunk i/n failed") for a lost chunk; failures are never cached.
+    Concurrency: bounded by `sem` (shared across calls) or a fresh _CONCURRENCY semaphore.
     """
-    today = date.today().isoformat()
+    today = today or date.today()
     model = current_model_label()
-
-    all_events: list[Event] = []
+    out: dict[str, list[dict]] = {s["name"]: [] for s in sites_data}
+    errs: list[SiteError] = errors if errors is not None else []
     uncached_sites: list[dict] = []
+
+    def _err(name: str, msg: str) -> None:
+        if (name, msg) not in errs:
+            errs.append((name, msg))
 
     for s in sites_data:
         h = _text_hash(s["text"], s)
-        fetched_at = get_html_fetched_at(s["url"])
-        cached = get_cached_parse(s["name"], force=force_parse, fetched_at=fetched_at, content_hash=h, model=model, any_model=(not compare))
+        cached = get_cached_parse(s["name"], force=force_parse, fetched_at=s.get("fetched_at"),
+                                  content_hash=h, model=model)
         if cached is not None:
             raw_list, hit_type = cached
-            evts = _build_events(raw_list, s["url"], s["name"])
-            all_events.extend(evts)
-            print(f"  [HTML] {s['name']}: {len(evts)} events [{hit_type}]", flush=True)
-            timing.log_runtime(venue=s["name"], model=model, events=len(evts), cache_hit=True, secs=0.0)
+            out[s["name"]] = [d for d in raw_list if isinstance(d, dict)]
+            print(f"  [llm] {s['name']}: {len(out[s['name']])} records [{hit_type}]", flush=True)
+            timing.log_runtime(venue=s["name"], model=model, events=len(out[s["name"]]), cache_hit=True, secs=0.0)
         else:
             s["_text_hash"] = h  # carry hash through to save_extraction
             uncached_sites.append(s)
 
     if not uncached_sites:
-        return all_events
+        return out
 
     # Expand multi-chunk sites into one LLM unit per chunk (each <=6000 chars);
     # results merge back per parent site and are cached under the parent name.
@@ -393,8 +396,7 @@ async def extract_events_batch_async(
         for i, c in enumerate(chunks, 1):
             # Same name as the parent: the LLM keys its answer by the SITE header, so a
             # renamed "[part i/n]" header comes back under the bare name and is lost.
-            note = f"This is part {i} of {len(chunks)} of the page; other parts are processed separately. " + (s.get("notes") or "")
-            u = {**s, "text": c, "chunks": [c], "notes": note.strip(), "_parent": s, "_idx": i}
+            u = {**s, "text": c, "chunks": [c], "part": (i, len(chunks)), "_parent": s, "_idx": i}
             s["_units"].append(u)
             units.append(u)
 
@@ -402,13 +404,14 @@ async def extract_events_batch_async(
         return x.get("_parent", x)["name"]
 
     def _merge_raw(raw: list[dict]) -> list[dict]:
-        seen, out = set(), []
+        seen, res = set(), []
         for e in raw:
-            k = (str(e.get("title", "")).strip().lower(), e.get("date"), e.get("time"))
+            k = (str(e.get("title", "")).strip().lower(), str(e.get("date_text") or e.get("date") or ""),
+                 str(e.get("time_text") or e.get("time") or ""))
             if k not in seen:
                 seen.add(k)
-                out.append(e)
-        return out
+                res.append(e)
+        return res
 
     # Never put two units of the same site in one batch (they share the answer key).
     batches: list[list[dict]] = []
@@ -421,12 +424,12 @@ async def extract_events_batch_async(
                 break
         else:
             batches.append([u])
-    sem = asyncio.Semaphore(_CONCURRENCY)
+    sem = sem or asyncio.Semaphore(_CONCURRENCY)
 
-    async def _chunk_done(parent: dict, _model: str, dt: float, nsites: int, retry: bool, failed_idx: int | None = None, unit: dict | None = None) -> list[Event]:
+    async def _chunk_done(parent: dict, _model: str, dt: float, nsites: int, retry: bool, failed_idx: int | None = None, unit: dict | None = None) -> Tagged:
         """Account one finished chunk (ok or failed). On the last chunk, build the
-        parent's events from whatever chunks succeeded. A failed chunk never loses
-        the other chunks' events; a partial result is not cached (so it re-runs)."""
+        parent's records from whatever chunks succeeded. A failed chunk never loses
+        the other chunks' records; a partial result is not cached (so it re-runs)."""
         key = id(unit) if unit is not None else ("f", failed_idx)
         done = parent.setdefault("_done", set())
         if key in done:        # batch retry re-reported this unit: don't double-count
@@ -447,15 +450,13 @@ async def extract_events_batch_async(
                 parent["_failed"].remove(failed_idx)
             raise
 
-    async def _chunk_finalize(parent: dict, _model: str, dt: float, nsites: int, retry: bool) -> list[Event]:
+    async def _chunk_finalize(parent: dict, _model: str, dt: float, nsites: int, retry: bool) -> Tagged:
         name, n = parent["name"], parent["_n"]
         merged = _merge_raw(parent["_raw"])
         failed = sorted(parent["_failed"])
         for i in failed:
-            msg = f"{name} (chunk {i}/{n} failed)"
-            print(f"  [HTML] {msg}", flush=True)
-            if errors is not None and msg not in errors:
-                errors.append(msg)
+            print(f"  [llm] {name} (chunk {i}/{n} failed)", flush=True)
+            _err(name, f"chunk {i}/{n} failed")
         if not merged and not failed and retry:
             n_sig = _future_date_signals(parent["text"])
             if _model == "qwen":      # weak-model empty is provisional: always upgrade (as for non-chunked sites)
@@ -463,111 +464,112 @@ async def extract_events_batch_async(
             else:
                 tgt = _retry_target(_model) if n_sig >= 3 else None
             if tgt:
-                print(f"  [extract] {name}: 0 events over {n} chunks ({n_sig} date signals) — retrying with {tgt[1]}", flush=True)
+                print(f"  [llm] {name}: 0 records over {n} chunks ({n_sig} date signals) — retrying with {tgt[1]}", flush=True)
                 parent["_raw"], parent["_pending"], parent["_failed"], parent["_done"] = [], n, [], set()
-                got: list[Event] = []
+                got: Tagged = []
                 for u in parent["_units"]:
                     try:
                         got.extend(await _extract_sites([u], backend=tgt[0], model_label=tgt[1], retry=False))
                     except Exception as e:
-                        print(f"  [extract] {name}: {tgt[1]} retry failed ({str(e)[:60]}); not caching empty", flush=True)
+                        print(f"  [llm] {name}: {tgt[1]} retry failed ({str(e)[:60]}); not caching empty", flush=True)
                         return []
                 return got
-        _fix_urls(merged, parent.get("text", ""), parent["url"])
-        site_events = _build_events(merged, parent["url"], name)
-        print(f"  [HTML] {name}: {len(site_events)} events [{_model}] ({dt:.0f}s, {n} chunks{', PARTIAL' if failed else ''})", flush=True)
-        timing.log_runtime(venue=name, model=_model, events=len(site_events), secs=round(dt, 1), batch_size=nsites)
+        recs = _tag(merged, name)
+        print(f"  [llm] {name}: {len(recs)} records [{_model}] ({dt:.0f}s, {n} chunks{', PARTIAL' if failed else ''})", flush=True)
+        timing.log_runtime(venue=name, model=_model, events=len(recs), secs=round(dt, 1), batch_size=nsites)
         if not failed:
             save_extraction(name, merged, content_hash=parent.get("_text_hash"), model=_model)
-        return site_events
+        return recs
 
-    async def _extract_sites(sites: list[dict], backend: str | None = None, model_label: str | None = None, retry: bool = True) -> list[Event]:
+    async def _extract_sites(sites: list[dict], backend: str | None = None, model_label: str | None = None, retry: bool = True) -> Tagged:
         """One LLM call for `sites`. Raises on call/parse failure (handled by
         _run_batch's split-retry + haiku fallback). A valid empty result yields 0
-        events, no raise. backend/model_label override the default (used by the
+        records, no raise. backend/model_label override the default (used by the
         claude fallback to re-run a venue the local model couldn't parse)."""
         _model = model_label or model
         prompt = _make_batch_prompt(sites, today)
         t0 = timing.now()
         # Hard wall-clock cap per LLM call: run_llm's internal httpx read-timeout
         # resets per streamed chunk, so a slow/infinite ollama generation never
-        # fires it and stalls the whole run (a 14b venue hung indefinitely). Wrap
-        # the call in asyncio.wait_for so a hung venue is cancelled and skipped.
+        # fires it and stalls the whole run. Wrap in asyncio.wait_for so a hung
+        # venue is cancelled and skipped.
         raw = await asyncio.wait_for(run_llm(prompt, backend=backend, timeout=420, retries=2), timeout=450)
         dt = timing.now() - t0
         parsed = _parse_object_strict(raw)              # raises on truncated/garbled JSON
-        events: list[Event] = []
+        recs: Tagged = []
         empty_under_weak: list[dict] = []
         suspicious: list[tuple[dict, int]] = []
+        missing: list[dict] = []
         for site in sites:
-            raw_list = parsed.get(site["name"], [])
-            if not isinstance(raw_list, list):
-                raw_list = []
+            raw_list = _site_records(parsed, site["name"], len(sites))
+            if raw_list is None:            # reply keyed by other names: a failure, not an empty
+                print(f"  [llm] {site['name']}: not in reply (keys: {list(parsed)[:3] if isinstance(parsed, dict) else 'list'})", flush=True)
+                missing.append(site)
+                continue
             parent = site.get("_parent")
             if parent is not None:
                 if id(site) not in parent.get("_done", ()):
                     parent["_raw"].extend(r for r in raw_list if isinstance(r, dict))
-                events.extend(await _chunk_done(parent, _model, dt, len(sites), retry, unit=site))
+                recs.extend(await _chunk_done(parent, _model, dt, len(sites), retry, unit=site))
                 continue
             # Defer a weak-model (qwen) empty to an in-run haiku upgrade rather than
-            # caching a 0 that get_cached_parse would distrust and re-parse anyway —
-            # self-heals coverage within one run. Skip when this IS the haiku pass
-            # (_model trusted) to avoid recursion.
+            # caching a 0 that get_cached_parse would distrust and re-parse anyway.
             if not raw_list and _model == "qwen":
                 empty_under_weak.append(site)
                 continue
             if not raw_list and retry and _model != "qwen":
-                n_sig = _future_date_signals(_prompt_text(site))
+                n_sig = _future_date_signals(site["text"])
                 if n_sig >= 3 and _retry_target(_model):
                     suspicious.append((site, n_sig))
                     continue
-            _fix_urls(raw_list, site.get("text", ""), site["url"])
-            site_events = _build_events(raw_list, site["url"], site["name"])
-            events.extend(site_events)
-            print(f"  [HTML] {site['name']}: {len(site_events)} events [{_model}] ({dt:.0f}s)", flush=True)
-            timing.log_runtime(venue=site["name"], model=_model, events=len(site_events), secs=round(dt, 1), batch_size=len(sites))
+            site_recs = _tag(raw_list, site["name"])
+            recs.extend(site_recs)
+            print(f"  [llm] {site['name']}: {len(site_recs)} records [{_model}] ({dt:.0f}s)", flush=True)
+            timing.log_runtime(venue=site["name"], model=_model, events=len(site_recs), secs=round(dt, 1), batch_size=len(sites))
             save_extraction(site["name"], raw_list, content_hash=site.get("_text_hash"), model=_model)
+        if missing:
+            recs.extend(await _fail(missing))
         if empty_under_weak:
             names = ", ".join(s["name"] for s in empty_under_weak)
-            print(f"  [HTML] {len(empty_under_weak)} empty under {_model} → haiku upgrade: {names}", flush=True)
+            print(f"  [llm] {len(empty_under_weak)} empty under {_model} → haiku upgrade: {names}", flush=True)
             try:
-                events.extend(await _extract_sites(empty_under_weak, backend="claude", model_label="haiku"))
+                recs.extend(await _extract_sites(empty_under_weak, backend="claude", model_label="haiku"))
             except Exception as e:
-                print(f"  [HTML] haiku upgrade failed ({str(e)[:60]}); leaving unparsed for retry next run", flush=True)
+                print(f"  [llm] haiku upgrade failed ({str(e)[:60]}); leaving unparsed for retry next run", flush=True)
         for site, n_sig in suspicious:
             fb_backend, fb_label = _retry_target(_model)
-            print(f"  [extract] {site['name']}: 0 events but {n_sig} date signals — retrying with {fb_label}", flush=True)
+            print(f"  [llm] {site['name']}: 0 records but {n_sig} date signals — retrying with {fb_label}", flush=True)
             try:
                 got = await _extract_sites([site], backend=fb_backend, model_label=fb_label, retry=False)
             except Exception as e:
-                print(f"  [extract] {site['name']}: {fb_label} retry failed ({str(e)[:60]}); not caching empty", flush=True)
+                print(f"  [llm] {site['name']}: {fb_label} retry failed ({str(e)[:60]}); not caching empty", flush=True)
                 continue
-            events.extend(got)
+            recs.extend(got)
             if not got:  # both agree on empty → cache the original empty too
-                print(f"  [HTML] {site['name']}: 0 events [{_model}] ({dt:.0f}s)", flush=True)
+                print(f"  [llm] {site['name']}: 0 records [{_model}] ({dt:.0f}s)", flush=True)
                 save_extraction(site["name"], [], content_hash=site.get("_text_hash"), model=_model)
-        return events
+        return recs
 
-    async def _fail(batch: list[dict], names: list[str]) -> list[Event]:
-        """Terminal failure of a single unit: whole-site error, or (for a chunk of
-        a multi-chunk site) isolate it and keep the other chunks' events."""
-        out: list[Event] = []
+    async def _fail(batch: list[dict]) -> Tagged:
+        """Terminal failure of units: whole-site error, or (for a chunk of a multi-chunk
+        site) isolate it and keep the other chunks' records."""
+        res: Tagged = []
         for s in batch:
             if s.get("_parent") is not None:
-                out.extend(await _chunk_done(s["_parent"], model, 0.0, 1, True, failed_idx=s["_idx"], unit=s))
-            elif errors is not None and s["name"] not in errors:
-                errors.append(s["name"])
-        return out
+                res.extend(await _chunk_done(s["_parent"], model, 0.0, 1, True, failed_idx=s["_idx"], unit=s))
+            else:
+                _err(s["name"], "failed")
+        return res
 
     def _truncated(e: Exception) -> bool:
         return isinstance(e, ValueError) and "malformed" in str(e)
 
-    async def _split_run(u: dict, depth: int) -> list[Event]:
+    async def _split_run(u: dict, depth: int) -> Tagged:
         """Output was cut off (deepseek 8192-token cap): halve this chunk on record
         (line) boundaries and retry each half; max depth 2, then fail the chunk."""
         lines = u["text"].split("\n")
         if depth >= 2 or len(lines) < 2:
-            return await _fail([u], [_nm(u)])
+            return await _fail([u])
         mid = len(lines) // 2
         parent = u.get("_parent")
         halves = [{**u, "text": t, "chunks": [t], "_depth": depth + 1} for t in ("\n".join(lines[:mid]), "\n".join(lines[mid:]))]
@@ -581,20 +583,20 @@ async def extract_events_batch_async(
             parent["_units"] = [x for x in parent["_units"] if x is not u] + halves
             for h in halves:
                 h["_parent"], h["_idx"] = parent, u.get("_idx", 1)
-        print(f"  [extract] {_nm(u)}: output truncated -> splitting chunk in 2 (depth {depth + 1})", flush=True)
-        out: list[Event] = []
+        print(f"  [llm] {_nm(u)}: output truncated -> splitting chunk in 2 (depth {depth + 1})", flush=True)
+        res: Tagged = []
         for h in halves:
             try:
-                out.extend(await _extract_sites([h]))
+                res.extend(await _extract_sites([h]))
             except Exception as e2:
                 if _truncated(e2):
-                    out.extend(await _split_run(h, depth + 1))
+                    res.extend(await _split_run(h, depth + 1))
                 else:
-                    print(f"  [HTML] split half failed: {str(e2)[:80]}", flush=True)
-                    out.extend(await _fail([h], [_nm(h)]))
-        return out
+                    print(f"  [llm] split half failed: {str(e2)[:80]}", flush=True)
+                    res.extend(await _fail([h]))
+        return res
 
-    async def _run_batch(batch: list[dict]) -> list[Event]:
+    async def _run_batch(batch: list[dict]) -> Tagged:
         async with sem:
             try:
                 return await _extract_sites(batch)
@@ -603,38 +605,42 @@ async def extract_events_batch_async(
                     return await _split_run(batch[0], batch[0].get("_depth", 0))
                 if len(batch) <= 1:
                     names = list(dict.fromkeys(_nm(s) for s in batch))
-                    # Auto-fallback: a local-model (qwen/8b) parse failure — e.g.
-                    # malformed JSON on a dense venue — retries the venue with
-                    # claude/haiku before giving up, and stores it tagged
-                    # model="haiku" so it self-heals (next run reuses the cached
-                    # haiku result, no re-fail). Skip when the primary IS claude.
+                    # Auto-fallback: a primary-model failure retries the venue with
+                    # claude/haiku before giving up, stored as model="haiku" so it
+                    # self-heals. Skip when the primary IS claude.
                     if model != "haiku":
                         try:
-                            print(f"  [HTML] {names[0]}: {model} failed ({str(e)[:50]}) → fallback to haiku", flush=True)
+                            print(f"  [llm] {names[0]}: {model} failed ({str(e)[:50]}) → fallback to haiku", flush=True)
                             return await _extract_sites(batch, backend="claude", model_label="haiku")
                         except Exception as e_fb:
-                            print(f"  [HTML] FAILED ({', '.join(names)}): {model}+haiku both failed: {str(e_fb)[:80]}")
-                            return await _fail(batch, names)
-                    print(f"  [HTML] FAILED ({', '.join(names)}): {e}")
-                    return await _fail(batch, names)
+                            print(f"  [llm] FAILED ({', '.join(names)}): {model}+haiku both failed: {str(e_fb)[:80]}")
+                            return await _fail(batch)
+                    print(f"  [llm] FAILED ({', '.join(names)}): {e}")
+                    return await _fail(batch)
                 # Split-retry: a failed/garbled multi-site response is usually
-                # truncation or a transient rate limit — retry each site alone so
-                # one bad site (or a cut-off batch) can't silently zero the rest.
-                print(f"  [HTML] batch of {len(batch)} failed ({e}); retrying sites individually")
-                out: list[Event] = []
+                # truncation or a transient rate limit — retry each site alone.
+                print(f"  [llm] batch of {len(batch)} failed ({e}); retrying sites individually")
+                res: Tagged = []
                 for s in batch:
                     try:
-                        out.extend(await _extract_sites([s]))
+                        res.extend(await _extract_sites([s]))
                     except Exception as e2:
                         if _truncated(e2):
-                            out.extend(await _split_run(s, s.get("_depth", 0)))
+                            res.extend(await _split_run(s, s.get("_depth", 0)))
                             continue
-                        print(f"  [HTML] FAILED ({s['name']}): {e2}")
-                        out.extend(await _fail([s], [_nm(s)]))
-                return out
+                        print(f"  [llm] FAILED ({s['name']}): {e2}")
+                        res.extend(await _fail([s]))
+                return res
 
-    # Run batches concurrently (bounded by sem); gather preserves arg order.
-    results = await asyncio.gather(*[_run_batch(b) for b in batches])
-    for r in results:
-        all_events.extend(r)
-    return all_events
+    # Run batches concurrently (bounded by sem); a batch that still raises (e.g. the
+    # cache write) fails only its own sites.
+    results = await asyncio.gather(*[_run_batch(b) for b in batches], return_exceptions=True)
+    for b, tagged in zip(batches, results):
+        if isinstance(tagged, BaseException):
+            print(f"  [llm] batch crashed: {type(tagged).__name__}: {str(tagged)[:80]}", flush=True)
+            for u in b:
+                _err(_nm(u), f"failed ({type(tagged).__name__})")
+            continue
+        for name, d in tagged:
+            out.setdefault(name, []).append(d)
+    return out

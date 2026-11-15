@@ -87,3 +87,59 @@ def pick_event_url(lines: list[str], listing_url: str, *, pattern: str | None = 
         return min(enumerate(cands), key=rank)[1]
     except Exception:
         return None
+
+
+# ── title -> per-event link (shared by the jsonld / llm / spektrix sources) ──────
+
+_TAG_PREFIX = re.compile(r"^\s*\[[A-Z]{1,3}\]\s*")
+_ANCHOR = re.compile(r"<a\b[^>]*?\bhref\s*=\s*([\"'])(.*?)\1[^>]*>(.*?)</a\s*>", re.I | re.S)
+_TAGS = re.compile(r"<[^>]+>")
+_WS = re.compile(r"\s+")
+_QUOTES = str.maketrans({c: "'" for c in "‘’`´"} | {c: '"' for c in "“”"})
+
+
+def fold(s: str) -> str:
+    """Case/quote/whitespace-folded text for title comparison."""
+    import html as _html
+    return _WS.sub(" ", _html.unescape(s or "").translate(_QUOTES)).strip().casefold()
+
+
+def anchor_lines(html: str) -> list[str]:
+    """'<anchor text> -> <href>' for every <a href> in a page (the reduced-text link form)."""
+    import html as _html
+    out = []
+    for _, href, inner in _ANCHOR.findall(html or ""):
+        text = _WS.sub(" ", _html.unescape(_TAGS.sub(" ", inner))).strip()
+        if text and href:
+            out.append(f"{text} -> {_html.unescape(href).strip()}")
+    return out
+
+
+def _label(line: str) -> str:
+    """First ' | ' field of a reduced line (or the text before ' -> '), tag prefix dropped."""
+    body = line.rsplit(" -> ", 1)[0] if " -> " in line else line
+    return fold(_TAG_PREFIX.sub("", body).split(" | ", 1)[0])
+
+
+def match_title_url(title: str, lines: list[str], base_url: str, *, pattern: str | None = None) -> str | None:
+    """Per-event URL for `title` from reduced/anchor lines, by tier: a line whose label equals
+    the title, else one whose label starts with it, else (same-site links only) one whose label
+    contains it as a phrase ("More info about <title>"). The first tier with any match must
+    give one distinct URL, else None."""
+    t = fold(title)
+    if len(t) < 4:
+        return None
+    host = _norm(base_url or "")[0]
+    phrase = re.compile(r"(?<!\w)" + re.escape(t) + r"(?!\w)")
+    labelled = [(_label(ln), ln) for ln in lines or [] if isinstance(ln, str)]
+    tiers = ((lambda lab: lab == t, False), (lambda lab: lab.startswith(t), False),
+             (lambda lab: bool(phrase.search(lab)), True))
+    for ok, same_site in tiers:
+        urls = {u for lab, ln in labelled if ok(lab) and (u := pick_event_url([ln], base_url, pattern=pattern))}
+        if same_site:
+            urls = {u for u in urls if _norm(u)[0] == host}
+        if len(urls) == 1:
+            return urls.pop()
+        if len(urls) > 1:
+            return None
+    return None

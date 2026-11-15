@@ -41,15 +41,12 @@ def test_json_adapter_orange_tree():
     assert all(e.date >= TODAY for e in evs) and len(evs) < len(raws)   # past performances dropped
 
 
-def test_parity_with_rec_to_event_orange_tree():
-    from src.sources.adapters import get_adapter
-    from src.sources.reduce import rec_to_event
+def test_orange_tree_matches_recorded_output():
+    import json
+    expected = json.loads((FIX / "expected_events.json").read_text())
     cfg = VENUES["Orange Tree Theatre"]
-    site = cfg.to_legacy_dict()
-    recs = [r for r in get_adapter(site).records(_html("orange_tree"), site) if r.title]
-    old = {(e.title, e.date) for r in recs for e in rec_to_event(r, site, TODAY) if (e.end_date or e.date) >= TODAY}
-    new = {(e.title, e.date) for e in build_events(raws_from_html(_html("orange_tree"), cfg, _ctx()), cfg, _ctx())}
-    assert old == new
+    got = sorted([e.title, e.date.isoformat()] for e in build_events(raws_from_html(_html("orange_tree"), cfg, _ctx()), cfg, _ctx()))
+    assert expected["today"] == TODAY.isoformat() and got == expected["adapter"]["orange_tree"]
 
 
 def test_coliseum_python_adapter(monkeypatch):
@@ -88,7 +85,7 @@ def test_zero_records_reported():
     cfg = VenueConfig(name="Cards", url="https://x.org/", adapter={"kind": "cards", "card": ".nope"})
     ctx = _ctx()
     assert raws_from_html("<html><body></body></html>", cfg, ctx) == []
-    assert ctx.errors == ["Cards: adapter 'cards' found 0 records"]
+    assert not ctx.errors and ctx.stats["adapter.no_records"] == 1     # benign: next source runs
 
 
 def test_dedupe_and_not_ok_fetch():
@@ -96,5 +93,6 @@ def test_dedupe_and_not_ok_fetch():
                       adapter={"kind": "cards", "card": ".ev", "title": "h3", "date": ".d"})
     card = '<div class="ev"><h3>Gig</h3><span class="d">20 Nov 2026</span></div>'
     assert len(raws_from_html(card * 3, cfg, _ctx())) == 1
-    fr = FetchResult(FetchStatus.ERROR, body=card)
-    assert asyncio.run(get_source("adapter").records(cfg, fr, _ctx())) == []
+    fr = FetchResult(FetchStatus.ERROR, body=card)          # fallback body is parsed (flagged stale upstream)
+    assert len(asyncio.run(get_source("adapter").records(cfg, fr, _ctx()))) == 1
+    assert asyncio.run(get_source("adapter").records(cfg, FetchResult(FetchStatus.ERROR), _ctx())) == []
