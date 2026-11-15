@@ -1,0 +1,242 @@
+[
+{
+"id": "14201ARTVMVMMBMSJNNDBHCBBRVSCTRNG",
+"event": {
+"id": "4401APLLPBSHLDJVTLGBDQTQBHJDJSHCM"
+},
+"start": "2026-11-19T17:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 6pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5.30pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+}
+]
+}
+},
+{
+"id": "48202AKCKPVLTLKDJGNSTVJSJLLMBNRSR",
+"event": {
+"id": "4401APLLPBSHLDJVTLGBDQTQBHJDJSHCM"
+},
+"start": "2026-11-20T17:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 6pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5.30pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+}
+]
+}
+},
+{
+"id": "112402APNTNGBTQMLSJHKGQVLMRPTVRRT",
+"event": {
+"id": "4401APLLPBSHLDJVTLGBDQTQBHJDJSHCM"
+},
+"start": "2026-11-21T17:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 6pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5.30pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+}
+]
+}
+},
+{
+"id": "36801AVRGVGRDVPNHVPNNQVLKLPKNJBND",
+"event": {
+"id": "4401APLLPBSHLDJVTLGBDQTQBHJDJSHCM"
+},
+"start": "2026-11-23T17:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 6pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+},
+{
+"amount": 24.0,
+"ticketType": {
+"name": "Two-Course Meal - Arrival 5.30pm"
+},
+"priceBand": {
+"name": "GA Seating"
+}
+}
+]
+}
+},
+{
+"id": "130601APHPQJHJPRKCMSLRCJTVSRDKMKQ",
+"event": {
+"id": "20801AJMTLQPSPKJDPVTSBMNNJNRPTPVH"
+},
+"start": "2027-01-16T15:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 26.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 3"
+}
+},
+{
+"amount": 28.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 2"
+}
+},
+{
+"amount": 30.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 1"
+}
+}
+]
+}
+},
+{
+"id": "33401ASQTDQSSBKHDTGJNVLMTDQJCSHNC",
+"event": {
+"id": "20801AJMTLQPSPKJDPVTSBMNNJNRPTPVH"
+},
+"start": "2027-01-16T19:30:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 26.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 3"
+}
+},
+{
+"amount": 28.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 2"
+}
+},
+{
+"amount": 30.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 1"
+}
+}
+]
+}
+}
+]

@@ -204,3 +204,4 @@ class RawEvent(BaseModel):
     desc: Optional[str] = None             # short description / subtitle
     venue: Optional[str] = None            # venue when the page lists several (aggregators)
     source_kind: Optional[str] = None      # producer: "jsonld", "adapter:cards", "llm", "spektrix", ...
+    sold_out: Optional[bool] = None        # True when the source says so (Spektrix status); None = unknown

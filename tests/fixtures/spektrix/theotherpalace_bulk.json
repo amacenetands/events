@@ -1,0 +1,211 @@
+[
+{
+"id": "246206ARQSSKQCGCQCDLNVNQBMLPLJLTQ",
+"event": {
+"id": "106601ABDGMDSRMQSQSLLHHLBNPJHQMLS"
+},
+"start": "2026-11-15T14:30:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 28.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "A"
+}
+},
+{
+"amount": 30.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "B"
+}
+},
+{
+"amount": 10.0,
+"ticketType": {
+"name": "Standing"
+},
+"priceBand": {
+"name": "C"
+}
+}
+]
+}
+},
+{
+"id": "240703ASRQGGVGGHTHTRHBRGMPRRGJRMH",
+"event": {
+"id": "104401ANKRNNLHCVDTNJGJHJRJPJMRLCG"
+},
+"start": "2026-11-15T15:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 60.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "A"
+}
+},
+{
+"amount": 40.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "B"
+}
+},
+{
+"amount": 20.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "C"
+}
+},
+{
+"amount": 20.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "D"
+}
+}
+]
+}
+},
+{
+"id": "246801ANRVNCSBPMGDKKPTLRSDNBSTGNL",
+"event": {
+"id": "106601ABDGMDSRMQSQSLLHHLBNPJHQMLS"
+},
+"start": "2026-11-15T18:30:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 28.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "A"
+}
+},
+{
+"amount": 30.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "B"
+}
+},
+{
+"amount": 10.0,
+"ticketType": {
+"name": "Standing"
+},
+"priceBand": {
+"name": "C"
+}
+}
+]
+}
+},
+{
+"id": "246603AGCNTCSSPRSLDGMQBMJPKBLLMVK",
+"event": {
+"id": "106601ABDGMDSRMQSQSLLHHLBNPJHQMLS"
+},
+"start": "2026-11-17T20:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 28.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "A"
+}
+},
+{
+"amount": 30.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "B"
+}
+},
+{
+"amount": 10.0,
+"ticketType": {
+"name": "Standing"
+},
+"priceBand": {
+"name": "C"
+}
+}
+]
+}
+},
+{
+"id": "245802AKBNPMLCSDBCLKBLKLTSDVNCLTV",
+"event": {
+"id": "106601ABDGMDSRMQSQSLLHHLBNPJHQMLS"
+},
+"start": "2026-11-18T20:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 36.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "A"
+}
+},
+{
+"amount": 38.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "B"
+}
+},
+{
+"amount": 10.0,
+"ticketType": {
+"name": "Standing"
+},
+"priceBand": {
+"name": "C"
+}
+}
+]
+}
+}
+]

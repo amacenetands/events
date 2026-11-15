@@ -1,0 +1,62 @@
+{
+ "Kings Place": {
+  "file": "kings_place.html",
+  "url": "https://kingsplace.co.uk/whats-on/"
+ },
+ "The Other Palace": {
+  "file": "the_other_palace.html",
+  "url": "https://theotherpalace.co.uk/shows/"
+ },
+ "Bush Theatre": {
+  "file": "bush_theatre.html",
+  "url": "https://www.bushtheatre.co.uk/whats-on/"
+ },
+ "Royal Court Theatre": {
+  "file": "royal_court_theatre.html",
+  "url": "https://royalcourttheatre.com/whats-on/"
+ },
+ "Park Theatre": {
+  "file": "park_theatre.html",
+  "url": "https://parktheatre.co.uk/whats-on/"
+ },
+ "Lyric Hammersmith": {
+  "file": "lyric_hammersmith.html",
+  "url": "https://lyric.co.uk/whats-on/"
+ },
+ "Hackney Empire": {
+  "file": "hackney_empire.html",
+  "url": "https://www.hackneyempire.co.uk/whats-on"
+ },
+ "Camden People's Theatre": {
+  "file": "camden_people_s_theatre.html",
+  "url": "https://cptheatre.co.uk/Whats-On"
+ },
+ "Criterion Theatre": {
+  "file": "criterion_theatre.html",
+  "url": "https://www.criterion-theatre.co.uk/whats-on"
+ },
+ "Chickenshed Theatre": {
+  "file": "chickenshed_theatre.html",
+  "url": "https://www.chickenshed.org.uk/calendar"
+ },
+ "OSO Arts Centre": {
+  "file": "oso_arts_centre.html",
+  "url": "https://osoarts.org.uk/"
+ },
+ "Watermans Arts Centre": {
+  "file": "watermans_arts_centre.html",
+  "url": "https://www.watermans.org.uk/whats-on/"
+ },
+ "Conway Hall": {
+  "file": "conway_hall.html",
+  "url": "https://www.conwayhall.org.uk/upcomingconcerts/"
+ },
+ "Golden Goose Theatre": {
+  "file": "golden_goose_theatre.html",
+  "url": "https://www.londonpubtheatres.com/whats-on-golden-goose-theatre"
+ },
+ "London Transport Museum": {
+  "file": "london_transport_museum.html",
+  "url": "https://www.eventbrite.co.uk/d/united-kingdom--london/london-transport-museum/"
+ }
+}

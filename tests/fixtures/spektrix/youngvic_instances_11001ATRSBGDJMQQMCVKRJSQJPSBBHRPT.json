@@ -1,0 +1,198 @@
+[
+{
+"id": "52417AHGLVHSBJJMKVQBTPKTBLLLQVDCQ",
+"event": {
+"id": "11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT"
+},
+"start": "2026-11-16T20:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Zone A"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair transfer - transfer to theatre seat"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user - stay in wheelchair"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user companion"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+}
+]
+}
+},
+{
+"id": "52418ATHSSVQKGPJLHRVGVQRTQQVJMBSQ",
+"event": {
+"id": "11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT"
+},
+"start": "2026-11-17T20:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Zone A"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair transfer - transfer to theatre seat"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user - stay in wheelchair"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user companion"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+}
+]
+}
+},
+{
+"id": "52607AJVKRRMNVPVPJTBCRDPBNRTLPPLG",
+"event": {
+"id": "11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT"
+},
+"start": "2026-11-18T15:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Zone A"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair transfer - transfer to theatre seat"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user - stay in wheelchair"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user companion"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+}
+]
+}
+},
+{
+"id": "52419ASSQVMJPMRVVGSKHHBTJHLNKNNJC",
+"event": {
+"id": "11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT"
+},
+"start": "2026-11-18T20:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Zone A"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair transfer - transfer to theatre seat"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user - stay in wheelchair"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+},
+{
+"amount": 29.0,
+"ticketType": {
+"name": "Wheelchair user companion"
+},
+"priceBand": {
+"name": "Wheelchair position"
+}
+}
+]
+}
+}
+]

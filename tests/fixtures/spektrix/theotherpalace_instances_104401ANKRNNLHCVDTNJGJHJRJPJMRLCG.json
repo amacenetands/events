@@ -1,0 +1,51 @@
+[
+{
+"id": "240703ASRQGGVGGHTHTRHBRGMPRRGJRMH",
+"event": {
+"id": "104401ANKRNNLHCVDTNJGJHJRJPJMRLCG"
+},
+"start": "2026-11-15T15:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 60.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "A"
+}
+},
+{
+"amount": 40.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "B"
+}
+},
+{
+"amount": 20.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "C"
+}
+},
+{
+"amount": 20.0,
+"ticketType": {
+"name": "Full Price"
+},
+"priceBand": {
+"name": "D"
+}
+}
+]
+}
+}
+]

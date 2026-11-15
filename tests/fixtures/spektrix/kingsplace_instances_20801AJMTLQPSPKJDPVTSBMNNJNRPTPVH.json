@@ -1,0 +1,82 @@
+[
+{
+"id": "130601APHPQJHJPRKCMSLRCJTVSRDKMKQ",
+"event": {
+"id": "20801AJMTLQPSPKJDPVTSBMNNJNRPTPVH"
+},
+"start": "2027-01-16T15:00:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 26.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 3"
+}
+},
+{
+"amount": 28.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 2"
+}
+},
+{
+"amount": 30.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 1"
+}
+}
+]
+}
+},
+{
+"id": "33401ASQTDQSSBKHDTGJNVLMTDQJCSHNC",
+"event": {
+"id": "20801AJMTLQPSPKJDPVTSBMNNJNRPTPVH"
+},
+"start": "2027-01-16T19:30:00",
+"isOnSale": true,
+"cancelled": false,
+"priceList": {
+"prices": [
+{
+"amount": 26.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 3"
+}
+},
+{
+"amount": 28.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 2"
+}
+},
+{
+"amount": 30.0,
+"ticketType": {
+"name": "Standard"
+},
+"priceBand": {
+"name": "Price Band 1"
+}
+}
+]
+}
+}
+]
