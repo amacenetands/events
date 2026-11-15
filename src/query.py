@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Callable, Iterable
 
+from .classify import is_elsewhere
 from .models import Event
 
 ALL_KINDS = frozenset({"one_off", "run", "recurring"})
@@ -40,6 +41,18 @@ class Filter:
     tz: str | None = None                      # IANA tz; default from city (CITY_TZ)
     public_only: bool = True                   # drop schools/members/trade/private events
     include_online: bool = False               # keep webinar/livestream-only events
+
+
+_BANNED_HOST = re.compile(r"(^|\.)eventbrite\.[a-z.]+$", re.I)
+
+
+def is_banned_url(url: str | None) -> bool:
+    """Sources we never surface (eventbrite.*)."""
+    from urllib.parse import urlparse
+    try:
+        return bool(_BANNED_HOST.search(urlparse(url or "").hostname or ""))
+    except ValueError:
+        return False
 
 
 def city_today(f: "Filter") -> date:
@@ -113,6 +126,30 @@ def time_bucket(t: str | None) -> str | None:
     return "morning" if h < 12 else ("afternoon" if h < 17 else "evening")
 
 
+_EVENING_CATS = frozenset({"concert", "comedy", "theatre", "film"})
+_DAY_CATS = frozenset({"exhibition", "tour"})
+_DAYISH = re.compile(r"\b(matin[eé]e|morning|lunch(?:time)?|afternoon|brunch|family|kids?|children)\b", re.I)
+
+
+def infer_buckets(e: Event) -> frozenset | None:
+    """Time buckets for an event: from start time; else a deterministic guess for untimed
+    one-offs (concert/comedy/theatre/film -> evening; exhibition/tour -> daytime; matinee-ish
+    wording -> daytime). Runs/recurring series are open-hours: compatible with any bucket (None).
+    Returns frozenset() when an untimed one-off cannot be placed."""
+    b = time_bucket(e.time)
+    if b:
+        return frozenset({b})
+    if e.kind != "one_off":
+        return None
+    if e.category in _EVENING_CATS:
+        if _DAYISH.search(f"{e.title} {e.description or ''}"):
+            return frozenset({"morning", "afternoon"})
+        return frozenset({"evening"})
+    if e.category in _DAY_CATS:
+        return frozenset({"morning", "afternoon"})
+    return frozenset()
+
+
 # ── predicates ───────────────────────────────────────────────────────────────
 
 def _span(e: Event) -> tuple[date, date | None]:
@@ -169,21 +206,30 @@ def query(
     today: date | None = None,
     tags_by_source: dict[str, set] | None = None,
     unseen: Callable[[list[Event]], list[Event]] | None = None,
+    stats: dict | None = None,
 ) -> list[Event]:
     """Apply Filter to events. Pure (history dedup only via the injected `unseen`)."""
-    start, end = resolve_when(f.when, today or city_today(f))
+    today = today or city_today(f)
+    start, end = resolve_when(f.when, today)
     cats = {c.lower() for c in f.categories}
     venues = {v.lower() for v in f.venues}
     out: list[Event] = []
+    events = [e for e in events if not is_banned_url(e.url)]
     for e in events:
         if e.kind not in f.kinds:
             continue
         if not _overlaps(e, start, end):
             continue
+        if e.date < today and (e.kind == "one_off" or (e.kind == "recurring" and e.end_date is None)):
+            continue                                  # past one-offs never pass
+        if e.kind in ("run", "recurring") and e.end_date and e.end_date < today:
+            continue
         if f.public_only and not e.public:
             continue
         if e.online and not f.include_online:
             continue
+        if is_elsewhere(e):
+            continue                                  # touring dates outside London
         if not _audience_ok(e, f):
             continue
         if cats and e.category not in cats:
@@ -195,11 +241,13 @@ def query(
             if not (set(f.venue_tags) & set(tags)):
                 continue
         if f.time_of_day:
-            b = time_bucket(e.time)
-            if b is None:
-                if f.strict_time and e.kind != "run":
+            bs = infer_buckets(e)
+            if bs is None:                      # run / recurring series: open hours
+                if f.strict_time and e.kind != "run" and not e.time:
                     continue
-            elif b not in f.time_of_day:
+            elif not (bs & f.time_of_day):
+                if not e.time and stats is not None:
+                    stats["untimed_hidden"] = stats.get("untimed_hidden", 0) + 1
                 continue
         if not _days_ok(e, f.days, start, end):
             continue

@@ -27,7 +27,7 @@ Steps when user asks to add a new venue to the events pipeline:
 python scripts/validate_venues.py --venue "Venue Name"
 ```
 
-If 403: likely JS-rendered or Cloudflare-blocked — set `js_required: true` or find Eventbrite organizer page.
+If 403: likely JS-rendered or Cloudflare-blocked — set `js_required: true`.
 
 ## 3. Generate remove_selectors
 

@@ -54,7 +54,7 @@ def infer_type(name: str, category_hint: str, pipeline) -> str:
     n = name.lower()
     pipelines = [pipeline] if isinstance(pipeline, str) else (pipeline or [])
 
-    if any(x in n for x in ["eventbrite", "time out", "visit london", "primary times",
+    if any(x in n for x in ["time out", "visit london", "primary times",
                               "mumsnet", "netmums", "timeout"]):
         return "aggregator"
     if any(x in n for x in ["university", "ucl", "goldsmiths", "birkbeck", "imperial college",

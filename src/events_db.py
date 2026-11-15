@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from .models import Event
 from .store import _conn, _now
+from .query import is_banned_url
 
 CRAWL_RETENTION_DAYS = 90
 _DDL = """
@@ -135,6 +136,8 @@ def load_events(city: str) -> Loaded:
         except Exception:
             bad += 1
             continue
+        if is_banned_url(e.url):
+            continue
         events.append(e)
         tags[r["source"]] = set(json.loads(r["tags"] or "[]"))
         fp = r["fingerprint"]
@@ -161,3 +164,21 @@ def age_days(at: datetime | None) -> float | None:
     if at is None:
         return None
     return (datetime.now(timezone.utc) - at).total_seconds() / 86400
+
+
+def purge_banned(city: str | None = None) -> int:
+    """Delete rows whose event url host is banned (eventbrite.*). Returns rows deleted."""
+    init_db()
+    rows = _conn.execute("SELECT city, event_key, event_json FROM events" + (" WHERE city=?" if city else ""),
+                         (city,) if city else ()).fetchall()
+    n = 0
+    with _conn:
+        for r in rows:
+            try:
+                url = json.loads(r["event_json"]).get("url")
+            except Exception:
+                continue
+            if is_banned_url(url):
+                _conn.execute("DELETE FROM events WHERE city=? AND event_key=?", (r["city"], r["event_key"]))
+                n += 1
+    return n

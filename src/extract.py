@@ -38,6 +38,9 @@ def _default_batch_size() -> int:
 
 
 BATCH_SIZE = _default_batch_size()
+# Max summed prompt-text chars per batch. DeepSeek caps output at 8192 tokens, so
+# dense batches (~26-29k chars) truncated mid-JSON and forced a split retry (2x calls).
+BATCH_CHAR_BUDGET = int(os.environ.get("BATCH_CHAR_BUDGET", "12000"))
 
 # Parse-cache versioning — folded into the content hash so logic changes that do
 # NOT alter the input text still invalidate cached extractions. Bump
@@ -96,7 +99,8 @@ _EVENT_SCHEMA = """\
   min_age      int|null   youngest suitable age if stated ("ages 5+" -> 5, "under 5s" -> 0); else null
   date_confirmed bool   true if date is a specific confirmed date found in text; false if estimated/inferred
   description  string|null  one sentence max
-  price        string|null"""
+  price        string|null
+  url          string|null  the event's OWN page: copy the "-> /path" link on that event's line in the text (never the listing page itself); null if no such link"""
 
 # Extra fields for aggregator sites where venue/url differ per event
 _VENUE_URL_FIELDS = """\
@@ -206,6 +210,33 @@ _GENERIC_TITLE_RE = re.compile(
     r"^(concert|event|show|performance|talk|exhibition|screening)\s*[-–]\s*\w{3}\s+\d",
     re.IGNORECASE,
 )
+
+
+def _fix_urls(raw_list: list[dict], text: str, listing_url: str) -> list[dict]:
+    """Events whose url is missing or equals the listing page: use the per-card
+    '-> href' link from the reduced text on a line containing the event title."""
+    norm = lambda u: str(u or "").strip().rstrip("/")
+    links = []
+    for ln in (text or "").splitlines():
+        if " -> " in ln:
+            body, href = ln.rsplit(" -> ", 1)
+            href = href.strip()
+            if href and not href.startswith(("#", "javascript", "mailto")):
+                links.append((body.lower(), href))
+    if not links:
+        return raw_list
+    for e in raw_list:
+        u = e.get("url")
+        if u and u != "null" and norm(u) != norm(listing_url):
+            continue
+        t = str(e.get("title") or "").strip().lower()
+        if len(t) < 4:
+            continue
+        for body, href in links:
+            if t in body:
+                e["url"] = href
+                break
+    return raw_list
 
 
 def _build_events(raw_list: list[dict], source_url: str, source_name: str) -> list[Event]:
@@ -384,7 +415,8 @@ async def extract_events_batch_async(
     for u in units:
         key = _nm(u)
         for b in batches:
-            if len(b) < BATCH_SIZE and all(_nm(x) != key for x in b):
+            if (len(b) < BATCH_SIZE and all(_nm(x) != key for x in b)
+                    and sum(len(x.get("text", "")) for x in b) + len(u.get("text", "")) <= BATCH_CHAR_BUDGET):
                 b.append(u)
                 break
         else:
@@ -441,6 +473,7 @@ async def extract_events_batch_async(
                         print(f"  [extract] {name}: {tgt[1]} retry failed ({str(e)[:60]}); not caching empty", flush=True)
                         return []
                 return got
+        _fix_urls(merged, parent.get("text", ""), parent["url"])
         site_events = _build_events(merged, parent["url"], name)
         print(f"  [HTML] {name}: {len(site_events)} events [{_model}] ({dt:.0f}s, {n} chunks{', PARTIAL' if failed else ''})", flush=True)
         timing.log_runtime(venue=name, model=_model, events=len(site_events), secs=round(dt, 1), batch_size=nsites)
@@ -488,6 +521,7 @@ async def extract_events_batch_async(
                 if n_sig >= 3 and _retry_target(_model):
                     suspicious.append((site, n_sig))
                     continue
+            _fix_urls(raw_list, site.get("text", ""), site["url"])
             site_events = _build_events(raw_list, site["url"], site["name"])
             events.extend(site_events)
             print(f"  [HTML] {site['name']}: {len(site_events)} events [{_model}] ({dt:.0f}s)", flush=True)

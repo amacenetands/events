@@ -38,6 +38,8 @@ W_ONE_OFF = 2.0
 W_RUN = 0.5
 W_THEATRE_RECURRING = 0.5
 W_AVOID = -3.0             # title/description hits a profile `avoid` phrase
+W_PRICEY = -4.0            # ticket/course price >= PRICEY_GBP
+PRICEY_GBP = 100
 W_INTEREST = 1.0           # title hits a profile `interests` phrase
 TOP_N = 12
 MAX_PER_VENUE = 2
@@ -141,6 +143,9 @@ def score_parts(e: Event, f, ctx: RankCtx) -> dict[str, float]:
         p["soon"] = W_SOON
     elif e.kind == "one_off" and e.date == ctx.today:
         p["soon"] = W_SOON
+    pm = re.search(r"£\s*(\d[\d,]*)", e.price or "")
+    if pm and int(pm.group(1).replace(",", "")) >= PRICEY_GBP:
+        p["pricey"] = W_PRICEY
     if e.time:
         p["timed"] = W_HAS_TIME
     if e.date_undetermined:
@@ -206,36 +211,69 @@ def pick_diverse(ordered: list[Event], n: int = TOP_N, max_venue: int = MAX_PER_
 
 # ── LLM rerank ───────────────────────────────────────────────────────────────
 
-def _profile_text(profile: dict) -> str:
+def _profile_text(profile: dict, family: bool = True) -> str:
     bits = []
     if profile.get("interests"):
         bits.append("Likes: " + ", ".join(profile["interests"]))
     if profile.get("avoid"):
         bits.append("Avoid: " + ", ".join(profile["avoid"]))
-    if profile.get("kids_ages"):
+    if family and profile.get("kids_ages"):
         bits.append("Kids ages: " + ", ".join(str(a) for a in profile["kids_ages"]))
     if profile.get("notes"):
         bits.append(str(profile["notes"]))
-    return "\n".join(bits) or "No stated preferences."
+    return "\n".join(bits)
 
 
-def build_prompt(pool: list[Event], profile: dict, n: int) -> str:
-    lines = []
-    for i, e in enumerate(pool, 1):
-        d = e.date.strftime("%a %d %b") + (f" {e.time}" if e.time else "")
-        if e.end_date and e.kind != "one_off":
-            d += f"-{e.end_date.strftime('%d %b')}"
-        lines.append(f"{i}|{e.title[:70]}|{e.venue}|{d}|{e.category}|{e.audience}")
-    return (f"Pick the {n} best events for this person from the list, balancing variety "
-            f"(max 2 per venue).\n{_profile_text(profile)}\n\n"
-            "Events (id|title|venue|date|category|audience):\n" + "\n".join(lines) +
-            f"\n\nReply with exactly {n} lines, best first, format: id|reason (max 12 words). Nothing else.")
+_TITLE_DATES = re.compile(r"\s*\((?:[^)]*\b20\d\d\b[^)]*|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\w*\s*[-–]\s*\w+)\)")
+_KIND = {"one_off": "one", "run": "run", "recurring": "rec"}
+_AUD = {"kids": "kids", "family": "fam", "adult": "adult", "all": "all"}
+
+
+def _when(e: Event, single_day: bool, today: date | None) -> str:
+    """Compact date: one-off -> 'HH:MM' (prefixed '%a%d%b' if multi-day query); run -> 'to %d%b' (+' last' if closing)."""
+    if e.kind == "one_off":
+        d = "" if single_day else e.date.strftime("%a%d%b")
+        return f"{d} {e.time or ''}".strip() or "-"
+    w = f"to {e.end_date.strftime('%d%b')}" if e.end_date else "open"
+    if e.recurrence:
+        w = f"{e.recurrence[:20]} {w}"
+    if today and e.end_date and 0 <= (e.end_date - today).days <= CLOSING_DAYS:
+        w += " last"
+    return w
+
+
+def build_prompt(pool: list[Event], profile: dict, n: int, f=None, today: date | None = None) -> str:
+    aud = getattr(f, "audience", "any") or "any"
+    family = aud in ("family", "kids")
+    single, req = False, ""
+    if f is not None and today is not None:
+        from .query import describe, resolve_when   # lazy: avoid import cycle
+        try:
+            start, end = resolve_when(f.when, today)
+            single = start == end
+        except Exception:
+            pass
+        req = describe(f, today)
+    lines = [f"E{i}|{_TITLE_DATES.sub('', e.title)[:60]}|{e.venue[:30]}|{_KIND.get(e.kind, e.kind)}|{_when(e, single, today)}|"
+             f"{e.category}|{_AUD.get(e.audience, e.audience)}" for i, e in enumerate(pool, 1)]
+    rules = ["Prefer one-off or rare events (kind=one) over ongoing runs/recurring series; "
+             "include a run only if exceptional or closing soon (last)."]
+    if family:
+        rules.append("Audience is family: prioritise events made for kids (aud kids/fam) suited to the kids' ages; "
+                     "drop adult-oriented events.")
+    rules.append("Variety: max 2 per venue.")
+    prof = _profile_text(profile, family)
+    return (f"Pick the {n} best events{' for: ' + req if req else ''}.\n"
+            + "".join(f"{i}. {r}\n" for i, r in enumerate(rules, 1))
+            + (prof + "\n" if prof else "")
+            + "\nid|title|venue|kind|when|cat|aud\n" + "\n".join(lines)
+            + f"\n\nReply {n} lines, best first: E<id>|reason (max 8 words). Use list E-ids. Nothing else.")
 
 
 def parse_llm(text: str, pool: list[Event]) -> list[tuple[Event, str]]:
     out, seen = [], set()
     for ln in text.splitlines():
-        m = re.match(r"\s*\W*(\d+)\s*[|:.\-)]\s*(.*)", ln)
+        m = re.search(r"\bE(\d+)\s*[|:.\-)]\s*(.*)", ln) or re.match(r"\s*\W*(\d+)\s*[|:.\-)]\s*(.*)", ln)
         if not m:
             continue
         i = int(m.group(1))
@@ -246,18 +284,25 @@ def parse_llm(text: str, pool: list[Event]) -> list[tuple[Event, str]]:
 
 
 async def llm_rerank(ordered: list[Event], profile: dict, n: int = TOP_N,
-                     pool_size: int = LLM_POOL) -> list[tuple[Event, str]]:
-    """Raises on backend error / unparseable reply (caller falls back)."""
-    pool = ordered[:pool_size]
-    raw = await run_llm(build_prompt(pool, profile, n), backend=os.environ.get("RANK_BACKEND", "deepseek"),
-                        max_output_tokens=800, timeout=90, retries=2)
+                     pool_size: int = LLM_POOL, backend: str | None = None, f=None,
+                     today: date | None = None) -> list[tuple[Event, str]]:
+    """Raises on backend error / unparseable reply (caller falls back).
+    backend: deepseek | anthropic (Claude API) | claude (CLI) | ollama; default $RANK_BACKEND or deepseek."""
+    ones = [e for e in ordered if e.kind != "run"][: pool_size // 2]   # one-offs/recurring guaranteed seats
+    have = {id(e) for e in ones}
+    pool = sorted(ones + [e for e in ordered if id(e) not in have][: pool_size - len(ones)],
+                  key=lambda e: ordered.index(e))
+    backend = backend or os.environ.get("RANK_BACKEND", "deepseek")
+    raw = await run_llm(build_prompt(pool, profile, n, f, today), backend=backend,
+                        max_output_tokens=400, timeout=240 if backend == "claude" else 90, retries=2)  # CLI startup is slow
     res = parse_llm(raw, pool)
     if not res:
         raise ValueError("LLM rerank: no parseable ids")
     return res
 
 
-async def rank_events(events: list[Event], f, ctx: RankCtx, *, n: int = TOP_N, use_llm: bool = False) -> RankResult:
+async def rank_events(events: list[Event], f, ctx: RankCtx, *, n: int = TOP_N, use_llm: bool = False,
+                      backend: str | None = None) -> RankResult:
     cands = candidates(events)
     scores = {e.fingerprint(): score(e, f, ctx) for e in cands}
     ordered = sorted(cands, key=lambda e: (-scores[e.fingerprint()], e.date, e.title))
@@ -266,7 +311,7 @@ async def rank_events(events: list[Event], f, ctx: RankCtx, *, n: int = TOP_N, u
     used = False
     if use_llm and ordered:
         try:
-            res = await llm_rerank(ordered, ctx.profile, n)
+            res = await llm_rerank(ordered, ctx.profile, n, backend=backend, f=f, today=ctx.today)
             chosen = pick_diverse([e for e, _ in res], n)
             why = {e.fingerprint(): r for e, r in res}
             if len(chosen) < n:   # top up from heuristic order

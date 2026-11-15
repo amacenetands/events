@@ -124,7 +124,7 @@ def test_link_with_parens_and_spaces_and_html_escape():
     e = ev("Rock <b>&</b> Roll", url="https://x.test/a b/(c)", venue="A&B", description="<script>x</script>")
     md = generate_digest_v2([e], Filter(when="next:3"), today=TODAY)
     assert "https://x.test/a%20b/%28c%29" in md
-    assert "<script>" not in md and "&lt;script&gt;" in md
+    assert "<script>" not in md
     assert "A&amp;B" in md
     html = render_html(md)
     assert "<script>" not in html and 'href="https://x.test/a%20b/%28c%29"' in html

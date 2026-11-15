@@ -23,6 +23,23 @@ def norm_category(v) -> str:
     return c if c in CATEGORIES else "other"
 
 
+def clean_text(v):
+    """html.unescape (repeatedly: &amp;#038;) + strip tags; <br> -> ' / '."""
+    import re, html
+    if not isinstance(v, str):
+        return v
+    if "&" not in v and "<" not in v:
+        return v
+    for _ in range(3):
+        u = html.unescape(v)
+        if u == v:
+            break
+        v = u
+    v = re.sub(r"\s*<\s*br\s*/?\s*>\s*", " / ", v, flags=re.I)
+    v = re.sub(r"</?[a-zA-Z][^<>]*>", "", v)
+    return re.sub(r"[ \t]+", " ", v).strip()
+
+
 def parse_time(v):
     import re
     if not v:
@@ -124,6 +141,11 @@ class Event(BaseModel):
             except (TypeError, ValueError):
                 d["min_age"] = None
         return d
+
+    @field_validator("title", "venue", "description", mode="before")
+    @classmethod
+    def _clean(cls, v):
+        return clean_text(v)
 
     @field_validator("date", mode="before")
     @classmethod

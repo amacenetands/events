@@ -28,7 +28,8 @@ SITES_YAML = Path(__file__).parent.parent.parent / "sites.yaml"
 # explicit --tag (e.g. moscow / moscow-theatre).
 MOSCOW_TAGS = frozenset({"moscow", "moscow-theatre"})
 MAX_CONCURRENT_HTTPX = 8
-MAX_CONCURRENT_BROWSER = 3
+MAX_CONCURRENT_BROWSER = 5
+BROWSER_DELAY_DEFAULT = 3.0   # seconds to let JS render; per-site `delay:` / `wait_for:` in sites.yaml
 
 # Hard per-fetch timeouts — a hung fetch is cancelled, logged, returns None
 FETCH_TIMEOUT_BROWSER = 120
@@ -45,12 +46,12 @@ HEADERS = {
 }
 
 
-def _load_sites(pipeline: str | None = None) -> list[dict]:
+def _load_sites(pipeline: str | None = None, include_disabled: bool = False) -> list[dict]:
     from datetime import date
     year = str(date.today().year)
     with open(SITES_YAML) as f:
         data = yaml.safe_load(f)
-    sites = [s for s in data.get("html_sites", []) if not s.get("skip", False)]
+    sites = [s for s in data.get("html_sites", []) if not s.get("skip", False) and (include_disabled or not s.get("disabled", False))]
     for s in sites:
         s["url"] = s["url"].replace("{YEAR}", year)
     def _tags(s: dict) -> set:
@@ -69,9 +70,10 @@ def _load_sites(pipeline: str | None = None) -> list[dict]:
     return sites
 
 
-def configured_site_names(pipeline: str | None = None) -> list[str]:
-    """Names of all non-skipped sites for a pipeline — for coverage reporting."""
-    return [s["name"] for s in _load_sites(pipeline=pipeline)]
+def configured_site_names(pipeline: str | None = None, include_disabled: bool = False) -> list[str]:
+    """Names of all non-skipped sites for a pipeline. include_disabled keeps
+    fetch-disabled (bot-blocked) venues so their cached rows still surface."""
+    return [s["name"] for s in _load_sites(pipeline=pipeline, include_disabled=include_disabled)]
 
 
 # Word-boundaried so a boilerplate word can't match as a substring of a real
@@ -438,8 +440,36 @@ async def _fetch_markdown_simple(
         save_html_cache(site["url"], html, site_name=site["name"])
         return {"site": site, "html": html}
     except Exception as exc:
-        print(f"  [HTML] {site['name']}: fetch failed — {exc}")
+        print(f"  [HTML] {site['name']}: fetch failed — {exc!r}")
         return None
+
+
+_shared_crawler = None
+_shared_lock: asyncio.Lock | None = None
+
+
+async def _get_shared_crawler():
+    """One AsyncWebCrawler (single browser) shared by all non-stealth browser sites."""
+    global _shared_crawler, _shared_lock
+    from crawl4ai import AsyncWebCrawler, BrowserConfig
+    if _shared_lock is None:
+        _shared_lock = asyncio.Lock()
+    async with _shared_lock:
+        if _shared_crawler is None:
+            c = AsyncWebCrawler(config=BrowserConfig(headless=True), verbose=False)
+            await c.start()
+            _shared_crawler = c
+    return _shared_crawler
+
+
+async def close_shared_crawler() -> None:
+    global _shared_crawler, _shared_lock
+    c, _shared_crawler, _shared_lock = _shared_crawler, None, None
+    if c is not None:
+        try:
+            await c.close()
+        except Exception:
+            pass
 
 
 async def _fetch_markdown_browser(
@@ -463,34 +493,43 @@ async def _fetch_markdown_browser(
         from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
         from crawl4ai.async_configs import CacheMode
         stealth = site.get("stealth", False)
-        from crawl4ai import BrowserConfig
-        browser_cfg = BrowserConfig(
-            headless=True,
-            enable_stealth=stealth,
-            extra_args=["--disable-blink-features=AutomationControlled"] if stealth else [],
-        )
+        wait_for = site.get("wait_for")
+        delay = float(site.get("delay", BROWSER_DELAY_DEFAULT))
         cfg = CrawlerRunConfig(
-            # Auto-scroll the full page + a second delayed scroll + longer
-            # wait so lazy-loaded / AJAX listings (Drupal Views, Isotope,
-            # React) actually render. The old single 5s scroll left these
-            # empty — this recovered Trinity Laban (0→42 dated lines) and
-            # Guildhall (0→14).
+            # Auto-scroll the full page + a second delayed scroll so lazy-loaded
+            # / AJAX listings (Drupal Views, Isotope, React) render.
             js_code=[
                 "window.scrollTo(0, document.body.scrollHeight);",
-                "await new Promise(r => setTimeout(r, 2000)); window.scrollTo(0, document.body.scrollHeight);",
+                "await new Promise(r => setTimeout(r, 1500)); window.scrollTo(0, document.body.scrollHeight);",
             ],
-            delay_before_return_html=12.0,
+            delay_before_return_html=delay,
+            wait_for=f"css:{wait_for}" if wait_for else None,
             page_timeout=60000,
             scan_full_page=True,
             cache_mode=CacheMode.BYPASS,
             magic=stealth,
             simulate_user=stealth,
         )
-        async with AsyncWebCrawler(config=browser_cfg, verbose=False) as crawler:
+        if stealth:
+            from crawl4ai import BrowserConfig
+            browser_cfg = BrowserConfig(
+                headless=True, enable_stealth=True,
+                extra_args=["--disable-blink-features=AutomationControlled"],
+            )
+            async with AsyncWebCrawler(config=browser_cfg, verbose=False) as crawler:
+                result = await crawler.arun(url=site["url"], config=cfg)
+        else:
+            crawler = await _get_shared_crawler()
             result = await crawler.arun(url=site["url"], config=cfg)
         if not result.success:
-            print(f"  [HTML/browser] {site['name']}: crawl failed")
-            return None
+            err = (getattr(result, "error_message", "") or "").strip().replace("\n", " ")[:300]
+            code = getattr(result, "status_code", None)
+            print(f"  [HTML/browser] {site['name']}: crawl failed (status={code}) — {err or 'no error_message'}")
+            # Bot-challenge / block pages: respect them — never cache or parse the interstitial.
+            if (not (result.html or "").strip() or code in (401, 403, 429)
+                    or re.search(r"anti-bot|blocked|challenge", err, re.I)):
+                return None
+            print(f"  [HTML/browser] {site['name']}: using partial html ({len(result.html)} chars)")
         raw_html = result.html or ""
         if raw_html:
             save_html_cache(site["url"], raw_html, site_name=site["name"])
@@ -502,7 +541,7 @@ async def _fetch_markdown_browser(
             save_html_cache(site["url"], content[:2_000_000], site_name=site["name"])
             return {"site": site, "html": "", "pre_text": content[:2_000_000]}
     except Exception as exc:
-        print(f"  [HTML/browser] {site['name']}: failed — {exc}")
+        print(f"  [HTML/browser] {site['name']}: failed — {exc!r}")
         return None
 
 
@@ -675,10 +714,13 @@ async def fetch_sites(
                 print(f"  [fetch] {site['name']}: browser timed out after {FETCH_TIMEOUT_BROWSER}s — skipped")
                 return None
 
-    async with httpx.AsyncClient() as client:
-        http_tasks = [_timed_simple(client, s, sem_http) for s in simple_sites]
-        br_tasks = [_timed_browser(s, sem_br) for s in browser_sites]
-        results = await asyncio.gather(*http_tasks, *br_tasks, return_exceptions=True)
+    try:
+        async with httpx.AsyncClient() as client:
+            http_tasks = [_timed_simple(client, s, sem_http) for s in simple_sites]
+            br_tasks = [_timed_browser(s, sem_br) for s in browser_sites]
+            results = await asyncio.gather(*http_tasks, *br_tasks, return_exceptions=True)
+    finally:
+        await close_shared_crawler()
 
     failed = []
     ok = 0
@@ -824,6 +866,8 @@ async def fetch_html_sites(
                 except asyncio.TimeoutError:
                     print(f"  [HTML] {site['name']}: browser timed out after {FETCH_TIMEOUT_BROWSER}s")
                     fetched = None
+                finally:
+                    await close_shared_crawler()
         else:
             async with httpx.AsyncClient() as client:
                 sem = asyncio.Semaphore(1)

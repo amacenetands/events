@@ -7,6 +7,7 @@ from urllib.parse import quote as _quote
 
 from .models import Event
 
+RUNS_CAP = 40
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 _RU_MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа",
@@ -55,7 +56,7 @@ def _save(content: str, prefix: str) -> Path:
 
 def _esc(s) -> str:
     """Scraped text -> safe for markdown->HTML (raw <, >, & escaped)."""
-    return html.escape(str(s or ""), quote=False)
+    return html.escape(html.unescape(str(s or "")), quote=False)
 
 
 def _safe_url(u: str) -> str:
@@ -129,8 +130,12 @@ def _recurring_line(group: list[Event], new: bool, lang: str = "en") -> str:
 
 
 def _run_line(e: Event, today: date, new: bool, lang: str = "en") -> str:
-    when = (f"{_t(lang, 'until')} {_dfmt(e.end_date, lang)}" if e.end_date
-            else f"{_t(lang, 'from')} {_dfmt(e.date, lang, 'day')}")
+    if e.end_date:
+        far = (e.end_date - today).days > 183 or e.end_date.year != today.year
+        when = f"{_t(lang, 'until')} {_dfmt(e.end_date, lang, 'full' if far else 'short')}"
+    else:
+        yr = e.date.year != today.year
+        when = f"{_t(lang, 'from')} {_dfmt(e.date, lang, 'full' if yr else 'day')}"
     soon = f" · **{_t(lang, 'closing')}**" if e.end_date and e.date <= today and 0 <= (e.end_date - today).days <= 7 else ""
     extra = f" · {_esc(e.recurrence)}" if e.recurrence else ""
     new_tag = f" **{_t(lang, 'new')}**" if new else ""
@@ -220,8 +225,18 @@ def generate_digest_v2(
         lines += [_recurring_line(g, any(is_new(x) for x in g), lang) for g in rec_lines]
         lines.append("")
     if runs:
+        n_runs = len(runs)
+        if n_runs > RUNS_CAP:
+            def _rk(e):
+                closing = bool(e.end_date and e.date <= today and 0 <= (e.end_date - today).days <= 7)
+                return (-scores.get(e.fingerprint(), 0), not closing, e.end_date or date(9999, 1, 1))
+            keep = sorted(runs, key=_rk)[:RUNS_CAP]
+            kept = {id(e) for e in keep}
+            runs = [e for e in runs if id(e) in kept]
         lines += [f"## {_t(lang, 'runs')}", ""]
         lines += [_run_line(e, today, is_new(e), lang) for e in runs]
+        if n_runs > len(runs):
+            lines.append(f"- _+{n_runs - len(runs)} {_t(lang, 'more')}_")
         lines.append("")
     if tbc:
         lines += [f"## {_t(lang, 'tbc')}", "", f"_{_t(lang, 'tbc_note')}_", ""]

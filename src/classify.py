@@ -20,10 +20,24 @@ _KIDS_T = re.compile(
     r"ages?\s*\d+|age\s*\d+\s*\+|\d+\s*\+\s*yrs?|for \d+\s?(?:-|–|to)\s?\d+s?)(?!\w)", re.I)
 _PRIVATE = re.compile(
     r"\b(?:gcse|a[- ]levels?|ks[1-5]|key stage [1-5]|cpd|educators?|members['’]? only|private hire|corporate|"
+    r"members['’]? (?:(?:closing|opening|early|exclusive|private|morning|evening|late)\s+)*(?:weekend\s+)?(?:views?|viewings?|previews?|events?|evenings?|mornings?|hours?|tours?)|"
+    r"disabled students['’]? allowance|student finance|prospective students|(?:for|to) (?:current )?students only|applicants?['’]? (?:day|event|session)|"
     r"school (?:groups?|parties|trips?|visits?|bookings?)|schools?\s*(?:&|and)\s*colleges?|(?:for|to) schools?|schools? only|"
     r"colleges? groups?|(?:for|to) teachers?|teachers['’]? (?:preview|session|workshop|event|evening|training|resources?|pack|only)|"
     r"teachers only|trade (?:only|event|show|visit|visitors?|day|professionals?)|(?:for|to) the trade)\b", re.I)
-_ONLINE = re.compile(r"\b(?:webinar|online[- ]only|online event|live[- ]?stream(?:ed)? only|virtual(?!\s+reality)|zoom)\b|^\s*online\b|\(online\)", re.I)
+_ONLINE = re.compile(r"\b(?:webinar|online[- ]only|online event|lecture recordings?|recorded (?:taster )?lectures?|recording available|on[- ]demand|live[- ]?stream(?:ed)? only|virtual(?!\s+reality)|zoom)\b|^\s*online\b|\(online\)", re.I)
+_ONLINE_T = re.compile(r"\b(?:live-?stream(?:ed)?|online|virtual(?!\s+reality)|webinar|zoom)\b", re.I)
+# venue that is a list of towns (touring show / exhibition elsewhere), e.g. "Cheltenham, Petworth, Rugby"
+_TOWN_LIST = re.compile(r"^[A-Z][a-z]+(?: [A-Z][a-z]+)?(?:, [A-Z][a-z]+(?: [A-Z][a-z]+)?){2,}$")
+
+
+def is_elsewhere(e) -> bool:
+    """Event listed at non-London touring venues rather than the source venue."""
+    v = (e.venue or "").strip()
+    return bool(_TOWN_LIST.match(v)) and "london" not in v.lower() and v.lower() != (e.source or "").lower()
+
+
+_POSTCODE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b", re.I)
 _IN_PERSON = re.compile(r"\b(?:hybrid|in[- ]person|on[- ]?site|in the (?:gallery|museum|theatre|hall))\b", re.I)
 _FAMILY_T = re.compile(r"\b(\(family\)|family|families|half[- ]term)\b", re.I)
 _KIDS_D = re.compile(
@@ -79,14 +93,30 @@ def _site_hints() -> dict[str, str]:
     return _hints
 
 
-def _min_age(text: str) -> int | None:
-    for rx in (_AGE_RANGE, _AGED, _AGE_PLUS):
-        m = rx.search(text)
-        if m:
-            n = int(m.group(1))
-            if n < 18:
-                return n
+_RANGE_AGE = re.compile(r"\b(?:ages?|aged|years?|yrs?|under|over)?\s*(\d{1,2})\s?(?:-|–|to)\s?(\d{1,2})\s?(?:s\b|\+|years?|yrs?|year[- ]olds?)", re.I)
+_AGE_CTX = re.compile(r"\b(?:ages?|aged|from age)\s*(\d{1,2})\s?(?:(?:-|–|to)\s?(\d{1,2}))?\s?(\+)?", re.I)
+_YOUNG_ADULT = re.compile(r"\b(?:1[6-9]|2\d)\s?(?:-|–|to)\s?(?:2\d|3\d)\s?s?\b(?!\s*(?:nov|dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct)\w*)", re.I)
+
+
+def _age_span(text: str) -> tuple[int, int | None] | None:
+    """(min_age, max_age|None) from age wording; real values, no 18 cutoff."""
+    m = _AGE_CTX.search(text)
+    if m:
+        return int(m.group(1)), (int(m.group(2)) if m.group(2) else None)
+    m = _RANGE_AGE.search(text)
+    if m:
+        lo, hi = int(m.group(1)), int(m.group(2))
+        if lo < hi:
+            return lo, hi
+    m = _AGE_PLUS.search(text)
+    if m and int(m.group(1)) < 16:
+        return int(m.group(1)), None
     return None
+
+
+def _min_age(text: str) -> int | None:
+    sp = _age_span(text)
+    return sp[0] if sp else None
 
 
 def _norm_title(t: str) -> str:
@@ -119,15 +149,27 @@ def _classify_one(e: Event, hints: dict[str, str]) -> dict:
 
     # audience
     aud = e.audience
+    span = _age_span(text)
+    lo, hi = span if span else (None, None)
+    adult_age = lo is not None and 16 <= lo <= 99
+    teen_age = lo is not None and 12 <= lo < 16 and (hi is None or hi >= 16)
+    explicit_family = bool(_FAMILY_T.search(title) or _FAMILY_D.search(desc))
+    kt = _KIDS_T.search(title) or _KIDS_D.search(desc)
+    if kt and re.match(r"(?:ages?|aged|\d)", kt.group(0), re.I) and (adult_age or teen_age):
+        kt = None      # age wording that isn't for children
     if _ADULT_STRONG.search(text):
         aud = "adult"
-    elif _KIDS_T.search(title) or _KIDS_D.search(desc):
+    elif adult_age and not explicit_family:
+        aud = "adult"
+    elif kt:
         aud = "kids"
     elif _FAMILY_T.search(title) or _FAMILY_D.search(desc):
         if aud not in ("kids",):
             aud = "family"
     elif _ADULT_WEAK.search(title) and aud == "all":
         aud = "adult"
+    if teen_age and aud == "kids" and not explicit_family:
+        aud = "all"
     if aud == "all":   # venue default: upgrade only, never override explicit adult
         hint = hints.get((e.source or "").lower()) or hints.get((e.venue or "").lower())
         low = f"{e.source} {e.venue}".lower()
@@ -135,10 +177,8 @@ def _classify_one(e: Event, hints: dict[str, str]) -> dict:
             aud = "family"
     if aud != e.audience:
         upd["audience"] = aud
-    if aud in ("kids", "family") and e.min_age is None:
-        ma = _min_age(text)
-        if ma is not None:
-            upd["min_age"] = ma
+    if aud in ("kids", "family", "adult") and e.min_age is None and lo is not None and (aud != "adult" or adult_age):
+        upd["min_age"] = lo
     elif aud == "adult" and e.min_age is None and re.search(r"\b18\s?\+|over[- ]18", text, re.I):
         upd["min_age"] = 18
 
@@ -168,8 +208,10 @@ def _classify_one(e: Event, hints: dict[str, str]) -> dict:
     # visibility
     if e.public and _PRIVATE.search(text):
         upd["public"] = False
-    if not e.online and _ONLINE.search(text) and not _IN_PERSON.search(text):
+    if not e.online and (_ONLINE.search(text) or _ONLINE_T.search(title)) and not _IN_PERSON.search(text):
         upd["online"] = True
+    if _POSTCODE.search(e.venue or "") or len(e.venue or "") > 60:
+        upd["venue"] = e.source or e.venue[:60]
 
     # category
     cat = norm_category(e.category)

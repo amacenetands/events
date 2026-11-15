@@ -34,11 +34,12 @@ from src.sources.html_sites import fetch_html_sites, fetch_sites, parse_sites, c
 from src.dedup import filter_unseen, mark_seen
 from src import rank as rankmod
 from src.classify import classify
+from src.tidy import tidy
 from src.digest import generate_digest_v2, coverage_summary, save_digest_v2
 from src.translate import translate_descriptions
 from src.email_sender import send_digest
 from src.models import Event
-from src.query import (Filter, query, describe, filter_from_dict, load_presets, preset_filter, parse_time_arg,
+from src.query import (is_banned_url, Filter, query, describe, filter_from_dict, load_presets, preset_filter, parse_time_arg,
                        resolve_when, city_today, city_now)
 from src import events_db, timing as _timing
 
@@ -136,6 +137,7 @@ async def crawl(
         print(f"WARNING: HTML source failed entirely ({results[-1]}) — not saving; keeping previous {city} events.")
         return 0
 
+    scraped = [e for e in scraped if not is_banned_url(e.url)]
     scraped = _dedup_by_fingerprint(classify(scraped))
     _absolutize_urls(scraped)
     today = city_today(Filter(city=city))
@@ -157,6 +159,31 @@ async def crawl(
 # ---------------------------------------------------------------------------
 # query
 # ---------------------------------------------------------------------------
+
+def _stale_venues(events, max_age_days: float) -> list[tuple[str, float]]:
+    """(venue, age_days) for venues whose rows are in `events` but whose page was last
+    fetched > max_age_days ago (oldest first). Per-source, so sites that failed this crawl
+    and sites with no current rows never trigger a global stale warning."""
+    try:
+        from src import dedup
+        with open(SITES_YAML) as fh:
+            urls = {s["name"]: s["url"].replace("{YEAR}", str(date.today().year))
+                    for s in yaml.safe_load(fh).get("html_sites", [])}
+        out = []
+        for src in sorted({e.source for e in events if e.source in urls}):
+            at = dedup.get_html_fetched_at(urls[src])
+            if not at:
+                continue
+            d = datetime.fromisoformat(at)
+            if d.tzinfo is None:
+                d = d.replace(tzinfo=timezone.utc)
+            a = events_db.age_days(d)
+            if a is not None and a > max_age_days:
+                out.append((src, a))
+        return sorted(out, key=lambda x: -x[1])
+    except Exception:
+        return []
+
 
 def _oldest_fetched(tag):
     """Oldest fetched_at among this crawl's pages (src.dedup.oldest_fetched_at); None if unavailable."""
@@ -186,6 +213,7 @@ async def run_query(
     mask: bool = False,
     do_rank: bool | None = None,
     llm_rank: bool = False,
+    rank_backend: str | None = None,
     top_n: int = rankmod.TOP_N,
     russian: bool = False,
     max_age_days: float = 7,
@@ -195,7 +223,7 @@ async def run_query(
 ) -> list[Event]:
     loaded = events_db.load_events(f.city)
     today, now = city_today(f), city_now(f)
-    loaded.events = classify(loaded.events)   # re-apply deterministic rules so new classifier flags need no recrawl
+    loaded.events = tidy(classify(loaded.events), today, {n.lower() for n in configured_site_names(CITY_TAG[f.city], include_disabled=True)})   # re-apply deterministic rules so new classifier flags need no recrawl
     age = events_db.age_days(loaded.crawled_at)
     if age is None:
         print(f"WARNING: no crawl for {f.city}. Run: venv/bin/python main.py crawl --city {f.city}")
@@ -204,25 +232,30 @@ async def run_query(
               f"Run: venv/bin/python main.py crawl --city {f.city}")
     else:
         print(f"Crawl: {f.city}, {_age_str(age)} old, {loaded.n_events} events")
-    if loaded.oldest_fetched_at is not None:
-        fage = events_db.age_days(loaded.oldest_fetched_at)
-        if fage is not None and fage > max_age_days:
-            print(f"WARNING: oldest page behind this crawl was fetched {_age_str(fage)} ago (> {max_age_days}d); "
-                  f"some venues may be stale. Run: venv/bin/python main.py crawl --city {f.city} --force-download")
+    stale = _stale_venues(loaded.events, max_age_days)
+    if stale:
+        names = ", ".join(f"{n} ({_age_str(a)})" for n, a in stale[:5])
+        more = f", +{len(stale) - 5} more" if len(stale) > 5 else ""
+        print(f"WARNING: {len(stale)} venues' data is older than {max_age_days:g}d: {names}{more}. "
+              f"Re-crawl: venv/bin/python main.py crawl --city {f.city} --force-download")
     if (age is None or age > max_age_days) and auto_crawl:
         await crawl(f.city, **(crawl_kwargs or {}))
         loaded = events_db.load_events(f.city)
 
-    events = query(loaded.events, f, today=today, tags_by_source=loaded.tags_by_source, unseen=filter_unseen)
-    print(f"Filter: {describe(f, today)}\n  {len(loaded.events)} crawled → {len(events)} match")
+    qstats: dict = {}
+    events = query(loaded.events, f, today=today, tags_by_source=loaded.tags_by_source, unseen=filter_unseen,
+                   stats=qstats)
+    hid = qstats.get("untimed_hidden", 0)
+    print(f"Filter: {describe(f, today)}\n  {len(loaded.events)} crawled → {len(events)} match"
+          + (f" ({hid} untimed one-offs hidden: no start time, not daytime-inferable)" if hid else ""))
 
     ctx = rankmod.build_ctx(loaded.first_seen, loaded.events, today=today, now=now)
     new_fps = ctx.new_fps
 
-    rank_on = (f.rank if do_rank is None else do_rank) or llm_rank
+    rank_on = (True if (f.rank if do_rank is None else do_rank) is None else (f.rank if do_rank is None else do_rank)) or llm_rank
     picks = reasons = scores = None
     if rank_on:
-        res = await rankmod.rank_events(events, f, ctx, n=top_n, use_llm=llm_rank)
+        res = await rankmod.rank_events(events, f, ctx, n=top_n, use_llm=llm_rank, backend=rank_backend)
         picks, reasons, scores = res.picks, res.reasons, res.scores
         print(f"Ranked: {len(picks)} top picks of {len(scores)} candidates"
               f"{' (LLM rerank)' if res.llm_used else ''}; all {len(events)} events kept")
@@ -334,6 +367,9 @@ def cmd_query(argv):
     p.add_argument("--include-online", action="store_true", help="keep webinar/livestream-only events")
     p.add_argument("--rank", action=argparse.BooleanOptionalAction, default=None)
     p.add_argument("--llm-rank", action="store_true", help="LLM rerank of top candidates (implies --rank)")
+    p.add_argument("--rank-backend", choices=["deepseek", "anthropic", "claude", "ollama"],
+                   help="LLM for --llm-rank (implies it): anthropic = Claude API (ANTHROPIC_API_KEY), "
+                        "claude = Claude CLI; default $RANK_BACKEND or deepseek")
     p.add_argument("--top", type=int, default=rankmod.TOP_N, help="number of top picks")
     p.add_argument("--send", action="store_true", help="email the digest (default: print only)")
     p.add_argument("--dry-run", action="store_true", help="explicit no-send (default)")
@@ -346,7 +382,7 @@ def cmd_query(argv):
     a = p.parse_args(argv)
     f = build_filter(a)
     asyncio.run(run_query(
-        f, preset=a.preset, send=a.send and not a.dry_run, mask=a.mask, do_rank=a.rank, llm_rank=a.llm_rank, top_n=a.top, russian=a.russian,
+        f, preset=a.preset, send=a.send and not a.dry_run, mask=a.mask, do_rank=a.rank, llm_rank=a.llm_rank or bool(a.rank_backend), rank_backend=a.rank_backend, top_n=a.top, russian=a.russian,
         max_age_days=a.max_age_days, auto_crawl=a.auto_crawl,
         crawl_kwargs=dict(parse_only=a.parse_only), quiet=a.quiet,
     ))

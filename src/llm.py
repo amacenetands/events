@@ -1,4 +1,4 @@
-"""Shared LLM backend gateway — Claude CLI, Ollama, and DeepSeek API."""
+"""Shared LLM backend gateway — Claude CLI, Claude API (anthropic), Ollama, and DeepSeek API."""
 import asyncio
 import os
 import re
@@ -10,6 +10,7 @@ _OLLAMA_CTX = int(os.environ.get("OLLAMA_CTX", "8192"))  # 32768 thrashed/hung t
 _DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 _DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 _DEEPSEEK_URL = os.environ.get("DEEPSEEK_URL", "https://api.deepseek.com")
+_ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 
 
 def current_model_label(backend: str | None = None) -> str:
@@ -21,6 +22,8 @@ def current_model_label(backend: str | None = None) -> str:
         return "haiku"
     if backend == "deepseek":
         return "deepseek"
+    if backend in ("anthropic", "claude-api"):
+        return "claude-api"
     return "qwen"
 
 
@@ -47,6 +50,8 @@ async def run_llm(
                 return await _run_ollama_async(prompt, model=model, max_output_tokens=max_output_tokens, timeout=timeout)
             if backend == "deepseek":
                 return await _run_deepseek_async(prompt, model=model, max_output_tokens=max_output_tokens, timeout=timeout)
+            if backend in ("anthropic", "claude-api"):
+                return await _run_anthropic_async(prompt, model=model, max_output_tokens=max_output_tokens, timeout=timeout)
             return await _run_claude_async(prompt, model=model, timeout=timeout)
         except (LLMConfigError, FileNotFoundError):
             raise
@@ -119,6 +124,29 @@ async def _run_deepseek_async(
     if not content:
         raise RuntimeError(f"DeepSeek returned empty content (finish_reason={data.get('choices', [{}])[0].get('finish_reason')})")
     return content.strip()
+
+
+async def _run_anthropic_async(
+    prompt: str,
+    *,
+    model: str | None = None,
+    max_output_tokens: int | None = None,
+    timeout: float = 300.0,
+) -> str:
+    """Claude via the Anthropic Messages API (needs ANTHROPIC_API_KEY)."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise LLMConfigError("ANTHROPIC_API_KEY not set")
+    import anthropic
+    client = anthropic.AsyncAnthropic(timeout=timeout, max_retries=0)  # run_llm owns retries
+    msg = await client.messages.create(
+        model=model or _ANTHROPIC_MODEL,
+        max_tokens=max_output_tokens or 4096,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    out = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
+    if not out:
+        raise RuntimeError(f"Claude API returned empty content (stop_reason={msg.stop_reason})")
+    return out
 
 
 async def _run_ollama_async(

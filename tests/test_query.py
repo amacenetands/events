@@ -76,10 +76,10 @@ def test_time_buckets():
     evs = [ev("m", time="09:30"), ev("a", time="12:00"), ev("a2", time="16:59"), ev("e", time="17:00"),
            ev("none"), ev("run", d="2026-11-01", end_date="2026-12-01", kind="run")]
     f = dict(time_of_day=frozenset({"evening"}))
-    assert titles(q(evs, **f)) == ["e", "none", "run"]
+    assert titles(q(evs, **f)) == ["e", "run"]   # untimed one-off with no inferable bucket is hidden
     assert titles(q(evs, strict_time=True, **f)) == ["e", "run"]
     assert titles(q(evs, time_of_day=parse_time_arg("daytime"), strict_time=True)) == ["a", "a2", "m", "run"]
-    assert titles(q(evs, time_of_day=frozenset({"morning"}))) == ["m", "none", "run"]
+    assert titles(q(evs, time_of_day=frozenset({"morning"}))) == ["m", "run"]
 
 
 def test_days():
@@ -158,3 +158,24 @@ def test_digest_v2_and_links():
     assert "Today show — https://a.test/x" in plain and "](" not in plain and "**" not in plain
     hrefs = re.findall(r'href="([^"]+)"', render_html(md))
     assert hrefs and all(h.startswith("https://") for h in hrefs if not h.startswith("/rel"))
+
+
+def test_untimed_evening_concert_hidden_in_daytime():
+    from datetime import date
+    from src.query import Filter, query, parse_time_arg, is_banned_url
+    from src.models import Event
+    mk = lambda **k: Event(**{"title": "x", "venue": "V", "date": date(2026, 11, 10), "url": "https://v.org/a", **k})
+    gig = mk(title="Jazz night", category="concert")
+    run = mk(title="Expo", category="exhibition", kind="run", end_date=date(2026, 12, 1))
+    talk = mk(title="Talk", category="talk")
+    timed = mk(title="Lunch", category="concert", time="13:00")
+    f = Filter(when="range:2026-11-09..2026-11-11", time_of_day=parse_time_arg("daytime"))
+    st = {}
+    out = query([gig, run, talk, timed], f, today=date(2026, 11, 9), stats=st)
+    assert {e.title for e in out} == {"Expo", "Lunch"} and st["untimed_hidden"] == 2
+    out = query([gig, run, talk, timed], Filter(when=f.when), today=date(2026, 11, 9))
+    assert len(out) == 4
+    ev = query([gig], Filter(when=f.when, time_of_day=parse_time_arg("evening")), today=date(2026, 11, 9))
+    assert ev == [gig]
+    assert is_banned_url("https://www.eventbrite.co.uk/e/1") and not is_banned_url("https://v.org/eventbrite")
+    assert query([mk(url="https://www.eventbrite.com/e/2")], Filter(when=f.when), today=date(2026, 11, 9)) == []

@@ -122,3 +122,75 @@ def test_public_and_online_flags():
     assert classify([ev("Webinar: Rembrandt")])[0].online is True
     assert classify([ev("Virtual Reality Experience")])[0].online is False
     assert classify([ev("Talk", description="hybrid, virtual or in person")])[0].online is False
+
+
+def test_adult_age_wording_not_kids():
+    from datetime import date as _d
+    for t, d in [("Salsa night", "ages 18-25"), ("Walking club", "ages 50+"), ("Careers", "for 16-25 year olds"),
+                 ("Revision", "GCSE and A-level students aged 14-19")]:
+        e = classify([ev(t, description=d)])[0]
+        assert e.audience != "kids", (t, e.audience)
+    assert classify([ev("Walking club", description="ages 50+")])[0].audience == "adult"
+    assert classify([ev("Rhyme time", description="ages 2-4")])[0].audience == "kids"
+
+
+def test_livestream_online_and_venue_sanity():
+    assert classify([ev("Couture (Livestream)")])[0].online is True
+    e = classify([ev("X", venue="1 High St, London N1 9AB", source="Src")])[0]
+    assert e.venue == "Src"
+
+
+def test_html_entities_cleaned():
+    e = ev("Tom &#038; Jerry<br>Live", description="a &amp;amp; b <b>c</b>")
+    assert e.title == "Tom & Jerry / Live" and e.description == "a & b c"
+
+
+def test_tidy_collapse_noise_dedupe():
+    from datetime import date as _d
+    from src.tidy import tidy
+    T = _d(2026, 11, 9)
+    play = [ev("Cranford", f"2026-11-{d}", source="OT", venue="OT", kind="recurring") for d in (10, 11, 13, 14, 17)]
+    junk = [ev("Performance", "2026-11-10", source="OT"), ev("Museum Admission", "2026-11-10", source="OT"),
+            ev("Old", "2026-11-01", source="OT")]
+    a = ev("Talk", "2026-11-12", time="19:00", source="BM", venue="BM", url="https://x.test/")
+    b = ev("Talk", "2026-11-12", time="19:00", source="Linnean", venue="BM", url="https://x.test/events/talk-1")
+    out = tidy(play + junk + [a, b], T)
+    runs = [e for e in out if e.title == "Cranford"]
+    assert len(runs) == 1 and runs[0].kind == "run" and str(runs[0].end_date) == "2026-11-17"
+    assert [e.title for e in out if e.title in ("Performance", "Museum Admission", "Old")] == []
+    assert [e.source for e in out if e.title == "Talk"] == ["Linnean"]
+
+
+def test_members_views_private():
+    (e,) = classify([ev("Schiaparelli Members' Closing Weekend Morning Views")])
+    assert e.public is False
+
+
+def test_student_admin_private():
+    (e,) = classify([ev("Disabled Students Allowance: Q&A Session")])
+    assert e.public is False
+
+
+def test_lecture_recording_online():
+    (e,) = classify([ev("Taster Lecture Recording: Aphrodite", description="Online taster lecture recording available")])
+    assert e.online is True
+
+
+def test_touring_town_list_elsewhere():
+    from src.classify import is_elsewhere
+    assert is_elsewhere(ev("Paula Rego", venue="Cheltenham, Petworth, Rugby", source="Southbank Centre"))
+    assert not is_elsewhere(ev("X", venue="Kings Place", source="Kings Place"))
+
+
+def test_rank_prompt_rules_and_compact_rows():
+    from src.rank import build_prompt, parse_llm
+    from src.query import Filter
+    today = dt.date(2026, 11, 15)
+    pool = [ev("Kids Concert", d="2026-11-15", time="10:15", audience="kids"),
+            ev("Play Days (Nov-Dec 2026)", d="2026-11-01", kind="run", end_date=dt.date(2026, 12, 18), audience="family")]
+    p = build_prompt(pool, {"kids_ages": [6]}, 2, Filter(city="london", when="today", audience="family"), today)
+    assert "kind=one" in p and "prioritise events made for kids" in p and "Kids ages: 6" in p
+    assert "E2|Play Days|" in p and "|run|to 18Dec|" in p and "E1|Kids Concert|" in p
+    adult = build_prompt(pool, {"kids_ages": [6]}, 2, Filter(city="london", when="today", audience="adult"), today)
+    assert "Kids ages" not in adult and "made for kids" not in adult
+    assert [e.title for e, _ in parse_llm("1. E2|closing\nE1|why", pool)] == ["Play Days (Nov-Dec 2026)", "Kids Concert"]

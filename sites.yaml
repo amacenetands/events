@@ -1,77 +1,4 @@
 html_sites:
-- name: Eventbrite London
-  map: https://maps.google.com/?q=Eventbrite+London+London
-  type: aggregator
-  must_determine_venue: true
-  remove_selectors:
-  - '#unsupported-browser-alert'
-  - .GlobalNav-module__main___jfEt2
-  - .eds-structure__right-drawer
-  - .eds-notification-bar.eds-notification-bar--warning
-  url: https://www.eventbrite.co.uk/d/united-kingdom--london/events/
-  category_hint: other
-  js_required: true
-  skip: false
-  notes: Main aggregator — broad coverage of London events all categories
-- name: Eventbrite London Kids
-  map: https://maps.google.com/?q=Eventbrite+London+Kids+London
-  type: aggregator
-  must_determine_venue: true
-  remove_selectors:
-  - '#unsupported-browser-alert'
-  - .eds-structure__header
-  - .eds-structure__drawer
-  - .eds-notification-bar
-  url: https://www.eventbrite.co.uk/d/united-kingdom--london/kids/
-  category_hint: kids
-  js_required: true
-  skip: false
-  pipeline: family
-  notes: Kids-filtered Eventbrite — workshops, camps, messy play, creative activities
-    for families
-- name: Time Out London
-  map: https://maps.google.com/?q=Time+Out+London+London
-  type: aggregator
-  must_determine_venue: true
-  remove_selectors:
-  - '#ad-skin-1-8536'
-  - '#ad-oop-1-8980'
-  - '#ad-head-1-7261'
-  - '#ad-native-2-2149'
-  - '#ad-foot-1-2512'
-  - .containerAdWrapper
-  - '#headerNewsletter'
-  - '#popup-newsletter'
-  - .masthead-header
-  - '#site-footer'
-  - ._skipLinks_8n5ih_1
-  - '#sp_message_container_1486677'
-  - .teads-placement
-  - .adsbygoogle
-  - '#inline-placement-ref'
-  - '#inline-placement'
-  url: https://www.timeout.com/london/things-to-do
-  category_hint: other
-  js_required: true
-  skip: false
-  notes: Weekend picks — curated, high quality, broad categories
-- name: Time Out Kids London
-  map: https://maps.google.com/?q=Time+Out+Kids+London+London
-  type: aggregator
-  must_determine_venue: true
-  remove_selectors:
-  - .containerAd
-  - '#headerNewsletter'
-  - '#popup-newsletter'
-  - ._skipLinks_8n5ih_1
-  - .masthead-header
-  - '#site-footer'
-  url: https://www.timeout.com/london/kids
-  category_hint: kids
-  js_required: false
-  skip: false
-  pipeline: family
-  notes: Kids and family events this weekend
 - name: Visit London Family
   map: https://maps.google.com/?q=Visit+London+Family+London
   type: aggregator
@@ -106,6 +33,8 @@ html_sites:
   notes: Dated event listings for primary-school-age kids — arts, music, theatre,
     attractions
 - name: Southbank Centre
+  # DISABLED: Cloudflare JS challenge blocks automated clients
+  disabled: true
   weight: 3
   map: https://maps.google.com/?q=Southbank+Centre+London
   type: arts-centre
@@ -120,7 +49,6 @@ html_sites:
   url: https://www.southbankcentre.co.uk/whats-on
   category_hint: concert
   js_required: true
-  skip: false
   pipeline: family
   notes: Covers Royal Festival Hall, Queen Elizabeth Hall, Purcell Room. Flag family/kids
     events.
@@ -147,6 +75,8 @@ html_sites:
   notes: Classical, jazz, contemporary, cinema, exhibitions. Listing hides per-event
     dates — follow detail links for dates.
 - name: Kings Place
+  # DISABLED: Cloudflare JS challenge blocks automated clients
+  disabled: true
   weight: 3
   map: https://maps.google.com/?q=Kings+Place+London
   type: concert-hall
@@ -154,7 +84,6 @@ html_sites:
   category_hint: concert
   js_required: true
   stealth: true
-  skip: false
   pipeline:
   - family
   - daytime
@@ -373,6 +302,8 @@ html_sites:
   notes: Contemporary art, film, performance — watch for opening events and family
     days
 - name: Royal Academy
+  # DISABLED: Cloudflare JS challenge blocks automated clients
+  disabled: true
   weight: 3
   map: https://maps.google.com/?q=Royal+Academy+London
   type: gallery
@@ -390,7 +321,6 @@ html_sites:
     desc: ".event-card__category, .event-card__label"
   category_hint: gallery
   js_required: true
-  skip: false
   pipeline: family
   notes: Flag family workshops, kids events and RA Schools events
 - name: Serpentine Galleries
@@ -587,14 +517,14 @@ html_sites:
   - .eds-notification-bar
   - .eds-structure__header
   - .eds-structure__drawer
-  url: https://www.eventbrite.co.uk/d/united-kingdom--london/british-museum/
+  url: https://www.britishmuseum.org/whats-on
   category_hint: exhibition
   js_required: true
   skip: false
   pipeline:
   - family
   - museums
-  notes: Via Eventbrite — britishmuseum.org uses Cloudflare JS challenge, blocks all
+  notes: britishmuseum.org uses Cloudflare JS challenge, blocks all
     scrapers. Flag opening events, family Sunday sessions, evening lates.
 - name: Wallace Collection
   weight: 2
@@ -813,6 +743,8 @@ html_sites:
   - museums
   notes: Stratford — new V&A site, flag family events and opening events
 - name: Natural History Museum
+  # DISABLED: Cloudflare JS challenge blocks automated clients
+  disabled: true
   weight: 3
   map: https://maps.google.com/?q=Natural+History+Museum+London
   type: museum
@@ -824,13 +756,14 @@ html_sites:
   url: https://www.nhm.ac.uk/visit/whats-on.html
   category_hint: exhibition
   js_required: true
-  skip: false
   pipeline:
   - family
   - museums
   notes: Has lates events, special exhibitions, kids events — distinguish all three.
     Flag family/kids.
 - name: Science Museum
+  # DISABLED: Imperva/Incapsula anti-bot block
+  disabled: true
   weight: 3
   map: https://maps.google.com/?q=Science+Museum+London
   type: museum
@@ -840,7 +773,6 @@ html_sites:
   url: https://my.sciencemuseum.org.uk/events?view=calendar
   category_hint: exhibition
   js_required: true
-  skip: false
   pipeline:
   - family
   - museums
@@ -1028,7 +960,7 @@ html_sites:
   - .mobile_nav
   url: https://www.stmarylebow.org.uk/concerts-and-lunchtime-recitals/
   category_hint: concert
-  js_required: false
+  js_required: true
   skip: false
   pipeline: daytime
   notes: Cheapside — regular lunchtime recitals and classical concerts
@@ -1065,7 +997,7 @@ html_sites:
   - .overlay-light
   url: https://www.stpauls.co.uk/whats-on
   category_hint: concert
-  js_required: false
+  js_required: true
   skip: false
   pipeline: daytime
   notes: City of London — organ recitals, choral services, special concerts
@@ -1100,7 +1032,7 @@ html_sites:
   - .header-text
   url: https://www.ahbtt.org.uk/whats-on/
   category_hint: concert
-  js_required: false
+  js_required: true
   skip: false
   pipeline: daytime
   notes: Tower of London — lunchtime concerts and special events
@@ -1231,6 +1163,8 @@ html_sites:
   notes: Westminster — baroque and classical focus, chamber music, some lunchtime
     events
 - name: National Portrait Gallery
+  # DISABLED: Cloudflare JS challenge blocks automated clients
+  disabled: true
   map: https://maps.google.com/?q=National+Portrait+Gallery+London
   type: gallery
   remove_selectors:
@@ -1241,7 +1175,6 @@ html_sites:
   url: https://www.npg.org.uk/whatson/
   category_hint: concert
   js_required: true
-  skip: false
   pipeline: daytime
   notes: Leicester Square — lunchtime talks, gallery events, occasional concerts
 - name: Handel & Hendrix in London
@@ -1337,6 +1270,8 @@ html_sites:
   notes: Walpole Park, Ealing — Jazz Festival (Jul), Comedy Festival (Jul), Latino
     Life, Beer Festival, New Gen. Children under 12 free. Active Jul–Aug only.
 - name: Bach to Baby Ealing
+  # DISABLED: server resets connection / times out for this client (net::ERR_CONNECTION_RESET)
+  disabled: true
   map: https://maps.google.com/?q=Bach+to+Baby+Ealing+London
   type: concert-hall
   remove_selectors:
@@ -1353,7 +1288,6 @@ html_sites:
   url: https://www.bachtobaby.com/ealing-music-concerts-for-baby-and-family
   category_hint: concert
   js_required: true
-  skip: false
   pipeline: family
   notes: Haven Green Baptist Church, Ealing Broadway — classical concerts for babies
     and toddlers, quarterly dates. Always is_kids=true, is_family=true.
@@ -1391,6 +1325,8 @@ html_sites:
   notes: Historic music venue, birthplace of British blues — regular live gigs, blues
     and jazz focus
 - name: Ealing Culture
+  # DISABLED: server resets connection / times out for this client (net::ERR_CONNECTION_RESET)
+  disabled: true
   map: https://maps.google.com/?q=Ealing+Culture+London
   type: venue
   remove_selectors:
@@ -1400,7 +1336,6 @@ html_sites:
   url: https://ealingculture.org/whats-on/
   category_hint: other
   js_required: true
-  skip: false
   pipeline: family
   notes: Ealing Borough arts aggregator — community events, family programming, local
     arts organisations
@@ -1474,6 +1409,8 @@ html_sites:
   notes: Chiswick/Acton Green — annual two-week arts festival (Jun), Green Days family
     fête weekend, children's events, theatre, music, talks
 - name: St Nicholas Church Chiswick
+  # DISABLED: unreachable from crawler (navigation timeouts / network io suspended)
+  disabled: true
   map: https://maps.google.com/?q=St+Nicholas+Church+Chiswick+London
   type: church
   remove_selectors:
@@ -1486,17 +1423,17 @@ html_sites:
   url: https://stnicholaschiswick.org/events/
   category_hint: concert
   js_required: true
-  skip: false
   pipeline: family
   notes: Chiswick Mall — monthly Sunday afternoon concerts featuring young talent,
     free/low-cost. Under 18s free.
 - name: Chiswick Calendar
+  # DISABLED: server resets connection / times out for this client (net::ERR_CONNECTION_RESET)
+  disabled: true
   map: https://maps.google.com/?q=Chiswick+Calendar+London
   type: aggregator
   url: https://chiswickcalendar.co.uk/whats-on-in-chiswick/
   category_hint: other
   js_required: true
-  skip: false
   pipeline: family
   notes: Local Chiswick events aggregator — children's events, music, theatre, community.
     Scrape for family/kids listings.
@@ -1542,6 +1479,8 @@ html_sites:
   notes: Grove Park, Chiswick — Bach to Baby quarterly family classical concerts.
     Always is_kids=true, is_family=true.
 - name: Kew Gardens
+  # DISABLED: 403 blocks automated clients
+  disabled: true
   map: https://maps.google.com/?q=Kew+Gardens+London
   type: garden
   remove_selectors:
@@ -1552,7 +1491,6 @@ html_sites:
   url: https://www.kew.org/kew-gardens/whats-on
   category_hint: kids
   js_required: false
-  skip: false
   pipeline: family
   notes: Seasonal events, family activities — often worth picking even if not strictly
     one-off
@@ -1693,7 +1631,7 @@ html_sites:
   type: church
   url: https://www.stpauls.co.uk/whats-on
   category_hint: concert
-  js_required: false
+  js_required: true
   skip: false
   pipeline: family
   notes: Organ recitals, choral services, special concerts and exhibitions
@@ -1877,6 +1815,8 @@ html_sites:
   - museums
   notes: Exhibitions, talks, workshops — major national library, St Pancras
 - name: London Transport Museum
+  # DISABLED: 403 blocks automated clients
+  disabled: true
   map: https://maps.google.com/?q=London+Transport+Museum+London
   type: museum
   remove_selectors:
@@ -1884,14 +1824,13 @@ html_sites:
   - .GlobalNav-module__main___jfEt2
   - .eds-structure__header
   - .eds-structure__drawer
-  url: https://www.eventbrite.co.uk/d/united-kingdom--london/london-transport-museum/
+  url: https://www.ltmuseum.co.uk/whats-on
   category_hint: exhibition
   js_required: true
-  skip: false
   pipeline:
   - family
   - museums
-  notes: Via Eventbrite — ltmuseum.co.uk uses Cloudflare, blocks all scrapers. Covent
+  notes: ltmuseum.co.uk uses Cloudflare, blocks all scrapers. Covent
     Garden — weekly under-5 sessions, half-term programmes, Depot open days.
 - name: Sir John Soane's Museum
   weight: 2
@@ -2103,6 +2042,8 @@ html_sites:
   notes: Westminster SW1 — underground WWII bunker, family guides, school holiday
     programmes, hands-on exploration.
 - name: UCL Events
+  # DISABLED: 403 blocks automated clients
+  disabled: true
   map: https://maps.google.com/?q=UCL+Events+London
   type: university
   remove_selectors:
@@ -2116,7 +2057,6 @@ html_sites:
   url: https://www.ucl.ac.uk/events
   category_hint: other
   js_required: false
-  skip: false
   pipeline: family
   notes: University College London — public talks, seminars, exhibitions, performances
     across all disciplines. Free, open to public.
@@ -2333,12 +2273,13 @@ html_sites:
   notes: Islington N1 — Grade II Art Deco hall (1930), 890-cap, strong year-round
     concert calendar including family-friendly programming.
 - name: Chelsea Physic Garden
+  # DISABLED: server resets connection / times out for this client (net::ERR_CONNECTION_RESET)
+  disabled: true
   map: https://maps.google.com/?q=Chelsea+Physic+Garden+London
   type: garden
   url: https://www.chelseaphysicgarden.co.uk/visit/whats-on/
   category_hint: kids
   js_required: true
-  skip: false
   pipeline: family
   notes: Kensington & Chelsea SW3 — 350-year-old botanic garden, free under-5s, family
     trails, seasonal garden events, quieter alternative to Kew.
@@ -2360,6 +2301,8 @@ html_sites:
   notes: Lambeth SE11 — sheep shearing, wool spinning, seed-sowing workshops, seasonal
     events (Easter, Halloween, Christmas). Free.
 - name: St Michael and All Angels Bedford Park
+  # DISABLED: 403 blocks automated clients
+  disabled: true
   map: https://maps.google.com/?q=St+Michael+and+All+Angels+Bedford+Park+London
   type: church
   remove_selectors:
@@ -2372,7 +2315,6 @@ html_sites:
   url: https://smaaa.org.uk/services/events/
   category_hint: concert
   js_required: false
-  skip: false
   pipeline: family
   notes: 'Bedford Park W4 — community concerts incl. Poppy McGhee''s ''Music for the
     Community: In the Moment'' (welcoming families with young children and those with
@@ -3205,23 +3147,26 @@ html_sites:
   notes: 'Bloomsbury crypt venue — nightly comedy in 2 performance spaces [test: no]'
   js_required: true
 - name: Up the Creek
+  # DISABLED: server resets connection / times out for this client (net::ERR_CONNECTION_RESET)
+  disabled: true
   url: https://up-the-creek.com
   category_hint: comedy
-  skip: false
   pipeline: evening
   notes: 'Greenwich club — voted UK #1 comedy club by The Guardian [test: no]'
   js_required: true
 - name: The Boat Show Comedy Club
+  # DISABLED: unreachable from crawler (navigation timeouts / network io suspended)
+  disabled: true
   url: https://www.boatshowcomedy.co.uk
   category_hint: comedy
-  skip: false
   pipeline: evening
   notes: 'Floating club on Tattershall Castle paddle steamer, Westminster [test: no]'
   js_required: true
 - name: Ronnie Scott's
+  # DISABLED: Cloudflare JS challenge blocks automated clients
+  disabled: true
   url: https://www.ronniescotts.co.uk/find-a-show
   category_hint: concert
-  skip: false
   pipeline: evening
   notes: 'Iconic Soho jazz club since 1959 — 2 shows nightly [test: no]'
   js_required: true
@@ -3250,12 +3195,6 @@ html_sites:
   skip: false
   pipeline: evening
   notes: 'French bistro + candle-lit jazz club near Elephant & Castle [test: yes]'
-- name: Servant Jazz Quarters
-  url: https://www.servantjazzquarters.com
-  category_hint: concert
-  skip: false
-  pipeline: evening
-  notes: 'Dalston intimate ~70 cap basement venue [test: no]'
 - name: The Jago
   url: https://thejagodalston.com
   category_hint: concert
@@ -3277,12 +3216,6 @@ html_sites:
   pipeline: evening
   notes: 'Hackney old trades hall — indie gigs, club nights, comedy [test: no]'
   js_required: true
-- name: Oslo Hackney
-  url: https://www.oslohackney.com
-  category_hint: concert
-  skip: false
-  pipeline: evening
-  notes: 'Intimate venue attached to Hackney Central station [test: no]'
 - name: Village Underground
   url: https://www.villageunderground.co.uk/events/
   category_hint: concert
@@ -3327,9 +3260,10 @@ html_sites:
   pipeline: evening
   notes: 'Camden indie/alternative ~1100 cap [test: maybe]'
 - name: 100 Club
+  # DISABLED: server refuses TLS/connect from this client (ConnectError)
+  disabled: true
   url: https://www.the100club.co.uk
   category_hint: concert
-  skip: false
   pipeline: evening
   notes: 'Oxford St icon — punk/indie/jazz since 1942 [test: no]'
 - name: Paper Dress Vintage
@@ -3461,9 +3395,10 @@ html_sites:
   notes: '120-seat year-round fringe — SPRINT festival, artist guarantee pay [test:
     yes]'
 - name: The Courtyard Theatre
+  # DISABLED: 403 blocks automated clients
+  disabled: true
   url: https://thecourtyard.org.uk
   category_hint: theatre
-  skip: false
   pipeline: theatres
   notes: '150-seat Hoxton/Islington — versatile studio & main house [test: no]'
 - name: Bridewell Theatre
@@ -3804,7 +3739,7 @@ html_sites:
   notes: 'Nederlander large West End — Tottenham Court Road [test: yes]'
 
 - name: Arts Theatre
-  url: https://www.artsatmarblearch.com/whats-on/
+  url: https://www.artsatmarblearch.com/
   category_hint: theatre
   skip: false
   pipeline: theatres
@@ -3819,15 +3754,17 @@ html_sites:
 
 - name: London Coliseum
   url: https://londoncoliseum.org/whats-on/
+  adapter: {kind: coliseum}
   category_hint: theatre
   skip: false
   pipeline: theatres
   notes: 'ENO historic West End home — St Martin''s Lane, 2,359 seats [test: yes]'
 
 - name: St Martin's Theatre
+  # DISABLED: 403 blocks automated clients
+  disabled: true
   url: https://themousetrap.com/
   category_hint: theatre
-  skip: false
   pipeline: theatres
   notes: 'Independent 550-seat West End — home of The Mousetrap since 1974 [test: yes]'
 
@@ -3863,9 +3800,10 @@ html_sites:
   notes: 'Major independent not-for-profit — The Cut, Waterloo [test: yes]'
 
 - name: Young Vic
+  # DISABLED: Cloudflare JS challenge blocks automated clients
+  disabled: true
   url: https://www.youngvic.org/whats-on/
   category_hint: theatre
-  skip: false
   pipeline: theatres
   js_required: true
   notes: 'Major subsidised theatre — The Cut, Waterloo [test: yes]'
@@ -3955,9 +3893,10 @@ html_sites:
   notes: '170-seat in-the-round subsidised theatre — Richmond [test: yes]'
 
 - name: Southwark Playhouse
+  # DISABLED: server refuses TLS/connect from this client (ConnectError)
+  disabled: true
   url: https://southwarkplayhouse.co.uk/
   category_hint: theatre
-  skip: false
   pipeline: theatres
   notes: 'Major fringe theatre — 2 venues (Borough + Elephant) [test: yes]'
 
@@ -3969,9 +3908,10 @@ html_sites:
   notes: 'Major new writing/comedy/cabaret — Dean Street Soho + Walthamstow [test: yes]'
 
 - name: Theatre503
+  # DISABLED: server refuses TLS/connect from this client (ConnectError)
+  disabled: true
   url: https://theatre503.com/
   category_hint: theatre
-  skip: false
   pipeline: theatres
   notes: '63-seat new writing fringe theatre — Battersea, above Latchmere pub [test: yes]'
 
@@ -4036,9 +3976,10 @@ html_sites:
   notes: '900-seat producing house — Kingston [test: yes]'
 
 - name: Finborough Theatre
+  # DISABLED: 429 rate-limit/block
+  disabled: true
   url: https://www.finboroughtheatre.co.uk/whats-on/
   category_hint: theatre
-  skip: false
   pipeline: theatres
   notes: 'Multi-award-winning 50-seat pub theatre — Earl''s Court [test: yes]'
 
@@ -4114,9 +4055,10 @@ html_sites:
   notes: '55-seat basement theatre — Waterloo, year-round programming [test: yes]'
 
 - name: Brockley Jack Studio Theatre
+  # DISABLED: server refuses TLS/connect from this client (ConnectError)
+  disabled: true
   url: https://brockleyjack.co.uk/whats-on/
   category_hint: theatre
-  skip: false
   pipeline: theatres
   notes: '50-seat theatre above Brockley Jack pub — programming through Nov 2026 [test: yes]'
 
@@ -4147,13 +4089,6 @@ html_sites:
   skip: false
   pipeline: theatres
   notes: 'Award-winning theatre pub — Walthamstow, folk/comedy/theatre [test: yes]'
-
-- name: The Landor Space
-  url: https://londonpubtheatres.com/landor-space
-  category_hint: theatre
-  skip: false
-  pipeline: theatres
-  notes: 'Small performance space above The Landor pub — Clapham North [test: yes]'
 
 - name: Circle & Star Theatre
   url: https://www.tickettailor.com/events/circleandstar
