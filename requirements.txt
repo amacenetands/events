@@ -7,3 +7,4 @@ markdown>=3.6
 aiohttp>=3.9.0
 markdownify>=0.13.0
 anthropic>=0.100.0
+python-dateutil>=2.9
