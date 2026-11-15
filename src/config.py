@@ -121,6 +121,7 @@ class FetchCfg(_Strict):
     delay: Optional[float] = None              # seconds to let JS render (browser modes)
     wait_for: Optional[str] = None             # CSS selector to await (browser modes)
     remove_selectors: list[str] = []           # stripped before reduction/extraction
+    gap: Optional[float] = None                # s between fetch starts on this host (fetch layer default 1.0)
 
 
 class FollowCfg(_Strict):
@@ -164,6 +165,7 @@ class VenueConfig(_Strict):
     hint: Optional[str] = None                  # LLM-facing hint (not yet consumed)
     fetch: FetchCfg = Field(default_factory=FetchCfg)
     extract: list[SourceKind] = Field(default_factory=lambda: ["jsonld", "adapter", "llm"])
+    merge: bool = False                         # union every `extract` source (default: first non-empty wins)
     adapter: Optional[dict[str, Any]] = None
     follow: Optional[FollowCfg] = None
     enrich: Optional[EnrichCfg] = None
@@ -226,7 +228,7 @@ LEGACY_KEYS = frozenset({
     "delay", "wait_for", "cache_version",
 })
 # v3-native keys accepted as-is (so a partly migrated file still loads).
-NATIVE_KEYS = frozenset({"city", "tags", "about", "hint", "fetch", "extract", "follow",
+NATIVE_KEYS = frozenset({"city", "tags", "about", "hint", "fetch", "extract", "merge", "follow",
                          "enrich", "fix", "disabled_reason"})
 
 

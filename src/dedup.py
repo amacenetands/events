@@ -63,7 +63,7 @@ def save_html_cache(url: str, html: str, site_name: str = "") -> None:
 
 def get_html_fetched_at(url: str) -> Optional[str]:
     row = _conn.execute(
-        "SELECT fetched_at FROM scrapes WHERE url_key=?", (_url_key(url),)
+        "SELECT fetched_at FROM scrapes WHERE url_key=? AND html != ''", (_url_key(url),)
     ).fetchone()
     return row["fetched_at"] if row else None
 
@@ -77,7 +77,7 @@ def oldest_fetched_at(urls: list[str]) -> Optional[str]:
         return None
     q = ",".join("?" * len(keys))
     row = _conn.execute(
-        f"SELECT MIN(fetched_at) AS m FROM scrapes WHERE url_key IN ({q})", keys
+        f"SELECT MIN(fetched_at) AS m FROM scrapes WHERE url_key IN ({q}) AND html != ''", keys
     ).fetchone()
     return row["m"] if row and row["m"] else None
 
