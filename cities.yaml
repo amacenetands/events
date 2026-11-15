@@ -13,6 +13,7 @@ moscow:
   display_name: Москва
   tz: Europe/Moscow
   lang: ru
+  currency: "₽"
   sites: sites.yaml
   require_tags: [moscow, moscow-theatre]
   parked_tags: [moscow-theatre]   # theatres parked: only via explicit --tag moscow-theatre

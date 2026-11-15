@@ -103,7 +103,7 @@ _R_SEP = r"[–—−-]|→|›|»|to|until|till|through|по|до"
 _PARTIAL_BEFORE = re.compile(r"(?<![\d.:£$€₽])(?P<d>\d{1,2})" + _ORD + r"\s*(?P<sep>" + _R_SEP + r"|and|&|,|и)\s*$", re.I)
 _RANGE_SEP_WORD = re.compile(r"^(?:" + _R_SEP + r")$", re.I)
 _PARTIAL_AFTER = re.compile(r"^\s*(?P<sep>[–—−-]|→|to|&|and|,)\s*(?P<d>\d{1,2})" + _ORD
-                            + r"\b(?![:.]\d|\s?[ap]\.?m\b|\s*(?:" + _EN_MON + r")\b|\s*(?:" + _RU_MON_RE
+                            + r"\b(?![:./-]\d|\s?[ap]\.?m\b|\s*(?:" + _EN_MON + r")\b|\s*(?:" + _RU_MON_RE
                             + r")|\s*[%+]|\s*(?:yrs?|years?)\b)(?:,?\s+(?P<y>20\d\d)(?!\d))?", re.I)
 _AGE_PRE = re.compile(r"(?:\bages?|\baged|\byears?|\byrs|\d\+)\s*:?\s*(?:\d{1,2}\s*(?:[–—−-]|to)\s*)?$", re.I)
 _RANGE_GAP = re.compile(r"^[\s,.]*(?:[–—−-]+|→|›|»|to|until|till|through|thru|по|до)[\s,.]*$", re.I)

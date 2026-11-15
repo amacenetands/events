@@ -97,6 +97,7 @@ class Event(BaseModel):
     start_known: bool = True            # False: "on now until X"; `date` = earliest known/assumed day
     sold_out: bool = False              # every listed session sold out
     raw_date: Optional[str] = None      # date text as found on the page (debug/eval)
+    date_inconsistent: bool = False     # written weekday disagrees with the date (eval only; not shown)
 
     # Derived, read-only compat views (old code/cached JSON used these as fields)
     @property
@@ -205,3 +206,6 @@ class RawEvent(BaseModel):
     venue: Optional[str] = None            # venue when the page lists several (aggregators)
     source_kind: Optional[str] = None      # producer: "jsonld", "adapter:cards", "llm", "spektrix", ...
     sold_out: Optional[bool] = None        # True when the source says so (Spektrix status); None = unknown
+    category_text: str = ""                # source's own type word, verbatim-ish ("theatre", "music", "kids")
+    audience_text: str = ""                # audience as stated ("kids", "family", "adults only")
+    age_text: str = ""                     # age guidance as stated ("18+", "5-11", "3+")

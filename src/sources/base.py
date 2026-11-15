@@ -1,4 +1,12 @@
-"""Source contract: every source turns (venue config, fetched page) into RawEvents."""
+"""Source contract: every source turns (venue config, fetched page) into RawEvents.
+
+- `records()` MAY raise; callers (parse_sites) always go through `safe_records`, which
+  turns an exception into `ctx.stats["<kind>.raised"]` + one `ctx.errors` line and [].
+- Fetch fills `FetchResult.body` from the cache on NOT_MODIFIED, so a source treats any
+  `fr.ok and fr.body` the same way. Resolve relative links against `fr.url` (post-redirect)
+  when set, else the venue's listing URL.
+- Sources never filter by date; `build.build_events` drops past events.
+"""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
@@ -16,6 +24,7 @@ class SourceCtx:
     city: CityConfig
     stats: dict[str, int] = field(default_factory=dict)   # free-form counters, e.g. "spektrix.events_failed"
     errors: list[str] = field(default_factory=list)       # "<venue>: <what>"
+    force: bool = False                                    # bypass cached detail pages (re-download)
 
 @runtime_checkable
 class Source(Protocol):
@@ -42,10 +51,12 @@ def load_builtin_sources() -> None:
     for m in _BUILTIN_MODULES:
         importlib.import_module(f"{__package__}.{m}")
     for m in _OPTIONAL_MODULES:
+        name = f"{__package__}.{m}"
         try:
-            importlib.import_module(f"{__package__}.{m}")
-        except ImportError:
-            pass
+            importlib.import_module(name)
+        except ModuleNotFoundError as e:   # only a missing module is tolerated, not a broken one
+            if e.name != name:
+                raise
     _loaded = True
 
 
@@ -55,3 +66,19 @@ def get_source(kind: str) -> Source:
     if kind not in SOURCES:
         raise KeyError(f"unknown source kind {kind!r}; known: {sorted(SOURCES)}")
     return SOURCES[kind]
+
+
+def base_url(cfg: VenueConfig, fr: FetchResult | None, ctx: SourceCtx) -> str:
+    """URL relative links resolve against: the post-redirect fetch URL, else the listing URL."""
+    return (fr.url if fr is not None and fr.url else "") or cfg.resolved_url(ctx.today.year)
+
+
+async def safe_records(src: Source, cfg: VenueConfig, fr: FetchResult | None, ctx: SourceCtx) -> list[RawEvent]:
+    """src.records(); an exception becomes a stat + one error line and []."""
+    try:
+        return await src.records(cfg, fr, ctx)
+    except Exception as ex:   # noqa: BLE001 — one broken source must not sink the crawl
+        key = f"{src.kind}.raised"
+        ctx.stats[key] = ctx.stats.get(key, 0) + 1
+        ctx.errors.append(f"{cfg.name}: source {src.kind} raised {type(ex).__name__}: {str(ex)[:80]}")
+        return []

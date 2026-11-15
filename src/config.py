@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+import re
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 ROOT = Path(__file__).resolve().parent.parent
 CITIES_YAML = ROOT / "cities.yaml"
@@ -44,6 +46,7 @@ class CityConfig(BaseModel):
     display_name: str                          # city name for headings ("London", "Москва")
     tz: str
     lang: str = "en"
+    currency: str = "£"                        # symbol for prices given without one (JSON-LD offers)
     sites: str = "sites.yaml"                  # relative to cities.yaml
     exclude_tags: tuple[str, ...] = ()         # venues with any of these are not in the city
     require_tags: tuple[str, ...] = ()         # venues need one of these to be in the city
@@ -102,6 +105,16 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+def _check_regex(v: Optional[str]) -> Optional[str]:
+    """Reject patterns that do not compile (fail at load, not mid-crawl)."""
+    if v is not None:
+        try:
+            re.compile(v)
+        except re.error as e:
+            raise ValueError(f"invalid regex {v!r}: {e}") from e
+    return v
+
+
 class FetchCfg(_Strict):
     """How to fetch the listing page."""
     mode: Literal["http", "browser", "browser_stealth", "api"] = "http"
@@ -114,6 +127,8 @@ class FollowCfg(_Strict):
     """`follow_links` source: the listing hides dates, detail pages ARE the extraction."""
     link_pattern: Optional[str] = None         # None → crawler default (r"/event/")
     max: int = LEGACY_MAX_LINKS
+
+    _re = field_validator("link_pattern")(_check_regex)
 
 
 class EnrichCfg(_Strict):
@@ -130,6 +145,8 @@ class FixCfg(_Strict):
     date_order: Literal["dmy", "mdy", "ymd"] = "dmy"
     url_pattern: Optional[str] = None
     drop_title_re: Optional[str] = None
+
+    _re = field_validator("url_pattern", "drop_title_re")(_check_regex)
 
 
 class VenueConfig(_Strict):
