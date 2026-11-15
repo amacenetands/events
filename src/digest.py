@@ -6,6 +6,15 @@ from pathlib import Path
 from urllib.parse import quote as _quote
 
 from .models import Event
+from .config import get_city
+
+
+def _city_display(city: str) -> str:
+    """Heading name for a city (cities.yaml display_name; capitalised key if unknown)."""
+    try:
+        return get_city(city).display_name
+    except KeyError:
+        return city.capitalize()
 
 RUNS_CAP = 40
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
@@ -190,7 +199,7 @@ def generate_digest_v2(
     if lang == "ru":
         from .query import resolve_when
         s0, e0 = resolve_when(f.when, today)
-        desc = f"{f.city.capitalize() if f.city != 'moscow' else 'Москва'} · " + (
+        desc = f"{_city_display(f.city)} · " + (
             _dfmt(s0, lang) if s0 == e0 else f"{_dfmt(s0, lang)} – {_dfmt(e0, lang)}")
     else:
         desc = describe(f, today)

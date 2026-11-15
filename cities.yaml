@@ -1,0 +1,20 @@
+london:
+  label: "London Events"
+  display_name: London
+  tz: Europe/London
+  lang: en
+  sites: sites.yaml          # per-city file comes in a later step; both cities read sites.yaml for now
+  exclude_tags: [moscow, moscow-theatre]
+  crawl_tags: []             # crawl = every London venue
+  api_sources: [skiddle, songkick]
+  songkick_metro: 24426
+moscow:
+  label: "Moscow Events"
+  display_name: Москва
+  tz: Europe/Moscow
+  lang: ru
+  sites: sites.yaml
+  require_tags: [moscow, moscow-theatre]
+  parked_tags: [moscow-theatre]   # theatres parked: only via explicit --tag moscow-theatre
+  crawl_tags: [moscow]
+  api_sources: []

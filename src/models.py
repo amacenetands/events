@@ -91,6 +91,12 @@ class Event(BaseModel):
     source: str = ""
     public: bool = True    # False: schools/members/trade/private-hire only (set by classify)
     online: bool = False   # True: webinar / livestream only (set by classify)
+    # v3 fields — defaulted so stored event_json rows without them still load
+    byday: Optional[list[int]] = None   # run/recurring: session weekdays, 0=Mon..6=Sun
+    sessions_known: bool = True         # False: multi-day range with no weekday/session info
+    start_known: bool = True            # False: "on now until X"; `date` = earliest known/assumed day
+    sold_out: bool = False              # every listed session sold out
+    raw_date: Optional[str] = None      # date text as found on the page (debug/eval)
 
     # Derived, read-only compat views (old code/cached JSON used these as fields)
     @property
@@ -142,6 +148,16 @@ class Event(BaseModel):
                 d["min_age"] = None
         return d
 
+    @field_validator("byday", mode="before")
+    @classmethod
+    def _byday(cls, v):
+        if v is None:
+            return None
+        days = sorted({int(x) for x in v})
+        if any(d < 0 or d > 6 for d in days):
+            raise ValueError(f"byday out of range 0..6: {v!r}")
+        return days or None
+
     @field_validator("title", "venue", "description", mode="before")
     @classmethod
     def _clean(cls, v):
@@ -174,3 +190,17 @@ class Event(BaseModel):
         raw = (f"{self.title.lower().strip()}|{self.venue.lower().strip()}|"
                f"{self.date.isoformat()}|{self.time or ''}")
         return hashlib.sha1(raw.encode()).hexdigest()[:16]
+
+
+class RawEvent(BaseModel):
+    """One event as found on the page — strings only, no parsing (normalize/ does that)."""
+    title: str
+    date_text: Optional[str] = None        # date or start of range, verbatim ("Sat 22 Nov", "Until 4 Jan")
+    end_text: Optional[str] = None         # end of range, verbatim, when given separately
+    time_text: Optional[str] = None        # time(s), verbatim ("7.30pm", "Tue-Sat 7pm, Sat 2.30pm")
+    price_text: Optional[str] = None       # price, verbatim ("£15 / £10 conc", "Free")
+    recurrence_text: Optional[str] = None  # repeat rule, verbatim ("Every Saturday", "Weekdays")
+    url: Optional[str] = None              # event/detail link (may be relative)
+    desc: Optional[str] = None             # short description / subtitle
+    venue: Optional[str] = None            # venue when the page lists several (aggregators)
+    source_kind: Optional[str] = None      # producer: "jsonld", "adapter:cards", "llm", "spektrix", ...

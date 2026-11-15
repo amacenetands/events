@@ -24,9 +24,6 @@ from ..dedup import get_cached_html, save_html_cache, get_cached_html_any
 from ..models import Event
 
 SITES_YAML = Path(__file__).parent.parent.parent / "sites.yaml"
-# Region tags excluded from the untagged London default; reachable only via
-# explicit --tag (e.g. moscow / moscow-theatre).
-MOSCOW_TAGS = frozenset({"moscow", "moscow-theatre"})
 MAX_CONCURRENT_HTTPX = 8
 MAX_CONCURRENT_BROWSER = 5
 BROWSER_DELAY_DEFAULT = 3.0   # seconds to let JS render; per-site `delay:` / `wait_for:` in sites.yaml
@@ -47,27 +44,22 @@ HEADERS = {
 
 
 def _load_sites(pipeline: str | None = None, include_disabled: bool = False) -> list[dict]:
+    """Legacy-shaped site dicts for one pipeline tag, via config.load_venues.
+    pipeline=None → London default (Moscow-tagged venues excluded); a Moscow tag
+    (moscow / moscow-theatre) → that city's venues carrying it; any other tag →
+    London venues carrying it. {YEAR} in urls is resolved to the current year."""
     from datetime import date
-    year = str(date.today().year)
-    with open(SITES_YAML) as f:
-        data = yaml.safe_load(f)
-    sites = [s for s in data.get("html_sites", []) if not s.get("skip", False) and (include_disabled or not s.get("disabled", False))]
-    for s in sites:
-        s["url"] = s["url"].replace("{YEAR}", year)
-    def _tags(s: dict) -> set:
-        p = s.get("pipeline")
-        if p is None:
-            return set()
-        return set(p) if isinstance(p, list) else {p}
-
-    if pipeline:
-        sites = [s for s in sites if pipeline in _tags(s)]
-    else:
-        # No tag = London default. Moscow venues participate ONLY when their
-        # tag is requested explicitly (e.g. --tag moscow), never in the
-        # untagged London pipelines (standard / daytime / family / museums).
-        sites = [s for s in sites if not (_tags(s) & MOSCOW_TAGS)]
-    return sites
+    from .. import config
+    year = date.today().year
+    city = config.city_for_tag(pipeline)
+    venues = config.load_venues(city, include_disabled=include_disabled,
+                                tags=[pipeline] if pipeline else None)
+    out = []
+    for v in venues:
+        d = v.to_legacy_dict()
+        d["url"] = v.resolved_url(year)
+        out.append(d)
+    return out
 
 
 def configured_site_names(pipeline: str | None = None, include_disabled: bool = False) -> list[str]:

@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from .classify import is_elsewhere
+from .config import get_city
 from .models import Event
 
 ALL_KINDS = frozenset({"one_off", "run", "recurring"})
 TIME_BUCKETS = ("morning", "afternoon", "evening")
 _TIME_ALIASES = {"daytime": ("morning", "afternoon"), "day": ("morning", "afternoon")}
-CITY_TZ = {"london": "Europe/London", "moscow": "Europe/Moscow"}
 PRESETS_YAML = Path(__file__).parent.parent / "pipelines.yaml"
 
 
@@ -38,7 +38,7 @@ class Filter:
     lang: str = "en"
     label: str | None = None
     coverage: bool = False
-    tz: str | None = None                      # IANA tz; default from city (CITY_TZ)
+    tz: str | None = None                      # IANA tz; default from city (cities.yaml)
     public_only: bool = True                   # drop schools/members/trade/private events
     include_online: bool = False               # keep webinar/livestream-only events
 
@@ -60,8 +60,15 @@ def city_today(f: "Filter") -> date:
     return city_now(f).date()
 
 
+def _city_tz(city: str | None) -> str | None:
+    try:
+        return get_city(city).tz
+    except KeyError:
+        return None
+
+
 def city_now(f: "Filter") -> datetime:
-    tz = f.tz or CITY_TZ.get(f.city)
+    tz = f.tz or _city_tz(f.city)
     return datetime.now(ZoneInfo(tz)).replace(tzinfo=None) if tz else datetime.now()
 
 

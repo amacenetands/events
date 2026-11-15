@@ -1,11 +1,10 @@
-"""Songkick API v3 source — London metro area ID 24426."""
+"""Songkick API v3 source — metro area id from cities.yaml (`songkick_metro`)."""
 import os
 import httpx
 from datetime import date, timedelta
 from ..models import Event
 
 API = "https://api.songkick.com/api/3.0"
-LONDON_METRO_ID = 24426
 
 
 def _parse_event(raw: dict) -> Event | None:
@@ -48,7 +47,14 @@ def _parse_event(raw: dict) -> Event | None:
         return None
 
 
-async def fetch_songkick() -> list[Event]:
+async def fetch_songkick(metro: int | None = None) -> list[Event]:
+    """Upcoming events in a Songkick metro area (default: London's from cities.yaml)."""
+    if metro is None:
+        from ..config import get_city
+        metro = get_city("london").songkick_metro
+    if not metro:
+        print("  [Songkick] No metro id configured — skipping")
+        return []
     key = os.environ.get("SONGKICK_API_KEY", "")
     if not key:
         print("  [Songkick] No key — skipping")
@@ -66,7 +72,7 @@ async def fetch_songkick() -> list[Event]:
         page = 1
         while True:
             r = await client.get(
-                f"{API}/metro_areas/{LONDON_METRO_ID}/calendar.json",
+                f"{API}/metro_areas/{metro}/calendar.json",
                 params={**params, "page": page},
             )
             if r.status_code != 200:

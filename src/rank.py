@@ -47,7 +47,6 @@ MAX_PER_CATEGORY = 4
 LLM_POOL = 40
 
 PROFILE_YAML = Path(__file__).parent.parent / "profile.yaml"
-SITES_YAML = Path(__file__).parent.parent / "sites.yaml"
 
 
 @dataclass
@@ -72,12 +71,15 @@ def _tkey(e: Event) -> str:
     return re.sub(r"\W+", " ", e.title.lower()).strip()
 
 
-def load_weights(path: Path = SITES_YAML) -> dict[str, int]:
+def load_weights(path: Path | None = None) -> dict[str, int]:
+    """Lowercased venue name → weight (only non-default weights; rank treats missing as 1).
+    Every entry of the city sites files (or of `path`), skip/disabled included."""
+    from . import config
     try:
-        sites = yaml.safe_load(open(path)).get("html_sites", [])
+        venues = config.venues_from_file(path) if path is not None else config.all_venues()
     except Exception:
         return {}
-    return {s["name"].lower(): int(s["weight"]) for s in sites if s.get("weight")}
+    return {v.name.lower(): v.weight for v in venues if v.weight != 1}
 
 
 def load_profile(path: Path = PROFILE_YAML) -> dict:

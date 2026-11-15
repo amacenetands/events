@@ -20,7 +20,6 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
@@ -29,8 +28,8 @@ _crawl4ai_dir = os.environ.get("CRAWL4AI_BASE_DIRECTORY", "/tmp/.crawl4ai")
 os.environ["CRAWL4AI_BASE_DIRECTORY"] = _crawl4ai_dir
 Path(_crawl4ai_dir).mkdir(parents=True, exist_ok=True)
 
-from src.sources import API_SOURCES
-from src.sources.html_sites import fetch_html_sites, fetch_sites, parse_sites, configured_site_names
+from src.sources import api_sources_for
+from src.sources.html_sites import fetch_html_sites, fetch_sites, parse_sites, configured_site_names, _load_sites
 from src.dedup import filter_unseen, mark_seen
 from src import rank as rankmod
 from src.classify import classify
@@ -43,18 +42,17 @@ from src.query import (is_banned_url, Filter, query, describe, filter_from_dict,
                        resolve_when, city_today, city_now)
 from src import events_db, timing as _timing
 
-SITES_YAML = Path(__file__).parent / "sites.yaml"
-CITY_TAG = {"london": None, "moscow": "moscow"}   # sites.yaml pipeline arg per city
+from src import config as _config
+
+
+def _city_tag(city: str) -> str | None:
+    """sites.yaml pipeline arg for a city's crawl (cities.yaml: None for London, "moscow")."""
+    return _config.legacy_pipeline_tag(city)
 
 
 def _tags_by_source() -> dict[str, list[str]]:
-    with open(SITES_YAML) as fh:
-        sites = yaml.safe_load(fh).get("html_sites", [])
-    out = {}
-    for s in sites:
-        p = s.get("pipeline")
-        out[s["name"]] = [] if p is None else (list(p) if isinstance(p, list) else [p])
-    return out
+    """Venue name → tags, over every sites entry (skip/disabled included: cached rows)."""
+    return {v.name: list(v.tags) for v in _config.all_venues()}
 
 
 def _dedup_by_fingerprint(events: list[Event]) -> list[Event]:
@@ -72,8 +70,8 @@ def _dedup_by_fingerprint(events: list[Event]) -> list[Event]:
 def _absolutize_urls(events: list[Event]) -> None:
     """Ensure every event url is absolute http(s): join against the source site url."""
     from urllib.parse import urljoin
-    with open(SITES_YAML) as fh:
-        base = {s["name"]: s["url"] for s in yaml.safe_load(fh).get("html_sites", [])}
+    year = date.today().year
+    base = {v.name: v.resolved_url(year) for v in _config.all_venues()}
     for e in events:
         u = (e.url or "").strip()
         if not u.startswith(("http://", "https://")):
@@ -99,7 +97,7 @@ async def crawl(
 ) -> int:
     """Fetch + extract + classify ALL venues for city; persist to events table."""
     t0 = _timing.now()
-    tag = CITY_TAG[city]
+    tag = _city_tag(city)
     print(f"Crawl: {city}\n" + "=" * 40)
 
     if fetch_only:
@@ -125,7 +123,7 @@ async def crawl(
     else:
         html_coro = fetch_html_sites(pipeline=tag, force_download=force_download, force_parse=force_parse,
                                      compare=compare, errors=errors)
-    api = [src() for src in API_SOURCES] if city == "london" else []
+    api = [src() for src in api_sources_for(_config.get_city(city).api_sources)]   # cities.yaml
     results = await asyncio.gather(*api, html_coro, return_exceptions=True)
     scraped: list[Event] = []
     for r in results:
@@ -166,9 +164,8 @@ def _stale_venues(events, max_age_days: float) -> list[tuple[str, float]]:
     and sites with no current rows never trigger a global stale warning."""
     try:
         from src import dedup
-        with open(SITES_YAML) as fh:
-            urls = {s["name"]: s["url"].replace("{YEAR}", str(date.today().year))
-                    for s in yaml.safe_load(fh).get("html_sites", [])}
+        year = date.today().year
+        urls = {v.name: v.resolved_url(year) for v in _config.all_venues()}
         out = []
         for src in sorted({e.source for e in events if e.source in urls}):
             at = dedup.get_html_fetched_at(urls[src])
@@ -192,10 +189,7 @@ def _oldest_fetched(tag):
         fn = getattr(dedup, "oldest_fetched_at", None)
         if fn is None:
             return None
-        with open(SITES_YAML) as fh:
-            sites = yaml.safe_load(fh).get("html_sites", [])
-        names = set(configured_site_names(tag))
-        r = fn([s["url"] for s in sites if s["name"] in names])
+        r = fn([s["url"] for s in _load_sites(tag)])
         return r.isoformat() if hasattr(r, "isoformat") else (str(r) if r else None)
     except Exception:
         return None
@@ -223,7 +217,7 @@ async def run_query(
 ) -> list[Event]:
     loaded = events_db.load_events(f.city)
     today, now = city_today(f), city_now(f)
-    loaded.events = tidy(classify(loaded.events), today, {n.lower() for n in configured_site_names(CITY_TAG[f.city], include_disabled=True)})   # re-apply deterministic rules so new classifier flags need no recrawl
+    loaded.events = tidy(classify(loaded.events), today, {n.lower() for n in configured_site_names(_city_tag(f.city), include_disabled=True)})   # re-apply deterministic rules so new classifier flags need no recrawl
     age = events_db.age_days(loaded.crawled_at)
     if age is None:
         print(f"WARNING: no crawl for {f.city}. Run: venv/bin/python main.py crawl --city {f.city}")
@@ -274,7 +268,7 @@ async def run_query(
         counts: dict[str, int] = {}
         for e in base:
             counts[e.source] = counts.get(e.source, 0) + 1
-        footer = coverage_summary(counts, configured_site_names(CITY_TAG[f.city]))
+        footer = coverage_summary(counts, configured_site_names(_city_tag(f.city)))
 
     digest = generate_digest_v2(events, f, picks=picks, new_fps=new_fps, title=f.label, footer=footer,
                                reasons=reasons, scores=scores, today=today, lang=f.lang)
@@ -340,8 +334,14 @@ def build_filter(args) -> Filter:
         ov["public_only"] = False
     if args.include_online:
         ov["include_online"] = True
-    if (ov.get("city") or base.get("city")) == "moscow" and "lang" not in base:
-        ov["lang"] = "ru"          # Moscow digests default to RU headings
+    _cname = ov.get("city") or base.get("city")
+    try:
+        _lang = _config.get_city(_cname).lang
+    except KeyError:
+        raise SystemExit(f"unknown city {_cname!r} (preset {args.preset!r}); "
+                         f"known: {', '.join(_config.city_names())}") from None
+    if _lang != "en" and "lang" not in base:
+        ov["lang"] = _lang         # e.g. Moscow digests default to RU headings (cities.yaml lang)
     f = filter_from_dict(base, **ov)
     resolve_when(f.when)   # validate early
     return f
@@ -350,7 +350,7 @@ def build_filter(args) -> Filter:
 def cmd_query(argv):
     p = argparse.ArgumentParser(prog="main.py query")
     p.add_argument("--preset")
-    p.add_argument("--city", choices=list(CITY_TAG))
+    p.add_argument("--city", choices=_config.city_names())
     p.add_argument("--when", help="today|tomorrow|weekend|next:N (N days incl. today)|range:YYYY-MM-DD..YYYY-MM-DD")
     p.add_argument("--audience", choices=["any", "family", "kids", "adult"])
     p.add_argument("--kinds", help="comma list of one_off,run,recurring")
@@ -390,7 +390,7 @@ def cmd_query(argv):
 
 def cmd_crawl(argv):
     p = argparse.ArgumentParser(prog="main.py crawl")
-    p.add_argument("--city", choices=list(CITY_TAG), default="london")
+    p.add_argument("--city", choices=_config.city_names(), default="london")
     _add_crawl_flags(p)
     a = p.parse_args(argv)
     asyncio.run(crawl(a.city, force_download=a.force_download, force_parse=a.force_parse,

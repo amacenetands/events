@@ -82,12 +82,10 @@ def _site_hints() -> dict[str, str]:
     if _hints is None:
         _hints = {}
         try:
-            import yaml
-            from .sources.html_sites import SITES_YAML
-            with open(SITES_YAML) as f:
-                for s in yaml.safe_load(f).get("html_sites", []):
-                    if s.get("category_hint"):
-                        _hints[s["name"].lower()] = s["category_hint"]
+            from . import config
+            for v in config.all_venues():
+                if v.category_hint:
+                    _hints[v.name.lower()] = v.category_hint
         except Exception:
             pass
     return _hints
