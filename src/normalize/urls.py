@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
 
-__all__ = ["pick_event_url"]
+__all__ = ["pick_event_url", "is_listing_url", "url_host", "anchor_lines", "match_title_url"]
 
 _ARROW = re.compile(r"->\s*(\S+)")
 _MD_LINK = re.compile(r"\]\((\S+?)\)")
@@ -63,6 +63,22 @@ def _is_listing(u: str, listing_url: str) -> bool:
     if h == lh and p == lp:
         return not q or q == lq or keys <= _LISTING_QUERY_KEYS
     return False
+
+
+def is_listing_url(u: str, listing_url: str) -> bool:
+    """u is the listing page (or a filter/pagination view of it) or a generic site page."""
+    try:
+        return _is_listing(u, listing_url)
+    except Exception:
+        return False
+
+
+def url_host(u: str) -> str:
+    """Lower-case host without 'www.' ('' when none)."""
+    try:
+        return _norm(u or "")[0]
+    except Exception:
+        return ""
 
 
 def pick_event_url(lines: list[str], listing_url: str, *, pattern: str | None = None) -> str | None:

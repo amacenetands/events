@@ -767,6 +767,7 @@ venues:
     title: .b-event-teaser__title
     date: .b-icon-list__item-text
     desc: .b-event-teaser__type
+    price: .b-icon-list__icon--ticket .b-icon-list__item-text
   hint: Flag family events.
   about: V&A Lates (adults only Friday evenings) are great picks.
 - name: Tate Modern
@@ -1214,6 +1215,7 @@ venues:
     Children under 12 free. Active Jul–Aug only.
 - name: Bach to Baby Ealing
   url: https://www.bachtobaby.com/ealing-music-concerts-for-baby-and-family
+  merge: true     # JSON-LD lists only the next concert; the llm adds the HTML-only ones
   tags:
   - family
   type: concert-hall

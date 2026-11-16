@@ -441,3 +441,11 @@ def test_time_label_and_schedule_label():
     assert schedule_label(s, TODAY).startswith("Thursdays from 10:00")
     assert time_label(_ev(time="19:30")) == "19:30" and time_label(_ev()) == ""
     assert Event.model_validate({"title": "x", "venue": "v", "date": str(TODAY), "url": "u"}).times_vary is False
+
+
+def test_five_weekday_sessions_are_a_run(cache):
+    # Mon–Fri sessions over two weeks: series_kind -> run with byday (not a weekly programme)
+    days = [_next(w, weeks=k) for k in (0, 1) for w in range(5)]
+    e = _ev(d=TODAY, end=max(days) + timedelta(days=1))
+    (out,), _ = _one(e, _page(_rows([(d, "10 am") for d in sorted(days)])))
+    assert (out.kind, out.byday, out.sessions_known) == ("run", [0, 1, 2, 3, 4], True)

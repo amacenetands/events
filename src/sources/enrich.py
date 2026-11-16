@@ -11,7 +11,7 @@ event's detail page. Gap-fill only — a listing value is never overwritten.
 - Page sessions come from the first of: JSON-LD Event nodes, `<time>` tags, short visible
   lines naming a weekday ("Thursday 19 November", "10 am" on the next line) above any
   "You may also like" block — all through normalize.parse_date_specs.
-- Sessions: a weekly pattern (>= 75% of its weekdays present) -> recurring + byday; one
+- Sessions: a weekly pattern (>= 75% of its weekdays present) -> byday, kind by normalize.series_kind; one
   upcoming date on the whole page -> one_off; a sparse list (<= SPARSE_MAX) -> one dated
   instance per session. The listing end is never shrunk (extended when the page goes on).
 - Never raises and never drops an event (`enrich.failed`).
@@ -27,7 +27,7 @@ from urllib.parse import urldefrag, urljoin, urlsplit
 from ..config import VenueConfig
 from ..fetch.detail import fetch_detail
 from ..models import Event
-from ..normalize import parse_date_specs, parse_price_text
+from ..normalize import parse_date_specs, parse_price_text, series_kind
 from .base import SourceCtx
 from .jsonld import _schedule, _sold_out, event_nodes, price_text
 
@@ -367,15 +367,16 @@ def _sessions_upd(e: Event, d: Detail, up: list[Session], ctx: SourceCtx) -> dic
         # keep a listing start that is still ahead and on the pattern (page may list from later)
         start = e.date if (e.start_known and today <= e.date <= days[0] and e.date.weekday() in wd) else days[0]
         daily = len(wd) == 7
+        kind = series_kind(wd)                  # <= 4 weekdays: weekly programme; 5+: a run
         upd = dict(date=start, end_date=_end(e, days[-1], ctx), start_known=True, sessions_known=True,
-                   kind="run" if daily else "recurring", byday=None if daily else wd)
-        if not daily and not e.recurrence:
+                   kind=kind, byday=None if daily else wd)
+        if kind == "recurring" and not e.recurrence:
             from ..digest import days_label
             upd["recurrence"] = days_label(wd, ctx.city.lang)
         return upd
     if d.byday and not d.sessions:
-        upd = dict(sessions_known=True, kind="recurring", byday=d.byday)
-        if not e.recurrence:
+        upd = dict(sessions_known=True, kind=series_kind(d.byday), byday=d.byday)
+        if upd["kind"] == "recurring" and not e.recurrence:
             from ..digest import days_label
             upd["recurrence"] = days_label(d.byday, ctx.city.lang)
         return upd

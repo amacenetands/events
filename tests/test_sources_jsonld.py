@@ -72,7 +72,35 @@ def test_event_schedule_recurrence():
     assert (r.date_text, r.end_text, r.recurrence_text) == ("2026-09-03", "2027-03-25", "Thursdays 10:00")
     (e,) = build_events([r], CFG, _ctx())
     assert (e.kind, e.byday, e.time, e.end_date, e.url) == (
-        "run", [3], "10:00", date(2027, 3, 25), "https://example.org/rhyme-time")
+        "recurring", [3], "10:00", date(2027, 3, 25), "https://example.org/rhyme-time")
+    plain = dict(sch, byDay="Thursday")                         # byDay as a plain string
+    (r2,) = raws_from_html(_page({"@type": "Event", "name": "Lego Club", "eventSchedule": plain}), CFG)
+    (e2,) = build_events([r2], CFG, _ctx())
+    assert (e2.kind, e2.byday, e2.time) == ("recurring", [3], "10:00")
+
+
+def test_offers_url_when_event_has_none():
+    off = lambda *us: [{"@type": "Offer", "url": u, "price": "10"} for u in us]
+    node = {"@type": "Event", "name": "Sharp Edges", "startDate": "2026-11-20"}
+    assert _records(_page(dict(node, offers=off("https://example.org/whatson/Sharp-Edges"))))[0].url == \
+        "https://example.org/whatson/Sharp-Edges"
+    # same-site offer preferred over a ticket vendor; listing / generic pages never used
+    got = _records(_page(dict(node, offers=off("https://tix.example.com/b/1", "/whatson/sharp"))))[0].url
+    assert got == "https://example.org/whatson/sharp"
+    assert _records(_page(dict(node, offers=off("https://tix.example.com/b/1"))))[0].url == "https://tix.example.com/b/1"
+    assert _records(_page(dict(node, offers=off(CFG.url, "/basket"))))[0].url is None
+    # an offers url shared by several nodes is a basket/checkout page, not the event's
+    two = _page(dict(node, offers=off("/basket/add")), dict(node, name="Other", offers=off("/basket/add")))
+    assert [r.url for r in _records(two)] == [None, None]
+    # the node's own url wins
+    assert _records(_page(dict(node, url="/ev/own", offers=off("/whatson/sharp"))))[0].url == "https://example.org/ev/own"
+
+
+def test_undated_nodes_counted_partial():
+    ctx = _ctx()
+    good = {"@type": "Event", "name": "A", "startDate": "2026-11-20"}
+    raws = _records(_page(good, {"@type": "Event", "name": "B"}), ctx=ctx)
+    assert [r.title for r in raws] == ["A"] and ctx.stats["jsonld.partial"] == 1
 
 
 def test_graph_types_sold_out_and_skips():

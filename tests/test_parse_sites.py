@@ -22,13 +22,15 @@ WALL = ("<html><head><title>Just a moment...</title></head><body>"
 class Fake:
     def __init__(self, kind, titles=(), exc=None):
         self.kind, self.titles, self.exc, self.calls = kind, list(titles), exc, 0
+        self.times: dict[str, str] = {}         # title -> HH:MM (default 19:30)
 
     async def records(self, cfg, fr, ctx):
         self.calls += 1
         if self.exc:
             raise self.exc
         day = (ctx.today + timedelta(days=7)).isoformat()      # relative: parse_sites uses the real today
-        return [RawEvent(title=t, date_text=f"{day}T19:30", source_kind=self.kind) for t in self.titles]
+        return [RawEvent(title=t, date_text=f"{day}T{self.times.get(t, '19:30')}", source_kind=self.kind)
+                for t in self.titles]
 
 
 @pytest.fixture
@@ -81,12 +83,14 @@ def test_order_and_adapter_needs_config(fakes):
 
 
 def test_merge_unions_and_dedupes(fakes):
-    fakes("jsonld", "Show A", "Show B")
-    fakes("llm", "Show B", "Show C")
+    fakes("jsonld", "Show A", "Show B").times = {"Show B": "15:00"}
+    fakes("llm", "Show B", "Show C", "Show A again").times = {"Show B": "15:00", "Show C": "21:00"}
     cfg = VenueConfig(name="V", url="https://ex.org/", merge=True)
-    evs, st, _ = _venue(cfg, _ok(PLAIN_PAGE))
-    assert st["source"] == "jsonld+llm" and st["raws"] == 4
+    evs, st, ctx = _venue(cfg, _ok(PLAIN_PAGE))
+    assert st["source"] == "jsonld+llm" and st["raws"] == 5
+    # "Show A again" shares Show A's date + time: the later source's copy is dropped
     assert sorted(e.title for e in evs) == ["Show A", "Show B", "Show C"]
+    assert ctx.stats["build.merge_dropped"] == 1
 
 
 SPX = {"kind": "spektrix", "client": "testclient"}

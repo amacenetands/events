@@ -60,17 +60,26 @@ def test_coliseum_python_adapter(monkeypatch):
     monkeypatch.setattr(coliseum, "dt", types.SimpleNamespace(date=_Date))
     cfg = VENUES["London Coliseum"]
     raws = raws_from_html(_html("coliseum"), cfg, _ctx())
-    tosca = next(r for r in raws if r.title == "Tosca")
-    assert (tosca.date_text, tosca.time_text, tosca.source_kind) == (
-        "19 November 2026 - 30 November 2026", "7.30pm", "adapter:coliseum")
-    e = next(e for e in build_events(raws, cfg, _ctx()) if e.title == "Tosca")
-    assert (e.kind, e.date, e.end_date, e.time, e.sessions_known, e.url) == (
-        "run", date(2026, 11, 19), date(2026, 11, 30), "19:30", False, "https://londoncoliseum.org/events/tosca/")
+    tosca = [r for r in raws if r.title == "Tosca"]
+    assert [(r.date_text, r.time_text, r.source_kind) for r in tosca] == [
+        ("19 November 2026", "7.30pm", "adapter:coliseum"), ("21 November 2026", "6.00pm", "adapter:coliseum"),
+        ("27 November 2026", "7.30pm", "adapter:coliseum"), ("30 November 2026", "5.00pm", "adapter:coliseum")]
+    evs = [e for e in build_events(raws, cfg, _ctx()) if e.title == "Tosca"]
+    assert [(e.kind, e.date, e.time, e.sessions_known) for e in evs] == [
+        ("one_off", date(2026, 11, 19), "19:30", True), ("one_off", date(2026, 11, 21), "18:00", True),
+        ("one_off", date(2026, 11, 27), "19:30", True), ("one_off", date(2026, 11, 30), "17:00", True)]
+    assert {e.url for e in evs} == {"https://londoncoliseum.org/events/tosca/"}
 
 
-def test_unparseable_dates_defer_to_llm():
+def test_few_undated_cards_dropped_many_defer_to_llm():
     ctx = _ctx()
-    assert raws_from_html(_html("vam"), VENUES["V&A"], ctx) == []     # "Now open" cards
+    raws = raws_from_html(_html("vam"), VENUES["V&A"], ctx)            # 9 of 10 cards dated
+    assert len(raws) == 9 and ctx.stats["adapter.undated"] == 1 and all(r.price_text for r in raws)
+    ad = {"kind": "cards", "card": "li", "title": "h2", "date": ".d"}
+    html = "".join(f'<li><h2>T{i}</h2><p class="d">{d}</p></li>'
+                   for i, d in enumerate(["Now open", "On-demand", f"{TODAY.day + 1} {TODAY:%B %Y}"]))
+    ctx = _ctx()
+    assert raws_from_html(html, VenueConfig(name="C", url="https://c.example/", adapter=ad), ctx) == []
     assert ctx.stats["adapter.unparsed_venues"] == 1
 
 
@@ -96,3 +105,50 @@ def test_dedupe_and_not_ok_fetch():
     fr = FetchResult(FetchStatus.ERROR, body=card)          # fallback body is parsed (flagged stale upstream)
     assert len(asyncio.run(get_source("adapter").records(cfg, fr, _ctx()))) == 1
     assert asyncio.run(get_source("adapter").records(cfg, FetchResult(FetchStatus.ERROR), _ctx())) == []
+
+
+# ── cards: price selector / card-text fallback, time from the title ─────────
+
+_CARDS = ('<ul>'
+          '<li class="c"><h2>Cloak Talk</h2><p class="d">{d1}</p><p class="t">Talk</p>'
+          '<div class="tk"><p>£15.00 - £20.00</p></div><a href="/event/cloak">More</a></li>'
+          '<li class="c"><h2>Library talks Monday 11.30</h2><p class="d">Every Monday until {end}</p>'
+          '<div class="tk"><p>Free</p></div><a href="/event/nal">More</a></li>'
+          '<li class="c"><h2>Free Your Mind</h2><p class="d">{d1}</p><a href="/event/fym">More</a></li>'
+          '</ul>')
+
+
+def _cards_html() -> tuple[str, date, date]:
+    d1 = TODAY + _dt.timedelta(days=3)
+    end = TODAY + _dt.timedelta(days=50)
+    return _CARDS.format(d1=f"{d1.day} {d1:%B %Y}", end=f"{end.day} {end:%B %Y}"), d1, end
+
+
+@pytest.mark.parametrize("price_sel", [".tk p", None])
+def test_cards_price_and_title_time(price_sel):
+    from src.sources.adapters import get_adapter
+    html, d1, end = _cards_html()
+    ad = {"kind": "cards", "card": "li.c", "title": "h2", "date": ".d", "desc": ".t"}
+    if price_sel:
+        ad["price"] = price_sel
+    recs = get_adapter({"adapter": ad}).records(html, {"adapter": ad}, today=TODAY)
+    from src.normalize import parse_price_text
+    assert [(r.title, parse_price_text(r.price) or "", r.time) for r in recs] == [
+        ("Cloak Talk", "£15–£20", ""), ("Library talks Monday 11.30", "Free", "11:30"),
+        ("Free Your Mind", "", "")]                     # a title word is not a price
+    cfg = VenueConfig(name="Cards", url="https://cards.example.org/whatson", adapter=ad)
+    evs = {e.title: e for e in build_events(raws_from_html(html, cfg, _ctx()), cfg, _ctx())}
+    assert evs["Cloak Talk"].price == "£15–£20"
+    nal = evs["Library talks"]                     # "Monday 11.30" moved into weekday + time
+    assert (nal.kind, nal.byday, nal.time, nal.end_date, nal.start_known, nal.price) == (
+        "recurring", [0], "11:30", end, False, "Free")
+    assert nal.date >= TODAY and nal.date.weekday() == 0
+
+
+@pytest.mark.parametrize("title,want", [
+    ("Talks Monday 11.30", "11:30"), ("Late 19:30", "19:30"), ("Gig 7pm", "19:00"), ("Tour 7.30am", "07:30"),
+    ("2:22 A Ghost Story", ""), ("After Midnight", ""), ("Concert 2.50", ""), ("Room 101", ""), ("Plain title", ""),
+])
+def test_cards_title_time(title, want):
+    from src.sources.adapters.cards import _title_time
+    assert _title_time(title) == want

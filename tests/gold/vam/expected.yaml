@@ -86,7 +86,7 @@
   sessions_known: false
   start_known: true
   evidence: New | V&A Academy online course | Gardens and Art | Thursday, 12 November 2026 – Thursday, 10 December 2026 | Online | £125.00
-- title: National Art Library and Archive talks Monday 11.30
+- title: National Art Library and Archive talks   # card title 'National Art Library and Archive talks Monday 11.30': its time is the `time` field
   date: '2026-11-09'
   end_date: '2026-12-28'
   kind: recurring

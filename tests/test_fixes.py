@@ -65,8 +65,8 @@ def test_date_order_reaches_parser():
 def test_range_means_weekly_weekday_in_text():
     ctx = _ctx()
     [e] = _build(_cfg(range_means_weekly=True), RawEvent(title="WordPlay", date_text="Fri 20 Nov – Fri 18 Dec"), ctx=ctx)
-    assert (e.kind, e.byday, e.sessions_known, e.end_date) == ("run", [4], True, date(2026, 12, 18))
-    assert ctx.stats["fix.range_means_weekly"] == 1
+    assert (e.kind, e.byday, e.sessions_known, e.end_date) == ("recurring", [4], True, date(2026, 12, 18))
+    assert e.recurrence == "Fridays" and ctx.stats["fix.range_means_weekly"] == 1
 
 
 def test_range_means_weekly_bare_same_weekday_ends_need_opt_in():
@@ -115,7 +115,8 @@ def test_weekly_title_regex():
                                       RawEvent(title="WordPlay: Ages 0 – 2", date_text="13 November 2026 – 18 December 2026"),
                                       RawEvent(title="Nan Goldin", date_text="24 November 2026 – 14 March 2027"),
                                       RawEvent(title="WordPlay special", date_text="21 Nov 2026"), ctx=ctx)}
-    assert (evs["WordPlay: Ages 0 – 2"].byday, evs["WordPlay: Ages 0 – 2"].sessions_known) == ([4], True)
+    w = evs["WordPlay: Ages 0 – 2"]
+    assert (w.byday, w.sessions_known, w.kind, w.recurrence) == ([4], True, "recurring", "Fridays")
     assert evs["Nan Goldin"].byday is None
     assert evs["WordPlay special"].kind == "one_off" and evs["WordPlay special"].byday is None
     assert ctx.stats["fix.weekly"] == 1
@@ -125,7 +126,7 @@ def test_byday_forced_moves_start_and_skips_one_offs():
     ctx = _ctx()
     evs = _build(_cfg(byday=[5, 6]), RawEvent(title="Tour", date_text="17 Nov 2026 – 31 Jan 2027"),   # Tue start
                  RawEvent(title="Gig", date_text="21 Nov 2026"), ctx=ctx)
-    assert (evs[0].kind, evs[0].byday, evs[0].date) == ("run", [5, 6], date(2026, 11, 21))
+    assert (evs[0].kind, evs[0].byday, evs[0].date) == ("run", [5, 6], date(2026, 11, 21))   # forced opening days
     assert evs[1].byday is None and evs[1].kind == "one_off"                  # one_off: no-op
     assert ctx.stats["fix.byday"] == 1
 

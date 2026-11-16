@@ -10,7 +10,7 @@ from typing import Callable, Iterable
 
 from .classify import is_elsewhere
 from .config import DEFAULT_CITY, get_city
-from .models import Event
+from .models import Event, is_ongoing
 
 ALL_KINDS = frozenset({"one_off", "run", "recurring"})
 TIME_BUCKETS = ("morning", "afternoon", "evening")
@@ -192,7 +192,7 @@ def _spec(e: Event, today: date | None = None):
     return DateSpec(kind="run", start=start, end=e.end_date,
                     byday=frozenset(e.byday) if e.byday else None, instances=(), times=(),
                     sessions_known=e.sessions_known, start_known=e.start_known,
-                    inconsistent=e.date_inconsistent, raw=e.raw_date or "")
+                    inconsistent=e.date_inconsistent, raw=e.raw_date or "", exdates=tuple(e.exdates or ()))
 
 
 def event_days(e: Event, start: date, end: date, *, today: date | None = None,
@@ -309,7 +309,7 @@ def query(
         if f.time_of_day:
             bs = infer_buckets(e)
             if bs is None:                      # run / recurring series: open hours
-                if f.strict_time and e.kind != "run" and not e.time:
+                if f.strict_time and not is_ongoing(e) and not e.time:
                     continue
             elif not (bs & f.time_of_day):
                 if not e.time and stats is not None:
@@ -324,8 +324,8 @@ def query(
         from .filters import drop_religious_services
         out = drop_religious_services(out)
     if f.new_only and unseen is not None:
-        fresh = {id(x) for x in unseen([e for e in out if e.kind != "run"])}
-        out = [e for e in out if e.kind == "run" or id(e) in fresh]
+        fresh = {id(x) for x in unseen([e for e in out if not is_ongoing(e)])}
+        out = [e for e in out if is_ongoing(e) or id(e) in fresh]
     return out
 
 

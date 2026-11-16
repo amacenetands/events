@@ -11,7 +11,8 @@ from zoneinfo import ZoneInfo
 
 from .times import _scan
 
-__all__ = ["DateSpec", "parse_date_text", "parse_date_specs", "weekday_of", "occurrences"]
+__all__ = ["DateSpec", "parse_date_text", "parse_date_specs", "weekday_of", "occurrences", "series_kind",
+           "SERIES_MAX_DAYS"]
 
 ROLL_DAYS = 60          # a year-less date more than this far in the past means next year
 
@@ -33,6 +34,7 @@ class DateSpec:
     inconsistent: bool
     raw: str
     span: tuple[int, int] | None = None     # char offsets of the matched date text in `raw`
+    exdates: tuple[date, ...] = ()          # "excluding 8th June": never sessions (occurrences skips them)
 
 
 # --- vocab --------------------------------------------------------------------
@@ -77,6 +79,10 @@ _IRREG = re.compile(
 _EXCEPT = re.compile(
     r"(?:\bclosed(?:\s+on)?|\bexcept(?:\s+(?:on|for))?|\bexcluding|\bnot\s+on|\bno\s+(?:shows?|performances?|sessions?)\s+on|кроме)"
     r"\s*:?\s*(?P<w>" + _WD_W + r"(?:\s*(?:,|&|and|or|и|/)\s*" + _WD_W + r")*)", re.I)
+# "excluding 8th June and 31st August": the dates right after the cue are exclusions, not sessions
+_EXDATE_CUE = re.compile(r"(?:\bclosed(?:\s+on)?|\bexcept(?:\s+(?:on|for))?|\bexcluding|\bnot\s+on"
+                         r"|\bno\s+(?:shows?|performances?|sessions?|events?)\s+on|кроме)\s*:?\s*$", re.I)
+_EXDATE_JOIN = re.compile(r"^\s*(?:,|&|and|or|и|[–—−-]|to|/)?\s*$", re.I)
 _UNKNOWN = re.compile(r"\b(?:tbc|tba|tbd|various\s+dates|multiple\s+dates|dates?\s+(?:to\s+be\s+)?(?:announced|confirmed)|to\s+be\s+(?:announced|confirmed)|coming\s+soon)\b|дата\s+уточняется", re.I)
 _DASHISH = re.compile(r"[–—−-]|→|\bto\b|\bпо\b", re.I)
 _EVERY_TAIL = re.compile(r"\b(?:every|each)\s*$", re.I)
@@ -491,6 +497,66 @@ def _spec(kind: str, start: date | None, end: date | None, byday: frozenset[int]
                     start_known, inconsistent, raw, span)
 
 
+SERIES_MAX_DAYS = 4      # weekly programme on <= 4 weekdays; 5+ is a (daily-ish) run with closed days
+
+
+def series_kind(byday, cue: bool = True) -> str:
+    """The one series predicate (parser, fixes, enrich): 'recurring' for a weekly programme on
+    1-4 named weekdays ('Thursdays', 'Weekends', 'Every Monday until …'), bounded or open;
+    'run' for no weekdays, daily, or 5+ weekdays ('Mon–Fri', 'Tue–Sun'). cue=False (forced
+    opening days) is always a run."""
+    days = set(byday or ())
+    return "recurring" if cue and days and len(days) <= SERIES_MAX_DAYS else "run"
+
+
+def _exclusions(text: str, ms: list[_M]) -> tuple[set[int], list[tuple[int, int]], set[date]]:
+    """Mentions listed right after an 'excluding / except / closed on / no performance on' cue:
+    (their indices, spans from the cue to the last one, excluded days). A dash-joined pair in the
+    list is a range of excluded days ('Closed 24-26 Dec'); the list stops at a comma followed by
+    a range ('except 25 Dec, 17 Nov – 10 Jan': the range is the run itself)."""
+    out: set[int] = set()
+    spans: list[tuple[int, int]] = []
+    days: set[date] = set()
+    lo = 0
+    for i, mm in enumerate(ms):
+        if i in out:
+            continue
+        before = text[lo:mm.start]
+        base = lo
+        lo = mm.end
+        pre = _PRE_WD.search(before)
+        cm = _EXDATE_CUE.search(before[:pre.start()] if pre else before)
+        if not cm:
+            continue
+        j = i
+        while j + 1 < len(ms):
+            gap = _PRE_WD.sub("", text[ms[j].end:ms[j + 1].start])
+            if not _EXDATE_JOIN.match(gap):
+                break
+            if (not _RANGE_GAP.match(gap) and j + 2 < len(ms)
+                    and _is_range_gap(text[ms[j + 1].end:ms[j + 2].start])):
+                break                           # ', 17 Nov – 10 Jan': a new (range) item, not an exclusion
+            j += 1
+        k = i
+        while k <= j:
+            a = ms[k]
+            if k < j and _RANGE_GAP.match(text[a.end:ms[k + 1].start]) and a.val and ms[k + 1].last \
+                    and 0 < (ms[k + 1].last - a.val).days <= 62:
+                d = a.val
+                while d <= ms[k + 1].last:
+                    days.add(d)
+                    d += dt.timedelta(days=1)
+                k += 2
+                continue
+            if a.val:
+                days.add(a.val)
+            k += 1
+        out |= set(range(i, j + 1))
+        spans.append((base + cm.start(), ms[j].end))
+        lo = ms[j].end
+    return out, spans, days
+
+
 def _group_spec(cx: _Ctx, items: list, a: int, b: int, shared: tuple[frozenset[int] | None, tuple[str, ...]],
                 raw: str) -> DateSpec:
     """DateSpec for one group: a single range, or a run of consecutive single mentions."""
@@ -533,7 +599,7 @@ def _group_spec(cx: _Ctx, items: list, a: int, b: int, shared: tuple[frozenset[i
             mb.wd_byday = True                  # '19 Nov – 17 Dec, Thursday'
             byday = (byday or frozenset()) | {mb.wd}
             sk_days = not cx.irregular
-        return _spec("run", s, e, byday, (), times, sk_days, True, incons(), raw)
+        return _spec(series_kind(byday), s, e, byday, (), times, sk_days, True, incons(), raw)
 
     vals = sorted({m.val for m in group})
     first = group[0]
@@ -544,12 +610,12 @@ def _group_spec(cx: _Ctx, items: list, a: int, b: int, shared: tuple[frozenset[i
             if _UNTIL_CUE.search(pre) and not _FROM_CUE.search(pre):
                 return _spec("run", None, first.last, byday, (), times, sk_days, False, False, raw)
             return _spec("run", v, first.last, byday, (), times, sk_days, True, False, raw)
-        if _UNTIL_CUE.search(pre) and not _FROM_CUE.search(pre):
-            return _spec("run", None, v, byday, (), times, sk_days, False, incons(), raw)
+        if _UNTIL_CUE.search(pre) and not _FROM_CUE.search(pre):     # 'Every Monday until 28 Dec'
+            return _spec(series_kind(byday), None, v, byday, (), times, sk_days, False, incons(), raw)
         if cx.recur_cue and byday is not None:
-            return _spec("recurring", v, None, byday, (), times, not cx.irregular, True, incons(), raw)
+            return _spec(series_kind(byday), v, None, byday, (), times, not cx.irregular, True, incons(), raw)
         if _FROM_CUE.search(pre) or _ONWARDS.match(text[group[-1].end:]):
-            return _spec("run", v, None, byday, (), times, sk_days, True, incons(), raw)
+            return _spec(series_kind(byday), v, None, byday, (), times, sk_days, True, incons(), raw)
         return _spec("one_off", v, None, None, (), times, True, True, incons(), raw)
     if byday is None:
         wds = {x.weekday() for x in vals}
@@ -566,6 +632,11 @@ def _parse(raw: str, joined: str, today: date, order: Order, lang: Lang, tz: Zon
     _attach_weekdays(text, ms)
     _resolve(ms, today, text)
     ms = [m for m in ms if m.val is not None]
+    ex_idx, ex_spans, ex_days = _exclusions(text, ms)
+    exdates = tuple(sorted(ex_days))
+    if ex_idx:
+        ms = [m for i, m in enumerate(ms) if i not in ex_idx]
+        text = _blank(text, ex_spans)
 
     items: list[tuple] = []
     i = 0
@@ -597,8 +668,8 @@ def _parse(raw: str, joined: str, today: date, order: Order, lang: Lang, tz: Zon
         if byday is not None and not (cx.recur_cue or span):
             return []                     # a bare singular weekday ("Thu") is not a schedule
         times = cx.times(0, len(text), [])
-        return [_spec("recurring", None, None, byday, (), times, byday is not None and not cx.irregular,
-                      False, False, raw)]
+        return [replace(_spec(series_kind(byday) if byday else "recurring", None, None, byday, (), times, byday is not None and not cx.irregular,
+                              False, False, raw), exdates=exdates)]
 
     groups: list[list[tuple]] = []
     for it in items:
@@ -624,7 +695,7 @@ def _parse(raw: str, joined: str, today: date, order: Order, lang: Lang, tz: Zon
     out: list[DateSpec] = []
     for k, g in enumerate(groups):
         sp = _group_spec(cx, g, cuts[k], cuts[k + 1], shared, raw)
-        sp = replace(sp, span=span_of([m for it in g for m in it[1:]]))
+        sp = replace(sp, span=span_of([m for it in g for m in it[1:]]), exdates=exdates)
         if not any((o.kind, o.start, o.end, o.instances) == (sp.kind, sp.start, sp.end, sp.instances) for o in out):
             out.append(sp)
     return out
@@ -642,12 +713,15 @@ def _merge(specs: list[DateSpec], raw: str) -> DateSpec | None:
     inc = any(s.inconsistent for s in specs)
     if all(s.kind != "run" for s in specs):
         vals = sorted({d for s in specs for d in (s.instances or (s.start,)) if d})
-        return _spec("recurring", vals[0], vals[-1], None, vals, times, False, True, inc, raw, span)
+        ex = tuple(sorted({d for s in specs for d in s.exdates}))
+        return replace(_spec("recurring", vals[0], vals[-1], None, vals, times, False, True, inc, raw, span),
+                       exdates=ex)
     start = None if any(s.start is None for s in specs) else min(s.start for s in specs)
     end = None if any(s.kind == "run" and s.end is None for s in specs) else max(s.end or s.start for s in specs)
     bydays = [s.byday for s in specs]
     byday = frozenset().union(*bydays) if all(b is not None for b in bydays) else None
-    return _spec("run", start, end, byday, (), times, False, start is not None, inc, raw, span)
+    ex = tuple(sorted({d for s in specs for d in s.exdates}))
+    return replace(_spec("run", start, end, byday, (), times, False, start is not None, inc, raw, span), exdates=ex)
 
 
 def _prepare(text, end_text, recurrence_text, tz) -> tuple[str, ZoneInfo | None] | None:
@@ -706,8 +780,9 @@ def occurrences(spec: DateSpec | None, start: date, end: date, *, max_n: int = 4
     hi = min(end, spec.end) if spec.end else end
     days = spec.byday if spec.byday is not None else _ALL
     out, d = [], lo
+    skip = set(spec.exdates)
     while d <= hi and len(out) < max_n:
-        if d.weekday() in days:
+        if d.weekday() in days and d not in skip:
             out.append(d)
         d += dt.timedelta(days=1)
     return out

@@ -17,7 +17,7 @@ from pathlib import Path
 import yaml
 
 from .llm import run_llm
-from .models import Event
+from .models import Event, is_ongoing
 
 # ── weights (documented knobs) ───────────────────────────────────────────────
 W_AUD_FIT = 3.0            # kids/family event when filter wants family/kids
@@ -172,7 +172,7 @@ def score_parts(e: Event, f, ctx: RankCtx) -> dict[str, float]:
         p["sold out"] = W_SOLD_OUT
     if e.kind == "one_off":
         p["one-off"] = W_ONE_OFF
-    elif e.kind == "run":
+    elif is_ongoing(e):
         p["run"] = W_RUN
     elif e.kind == "recurring" and e.category == "theatre":
         p["theatre run"] = W_THEATRE_RECURRING
@@ -312,7 +312,7 @@ async def llm_rerank(ordered: list[Event], profile: dict, n: int = TOP_N,
                      today: date | None = None) -> list[tuple[Event, str]]:
     """Raises on backend error / unparseable reply (caller falls back).
     backend: deepseek | anthropic (Claude API) | claude (CLI) | ollama; default $RANK_BACKEND or deepseek."""
-    ones = [e for e in ordered if e.kind != "run"][: pool_size // 2]   # one-offs/recurring guaranteed seats
+    ones = [e for e in ordered if not is_ongoing(e)][: pool_size // 2]   # one-offs / dated instances guaranteed seats
     have = {id(e) for e in ones}
     pool = sorted(ones + [e for e in ordered if id(e) not in have][: pool_size - len(ones)],
                   key=lambda e: ordered.index(e))

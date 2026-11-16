@@ -131,8 +131,9 @@ def _series(spec: DateSpec, cfg: VenueConfig, today: date) -> dict[str, Any]:
         start = max(start, today)
         if spec.byday:
             start = _first_on_or_after(spec, start)
+    ex = sorted(d for d in spec.exdates if d >= start and (spec.end is None or d <= spec.end))
     out = dict(date=start, end_date=spec.end, kind=spec.kind, byday=byday,
-               sessions_known=sessions_known, start_known=spec.start_known)
+               sessions_known=sessions_known, start_known=spec.start_known, exdates=ex or None)
     if spec.kind == "recurring":
         out["recurrence"] = _recurrence_label(spec.byday)
     return out
@@ -213,6 +214,33 @@ def build_event(raw: RawEvent, cfg: VenueConfig, ctx: SourceCtx) -> list[Event]:
         return []
 
 
+def _norm_title(t: str) -> str:
+    return re.sub(r"[\W_]+", " ", (t or "").casefold()).strip()
+
+
+def _merge_dedupe(built: list[Event], srcs: list[str], ctx: SourceCtx) -> list[Event]:
+    """Merge mode (several sources): a later source's event that an earlier source already
+    has — same venue + date + time (both timed), or same venue + normalised title + date —
+    is dropped (stat build.merge_dropped): JSON-LD 'Twas the Night … / Bach to Baby …' 11:00
+    and the LLM's 'Twas the Night …' 11:00 are one concert."""
+    rank = {k: i for i, k in enumerate(dict.fromkeys(srcs))}
+    if len(rank) < 2:
+        return built
+    first: dict[tuple, int] = {}
+    out: list[Event] = []
+    for e, src in zip(built, srcs):
+        v = e.venue.casefold()
+        keys = [("t", v, _norm_title(e.title), e.date)] + ([("dt", v, e.date, e.time)] if e.time else [])
+        r = rank[src]
+        if any(first.get(k, r) < r for k in keys):
+            _bump(ctx, "build.merge_dropped")
+            continue
+        for k in keys:
+            first.setdefault(k, r)
+        out.append(e)
+    return out
+
+
 def build_events(raws: list[RawEvent], cfg: VenueConfig, ctx: SourceCtx) -> list[Event]:
     """Events for all RawEvents of one venue: hook post_raw -> build -> `fix:` block
     (venues.fixes) -> hook post_build -> de-duplicated on event_key() unless the description
@@ -222,6 +250,7 @@ def build_events(raws: list[RawEvent], cfg: VenueConfig, ctx: SourceCtx) -> list
     raws = run_hook("post_raw", cfg, raws, ctx)
     seen: dict[str, tuple[str, set[tuple]]] = {}
     built: list[Event] = []
+    srcs: list[str] = []
     for raw in raws:
         src = raw.source_kind or ""
         for e in build_event(raw, cfg, ctx):
@@ -237,6 +266,8 @@ def build_events(raws: list[RawEvent], cfg: VenueConfig, ctx: SourceCtx) -> list
             else:
                 seen[k] = (src, {variant})
             built.append(e)
+            srcs.append(src)
+    built = _merge_dedupe(built, srcs, ctx)
     built = run_hook("post_build", cfg, apply_fixes(cfg, built, ctx), ctx)
     done: set[tuple] = set()
     out: list[Event] = []

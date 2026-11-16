@@ -239,3 +239,37 @@ def test_header_change_busts_cache_but_about_is_never_sent(fake):
     assert len(fake["calls"]) == 1 and "Human notes" not in fake["calls"][0][0]
     _run(cfg=CFG.model_copy(update={"hint": "Different hint"}))
     assert len(fake["calls"]) == 2
+
+
+# ── price post-check: a price copied from the neighbouring card is dropped ───
+
+def test_verify_prices_drops_bleed_keeps_own_and_unverifiable():
+    from src.models import RawEvent
+    text = ("[C] Sat 14 Nov, 7.30pm | Maxine Funke | £19 | £17 Advance | £12 MEMBERS -> /events/maxine/\n"
+            "[C] 20–21 Nov | JIMI TENOR BAND – Two-Day Residency | MORE INFO & TICKETS -> /events/jimi/\n"
+            "£19\n£17 Advance\n"
+            "Plain text gig on 22 Nov £5\n")
+    raws = [RawEvent(title="Maxine Funke", price_text="£19 £17 Advance"),
+            RawEvent(title="JIMI TENOR BAND – Two-Day Residency", price_text="£19 £17 Advance"),
+            RawEvent(title="Plain text gig", price_text="£5"),
+            RawEvent(title="Maxine Funke", price_text="£17 | £19")]          # reordered: amounts on card
+    ctx = _ctx()
+    out = llm_source.verify_prices(raws, text, ctx)
+    assert [r.price_text for r in out] == ["£19 £17 Advance", None, "£5", "£17 | £19"]
+    assert ctx.stats["llm.price_dropped"] == 1 and ctx.stats["llm.price_unverified"] == 1
+
+
+def test_verify_prices_jsonld_line_is_not_a_card_and_amounts_normalised():
+    from src.models import RawEvent
+    text = ("[J] Winter Gala | 2026-12-01 -> /e/gala\n"
+            "[C] Other Gig | 1 Dec | £12 -> /e/other\n"
+            "[C] Jazz Brunch | 13 Сент | от 750 руб. -> /e/brunch\n"
+            "[C] Quartet | 2 Dec | £10.00 -> /e/q\n")
+    raws = [RawEvent(title="Winter Gala", price_text="£12"),      # only a [J] line: not its own card -> kept
+            RawEvent(title="Jazz Brunch", price_text="From 750 ₽"),  # reformatted RU amount: on its card
+            RawEvent(title="Quartet", price_text="£10"),           # '£10' == '£10.00'
+            RawEvent(title="Quartet", price_text="£12")]           # on another card, not its own: dropped
+    ctx = _ctx()
+    out = llm_source.verify_prices(raws, text, ctx)
+    assert [r.price_text for r in out] == ["£12", "From 750 ₽", "£10", None]
+    assert ctx.stats == {"llm.price_unverified": 1, "llm.price_dropped": 1}

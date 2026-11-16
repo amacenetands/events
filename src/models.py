@@ -73,6 +73,17 @@ def parse_time(v):
     return f"{h:02d}:{mi:02d}"
 
 
+def is_series(e: "Event") -> bool:
+    """A weekly programme: kind recurring with weekdays, bounded or open (normalize.series_kind).
+    Query/rank treat series like runs (no seen-history filter, untimed kept, no one-off seat)."""
+    return e.kind == "recurring" and bool(e.byday)
+
+
+def is_ongoing(e: "Event") -> bool:
+    """A run or a weekly series (not a one-off or a dated instance)."""
+    return e.kind == "run" or is_series(e)
+
+
 class Event(BaseModel):
     title: str
     venue: str
@@ -99,6 +110,7 @@ class Event(BaseModel):
     times_vary: bool = False            # sessions start at several times; `time` = the earliest
     raw_date: Optional[str] = None      # date text as found on the page (debug/eval)
     date_inconsistent: bool = False     # written weekday disagrees with the date (eval only; not shown)
+    exdates: Optional[list[date]] = None   # run/series days excluded ("closed 25 Dec"); never sessions
 
     # Derived, read-only compat views (old code/cached JSON used these as fields)
     @property

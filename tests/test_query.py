@@ -179,3 +179,30 @@ def test_untimed_evening_concert_hidden_in_daytime():
     assert ev == [gig]
     assert is_banned_url("https://www.eventbrite.co.uk/e/1") and not is_banned_url("https://v.org/eventbrite")
     assert query([mk(url="https://www.eventbrite.com/e/2")], Filter(when=f.when), today=date(2026, 11, 9)) == []
+
+
+# ── series (recurring + byday) behave like runs; excluded days never match ───
+
+def test_series_kept_by_new_only_and_strict_time():
+    series = ev("series", "2026-11-12", end_date="2026-12-17", kind="recurring", byday=[3])
+    inst = ev("instance", "2026-11-12", kind="recurring")                 # dated instance: like a one-off
+    got = query([series, inst], Filter(when="next:14", new_only=True), TODAY, unseen=lambda xs: [])
+    assert titles(got) == ["series"]
+    assert titles(q([series, inst], time_of_day=frozenset({"evening"}), strict_time=True)) == ["series"]
+
+
+def test_excluded_day_never_matches():
+    from src.models import RawEvent
+    from src.config import VenueConfig, get_city
+    from src.sources.base import SourceCtx
+    from src.sources.build import build_events
+    from src.query import event_days
+    ctx = SourceCtx(http=None, today=TODAY, window_days=365, city=get_city("london"))
+    [e] = build_events([RawEvent(title="Talk", date_text="Thursdays 19 Nov–17 Dec except 3 Dec")],
+                       VenueConfig(name="V", url="https://x.test/"), ctx)
+    assert (e.kind, e.byday, e.exdates) == ("recurring", [3], [date(2026, 12, 3)])
+    assert event_days(e, TODAY, date(2026, 12, 31)) == [date(2026, 11, 19), date(2026, 11, 26),
+                                                         date(2026, 12, 10), date(2026, 12, 17)]
+    from src.query import _days_ok
+    assert not _days_ok(e, frozenset({3}), date(2026, 12, 3), date(2026, 12, 3))
+    assert _days_ok(e, frozenset({3}), date(2026, 12, 10), date(2026, 12, 10))

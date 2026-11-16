@@ -17,11 +17,12 @@ from .. import extract as ex
 from ..config import VenueConfig
 from ..fetch.types import FetchResult
 from ..models import RawEvent
+from ..normalize import price_amounts
 from ..normalize.urls import match_title_url
 from .base import SourceCtx, base_url, register_source
 from .reduce import reduce_site
 
-__all__ = ["LlmSource", "site_data", "fill_urls"]
+__all__ = ["LlmSource", "site_data", "fill_urls", "verify_prices"]
 
 IDLE_FLUSH = 0.3          # s without a new request before a partial batch is sent
 _HTML_TAG = re.compile(r"<\s*(?:!doctype|html|head|body|div|span|a|p|ul|ol|li|script|article|section|main"
@@ -76,6 +77,55 @@ def fill_urls(raws: list[RawEvent], text: str, base: str, pattern: str | None = 
         else:
             new = match_title_url(r.title, lines, base, pattern=pattern)
         out.append(r.model_copy(update={"url": new or None}) if new != r.url else r)
+    return out
+
+
+_CARD = re.compile(r"^\s*\[C\]\s")       # reducer's visible-card line ("[C] …"); [J] = JSON-LD only
+
+
+def _squash(s: str) -> str:
+    """Case-folded alphanumerics only: '£19 | £17 Advance' -> '1917advance'."""
+    return re.sub(r"[\W_]+", "", (s or "").casefold())
+
+
+def _body(line: str) -> str:
+    return line.split(" -> ", 1)[0]
+
+
+def _own_card(title: str, cards: list[str]) -> str | None:
+    """The single [C] card line naming `title`; None when not uniquely identifiable."""
+    t = _squash(title)
+    if len(t) < 4:
+        return None
+    hits = [ln for ln in cards if t in _squash(_body(ln))]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _on_card(price: str, line: str) -> bool:
+    """The price occurs on the card: same amounts ('£10.00' == '£10'), or the same squashed text."""
+    want = price_amounts(price)
+    if want:
+        return want <= price_amounts(_body(line))
+    return bool(_squash(price)) and _squash(price) in _squash(_body(line))
+
+
+def verify_prices(raws: list[RawEvent], text: str, ctx: SourceCtx) -> list[RawEvent]:
+    """Drop a price the model copied from a neighbouring card: only when it is absent from the
+    event's own [C] card and present on a different one (stat llm.price_dropped). Anything
+    else is kept; when not confirmed on the own card it counts as llm.price_unverified."""
+    cards = [ln for ln in (text or "").splitlines() if _CARD.match(ln)]
+    out = []
+    for r in raws:
+        if r.price_text:
+            own = _own_card(r.title, cards)
+            if own is None or not _on_card(r.price_text, own):
+                other = [ln for ln in cards if ln is not own and _on_card(r.price_text, ln)]
+                if own is not None and other and price_amounts(r.price_text):
+                    _bump(ctx, "llm.price_dropped")
+                    r = r.model_copy(update={"price_text": None})
+                else:
+                    _bump(ctx, "llm.price_unverified")
+        out.append(r)
     return out
 
 
@@ -165,6 +215,7 @@ class LlmSource:
         if not cfg.must_determine_venue:
             raws = [r.model_copy(update={"venue": None}) if r.venue else r for r in raws]
         raws = fill_urls(raws, site["text"], site["base"], cfg.fix.url_pattern, site["url"])
+        raws = verify_prices(raws, site["text"], ctx)
         _bump(ctx, "llm.records", len(raws))
         return raws
 

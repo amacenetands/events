@@ -14,7 +14,7 @@ parser, so build._specs passes it to normalize. Order:
                    has a recurrence cue ("every", "weekly", "Fridays"). Start/end labels are
                    never a session list ("Thu 12 Nov – Sat 14 Nov" stays a daily run). Bare
                    same-weekday ends need the object form {min_days, title_re}. Otherwise
-                   sessions_known=False. Open-ended -> kind recurring (series contract).
+                   sessions_known=False. Weekly on <= 4 days -> kind recurring (normalize.series_kind).
     time_default   fill `time` when missing (last; not on exhibitions, TBC events or runs whose
                    sessions are unknown — a default there would be invented)
 
@@ -27,7 +27,7 @@ from datetime import timedelta
 
 from ..config import VenueConfig
 from ..models import Event
-from ..normalize import weekday_of
+from ..normalize import series_kind, weekday_of
 
 __all__ = ["apply_fixes"]
 
@@ -57,11 +57,12 @@ def _first_session(e: Event, days: list[int]) -> Event | None:
     return None
 
 
-def _set_days(e: Event, days: list[int]) -> Event:
+def _set_days(e: Event, days: list[int], cue: bool = True) -> Event:
+    """Weekdays set; kind from normalize.series_kind (a weekly programme on <= 4 days is
+    recurring, bounded or open; 5+ days or forced opening days (cue=False) stay a run)."""
     upd: dict = dict(byday=sorted(set(days)), sessions_known=True)
-    if e.end_date is None:
-        upd["kind"] = "recurring"
-    if e.end_date is None or e.kind == "recurring":
+    upd["kind"] = series_kind(days, cue)
+    if upd["kind"] == "recurring":
         upd["recurrence"] = _WD_PLURAL[days[0]] if len(set(days)) == 1 else "multiple dates"
     return e.model_copy(update=upd)
 
@@ -107,7 +108,7 @@ def _one(e: Event, cfg: VenueConfig, listing: str, ctx) -> Event | None:
         if moved is None:
             _bump(ctx, "fix.byday.no_session")
         else:
-            e = _set_days(moved, fx.byday)
+            e = _set_days(moved, fx.byday, cue=False)
             _bump(ctx, "fix.byday")
     if fx.range_means_weekly and e.kind == "run" and not e.byday:
         days = _weekly_days(e, fx.range_means_weekly)

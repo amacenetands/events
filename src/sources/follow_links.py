@@ -77,12 +77,44 @@ def _foreign_link(tag, page_url: str, link_rx: re.Pattern) -> bool:
     return bool(link_rx.search(a["href"]) or link_rx.search(href)) and not _same_page(href, page_url)
 
 
-def _first_upcoming(soup, page_url: str, link_rx: re.Pattern, ctx: SourceCtx) -> tuple[date, str | None] | None:
-    """Earliest (date, time) on/after today among the page's own first <time datetime> tags."""
+def _first_upcoming(soup, page_url: str, link_rx: re.Pattern, ctx: SourceCtx,
+                    skip: tuple = ()) -> tuple[date, str | None] | None:
+    """Earliest (date, time) on/after today among the page's own first <time datetime> tags
+    (minus `skip`: the byline range's own tags)."""
     tz = ZoneInfo(ctx.city.tz)
-    own = [t for t in soup.find_all("time") if t.get("datetime") and not _foreign_link(t, page_url, link_rx)]
+    own = [t for t in soup.find_all("time") if t.get("datetime") and not _foreign_link(t, page_url, link_rx)
+           and not any(t is x for x in skip)]
     found = [p for t in own[:MAX_TIME_TAGS] if (p := _parse_dt(t["datetime"], tz, ctx.today)) and p[0] >= ctx.today]
     return min(found, key=lambda p: (p[0], p[1] or "")) if found else None
+
+
+_RANGE_DASH = re.compile(r"^\s*(?:[–—−-]|to|until)\s*$", re.I)
+
+
+def _byline_range(soup, page_url: str, link_rx: re.Pattern, ctx: SourceCtx) -> tuple[date, date, tuple] | None:
+    """(start, end, (tag, tag)) when the page's first own date element is a range of two
+    <time datetime> tags joined by a dash ('Fri 16 Oct — Wed 18 Nov 2026', a film run) ending
+    on/after today."""
+    from bs4 import NavigableString
+    tz = ZoneInfo(ctx.city.tz)
+    own = [t for t in soup.find_all("time") if t.get("datetime") and not _foreign_link(t, page_url, link_rx)]
+    if not own:
+        return None
+    first = own[0]
+    nxt = first.find_next_sibling("time")
+    if nxt is None or not nxt.get("datetime"):
+        return None
+    between = []
+    for x in first.next_siblings:
+        if x is nxt:
+            break
+        between.append(str(x) if isinstance(x, NavigableString) else x.get_text(" "))
+    if not _RANGE_DASH.match("".join(between)):
+        return None
+    a, b = _parse_dt(first["datetime"], tz, ctx.today), _parse_dt(nxt["datetime"], tz, ctx.today)
+    if a is None or b is None or b[0] <= a[0] or b[0] < ctx.today:
+        return None
+    return a[0], b[0], (first, nxt)
 
 
 def _price(soup, title: str) -> str | None:
@@ -97,12 +129,24 @@ def raw_from_detail(html: str, url: str, ctx: SourceCtx, link_pattern: str = DEF
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, "html.parser")
     title = _title(soup)
-    when = _first_upcoming(soup, url, re.compile(link_pattern), ctx) if title else None
-    if not when:
+    if not title:
+        return None
+    link_rx = re.compile(link_pattern)
+    run = _byline_range(soup, url, link_rx, ctx)
+    when = _first_upcoming(soup, url, link_rx, ctx, skip=run[2] if run else ())
+    if when and when[1]:
+        run = None              # a timed upcoming session beats the byline range
+    elif run:
+        when = None
+    if not run and not when:
         return None
     for t in soup(["script", "style", "noscript"]):
         t.decompose()
-    return RawEvent(title=title, date_text=when[0].isoformat(), time_text=when[1], url=url,
+    if run:                     # a run: no timed session listed besides the byline
+        date_text, time_text = f"{run[0].isoformat()} – {run[1].isoformat()}", None
+    else:
+        date_text, time_text = when[0].isoformat(), when[1]
+    return RawEvent(title=title, date_text=date_text, time_text=time_text, url=url,
                     price_text=_price(soup, title), source_kind="follow_links")
 
 

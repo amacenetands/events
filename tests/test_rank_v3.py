@@ -47,3 +47,23 @@ def test_prompt_falls_back_to_recurrence_and_check_days_only_long():
     short = ev("s", sessions_known=False, date=TODAY, end_date=TODAY + timedelta(days=3))
     assert "check days" not in build_prompt([short], {}, 1, Filter(), TODAY)
     assert "check days" in build_prompt([ev("l", sessions_known=False)], {}, 1, Filter(), TODAY)
+
+
+def test_series_scored_like_runs_and_no_one_off_seat(monkeypatch):
+    import asyncio
+    from src import rank as R
+    series = ev("series", kind="recurring", byday=[3], time="10:00")
+    inst = ev("inst", kind="recurring", byday=None, end_date=None, date=TODAY + timedelta(days=3), time="10:00")
+    assert "run" in score_parts(series, Filter(), CTX) and "run" not in score_parts(inst, Filter(), CTX)
+    seen = {}
+
+    async def fake(prompt, **k):
+        seen["p"] = prompt
+        return "1|ok"
+    monkeypatch.setattr(R, "run_llm", fake)
+    ordered = [ev(f"s{i}", kind="recurring", byday=[i % 7], venue=f"V{i}") for i in range(4)] + \
+              [ev(f"o{i}", kind="one_off", end_date=None, date=TODAY + timedelta(days=i), venue=f"W{i}") for i in range(2)]
+    asyncio.run(R.llm_rerank(ordered, {}, n=1, pool_size=4, today=TODAY))
+    p = seen["p"]               # 2 one-off seats (series are not one-offs) + the 2 best others
+    assert all(f"|{t}|" in p or f" {t}|" in p or f"{t}|" in p for t in ("o0", "o1", "s0", "s1"))
+    assert "s2|" not in p and "s3|" not in p

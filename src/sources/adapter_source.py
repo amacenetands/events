@@ -7,22 +7,33 @@ from urllib.parse import urljoin
 from ..config import VenueConfig
 from ..fetch.types import FetchResult
 from ..models import RawEvent
-from ..normalize import parse_date_specs
+from ..normalize import parse_date_specs, parse_time_text
 from .adapters import Adapter, Rec, get_adapter
 from .adapters.textutil import _SITE_HOST, set_site_host
 from .base import SourceCtx, base_url, register_source
 
 __all__ = ["AdapterSource", "rec_to_raw", "raws_from_html"]
 
-_TRAILING_TIME = re.compile(r"\s+\d{1,2}[:.]\d\d$")   # "Cranford 20:00" (Orange Tree)
+DATED_MIN = 0.8          # share of adapter records with a parseable date to trust the adapter
+# a closing time token with a dangling weekday / "at" before it: "Cranford 20:00" (Orange Tree),
+# "… talks Monday 11.30" (V&A), "… on Friday at 7pm"
+_TRAILING_TIME = re.compile(
+    r"(?:\s+(?:on\s+)?(?:mon|tues|wednes|thurs|fri|satur|sun)days?)?(?:\s+(?:at|@))?"
+    r"\s+(?P<t>\d{1,2}(?:[:.]\d\d)?\s?[ap]\.?m\.?|\d{1,2}[:.]\d\d)\s*$", re.I)
 
 
 def rec_to_raw(rec: Rec, kind: str, base: str = "") -> RawEvent:
     """Structured Rec -> RawEvent (strings as found; url absolute against `base`)."""
-    title = _TRAILING_TIME.sub("", rec.title).strip() or rec.title
+    title = rec.title
+    tm = _TRAILING_TIME.search(title)
+    if tm:
+        t = parse_time_text(tm["t"]) or parse_time_text(tm["t"], field=True)
+        if t and t in (parse_time_text(rec.time or "", field=True), parse_time_text(rec.date or "")):
+            title = title[:tm.start()].strip() or title     # the time lives in `time` / the date
     url = urljoin(base, rec.url) if rec.url and base else rec.url
     return RawEvent(title=title, date_text=rec.date or None, time_text=rec.time or None,
-                    url=url or None, desc=rec.desc or None, source_kind=f"adapter:{kind}")
+                    url=url or None, desc=rec.desc or None, price_text=rec.price or None,
+                    source_kind=f"adapter:{kind}")
 
 
 def _parses(rec: Rec, cfg: VenueConfig, ctx: SourceCtx) -> bool:
@@ -31,7 +42,8 @@ def _parses(rec: Rec, cfg: VenueConfig, ctx: SourceCtx) -> bool:
 
 
 def raws_from_html(html: str, cfg: VenueConfig, ctx: SourceCtx, base: str = "") -> list[RawEvent]:
-    """RawEvents when the venue's adapter is direct and every titled record has a parseable date.
+    """RawEvents when the venue's adapter is direct and >= DATED_MIN of its titled records have a
+    parseable date (the undated ones are dropped, stat adapter.undated); otherwise [] (next source).
     Links resolve against `base` (post-redirect page URL), else the listing URL."""
     site = cfg.to_legacy_dict()
     site["url"] = cfg.resolved_url(ctx.today.year)
@@ -49,10 +61,13 @@ def raws_from_html(html: str, cfg: VenueConfig, ctx: SourceCtx, base: str = "") 
     if not recs:
         ctx.stats["adapter.no_records"] = ctx.stats.get("adapter.no_records", 0) + 1
         return []
-    if not all(r.date and _parses(r, cfg, ctx) for r in recs):
+    dated = [r for r in recs if r.date and _parses(r, cfg, ctx)]
+    if len(dated) < DATED_MIN * len(recs):
         ctx.stats["adapter.unparsed_venues"] = ctx.stats.get("adapter.unparsed_venues", 0) + 1
         return []
-    return [rec_to_raw(r, adapter.kind, base or site["url"]) for r in recs]
+    if len(dated) < len(recs):          # "Now open" / "On-demand" cards: dropped, the rest trusted
+        ctx.stats["adapter.undated"] = ctx.stats.get("adapter.undated", 0) + len(recs) - len(dated)
+    return [rec_to_raw(r, adapter.kind, base or site["url"]) for r in dated]
 
 
 class AdapterSource:

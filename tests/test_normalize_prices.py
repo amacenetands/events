@@ -13,7 +13,7 @@ CASES = [
     ("1 500 ₽", "1500 ₽"), ("от 1500 руб.", "From 1500 ₽"), ("бесплатно", "Free"), ("Вход свободный", "Free"),
     ("£12 + booking fee", "£12"), ("£12 plus booking fee", "£12"),
     # mined
-    ("£13.50 – £28.00 full price | £11.00 – £25", "£13.50–£28"),   # Wilton's Music Hall
+    ("£13.50 – £28.00 full price | £11.00 – £25", "£13.50–£28"),   # Wilton's: labelled full price wins
     ("£ 10.00", "£10"),                                          # Green Note
     ("From £39 (£35 + £4 transaction fee)", "From £39"),         # Barbican
     ("£20.50 (£19 + £1.50 transaction fee)", "£20.50"),          # Barbican
@@ -30,7 +30,7 @@ CASES = [
     ("Children (age 7-16): £3.00", "£3"),                        # Fan Museum
     ("Price: £11", "£11"),                                       # Etcetera Theatre
     ("£80.00", "£80"),                                           # Pizza Express Jazz Club
-    ("Concession £5 per workshop, £70 for 14 week", "£5"),       # Barbican
+    ("Concession £5 per workshop, £70 for 14 week", "£5"),       # Barbican: both clauses concession -> cheapest
     ("£11.99", "£11.99"),                                        # Young V&A
     ("£10 - £10", "£10"),
     ("£0 - £0", "Free"),
@@ -87,3 +87,52 @@ def test_not_free(text):
 
 def test_free_after_access_note():
     assert parse_price_text("Step free access. Free entry") == "Free"
+
+
+@pytest.mark.parametrize("text,want", [
+    ("от 750р", "From 750 ₽"), ("750 руб.", "750 ₽"), ("750 ₽", "750 ₽"), ("₽750", "750 ₽"),
+    ("от 750 до 1500 р", "750–1500 ₽"), ("750 р.", "750 ₽"), ("1 500 рублей", "1500 ₽"),
+    ("Сегодня на сцене | от 3500р", "From 3500 ₽"),
+])
+def test_ru_currency(text, want):
+    assert parse_price_text(text) == want
+
+
+@pytest.mark.parametrize("text", ["750 рок-групп", "15 рядов"])
+def test_ru_not_price(text):
+    assert parse_price_text(text) is None
+
+
+@pytest.mark.parametrize("text,want", [
+    ("PWYC from £1", "Pay what you can from £1"), ("Pay what you can from £1", "Pay what you can from £1"),
+    ("PWYC £3+", "Pay what you can from £3"), ("PWYC", "Pay what you can"),
+    ("Pay what you can (suggested £10)", "Pay what you can"),
+])
+def test_pwyc_floor(text, want):
+    assert parse_price_text(text) == want
+
+
+@pytest.mark.parametrize("text,want", [
+    ("£15 | £12 Advance | £8 MEMBERS", "From £12"),          # two general tiers
+    ("Premium £45 / Standard £15", "£15"),
+    ("£20 | £10 Students | £5 Under 16s", "£20"),
+    ("£10 Concessions | £8 Members", "£8"),             # every tier restricted: lowest of all
+    ("£12 Adults, £6 Children", "£12"),
+    ("£10 non-members, £5 members", "£10"),
+    ("£20 (adults), £12.50 (under 16s)", "£20"),
+    ("£15 (£12 members) | £18 door", "From £15"),
+    ("£12 | £12 Advance", "£12"),                               # one distinct general tier
+    ("£13.50–£28 | £11–£25", "From £11"),                       # unlabelled ranges
+    ("Standard £20, £15 online | £10 Members", "From £15"),     # label carries over its comma clauses
+    ("£300, or 3 instalments of £100", "£300"),
+    ("£40 per course, £10 per month", "£40"),
+    ("Free | £5 donation", "Free"),
+])
+def test_lowest_general_tier(text, want):
+    assert parse_price_text(text) == want
+
+
+def test_lowest_general_tier_agrees_with_eval():
+    from src.eval.run import norm_price
+    for text in ("£15 | £12 Advance | £8 MEMBERS", "Premium £45 / Standard £15", "PWYC from £1", "от 750р"):
+        assert norm_price(parse_price_text(text)) == norm_price(text)

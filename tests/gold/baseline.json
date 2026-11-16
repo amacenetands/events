@@ -7,8 +7,8 @@
     "fp": 0,
     "p": 1.0,
     "r": 1.0,
-    "tn": 22,
-    "tp": 0
+    "tn": 24,
+    "tp": 1
    },
    "date": {
     "f1": 1.0,
@@ -17,43 +17,43 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 22
+    "tp": 25
    },
    "end_date": {
-    "f1": 0.9091,
+    "f1": 1.0,
     "fn": 0,
-    "fp": 1,
-    "p": 0.8333,
-    "r": 1.0,
-    "tn": 16,
-    "tp": 5
-   },
-   "kind": {
-    "f1": 0.9545,
-    "fn": 1,
-    "fp": 1,
-    "p": 0.9545,
-    "r": 0.9545,
-    "tn": 0,
-    "tp": 21
-   },
-   "price": {
-    "f1": 0.0,
-    "fn": 9,
     "fp": 0,
     "p": 1.0,
-    "r": 0.0,
-    "tn": 13,
-    "tp": 0
+    "r": 1.0,
+    "tn": 19,
+    "tp": 6
+   },
+   "kind": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 25
+   },
+   "price": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 15,
+    "tp": 10
    },
    "sessions_known": {
-    "f1": 0.9545,
-    "fn": 1,
-    "fp": 1,
-    "p": 0.9545,
-    "r": 0.9545,
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
     "tn": 0,
-    "tp": 21
+    "tp": 25
    },
    "start_known": {
     "f1": 1.0,
@@ -62,7 +62,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 22
+    "tp": 25
    },
    "time": {
     "f1": 1.0,
@@ -71,7 +71,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 9,
-    "tp": 13
+    "tp": 16
    },
    "title": {
     "f1": 1.0,
@@ -80,7 +80,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 22
+    "tp": 25
    },
    "url": {
     "f1": 1.0,
@@ -89,7 +89,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 22
+    "tp": 25
    }
   },
   "follow_links": {
@@ -99,7 +99,7 @@
     "fp": 0,
     "p": 1.0,
     "r": 1.0,
-    "tn": 1,
+    "tn": 2,
     "tp": 0
    },
    "date": {
@@ -109,7 +109,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 1
+    "tp": 2
    },
    "end_date": {
     "f1": 1.0,
@@ -118,7 +118,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 1,
-    "tp": 0
+    "tp": 1
    },
    "kind": {
     "f1": 1.0,
@@ -127,7 +127,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 1
+    "tp": 2
    },
    "price": {
     "f1": 1.0,
@@ -136,7 +136,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 1
+    "tp": 2
    },
    "sessions_known": {
     "f1": 1.0,
@@ -145,7 +145,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 1
+    "tp": 2
    },
    "start_known": {
     "f1": 1.0,
@@ -154,7 +154,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 1
+    "tp": 2
    },
    "time": {
     "f1": 1.0,
@@ -162,7 +162,7 @@
     "fp": 0,
     "p": 1.0,
     "r": 1.0,
-    "tn": 0,
+    "tn": 1,
     "tp": 1
    },
    "title": {
@@ -172,7 +172,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 1
+    "tp": 2
    },
    "url": {
     "f1": 1.0,
@@ -181,7 +181,7 @@
     "p": 1.0,
     "r": 1.0,
     "tn": 0,
-    "tp": 1
+    "tp": 2
    }
   },
   "jsonld": {
@@ -213,22 +213,22 @@
     "tp": 11
    },
    "kind": {
-    "f1": 0.9355,
-    "fn": 2,
-    "fp": 2,
-    "p": 0.9355,
-    "r": 0.9355,
-    "tn": 0,
-    "tp": 29
-   },
-   "price": {
-    "f1": 0.8718,
-    "fn": 5,
+    "f1": 1.0,
+    "fn": 0,
     "fp": 0,
     "p": 1.0,
-    "r": 0.7727,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 31
+   },
+   "price": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
     "tn": 9,
-    "tp": 17
+    "tp": 22
    },
    "sessions_known": {
     "f1": 1.0,
@@ -267,13 +267,13 @@
     "tp": 31
    },
    "url": {
-    "f1": 0.5161,
-    "fn": 15,
-    "fp": 15,
-    "p": 0.5161,
-    "r": 0.5161,
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
     "tn": 0,
-    "tp": 16
+    "tp": 31
    }
   },
   "llm": {
@@ -314,13 +314,13 @@
     "tp": 35
    },
    "price": {
-    "f1": 0.6977,
-    "fn": 9,
-    "fp": 4,
-    "p": 0.7895,
-    "r": 0.625,
-    "tn": 10,
-    "tp": 15
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 11,
+    "tp": 24
    },
    "sessions_known": {
     "f1": 1.0,
@@ -463,10 +463,10 @@
  },
  "coverage": {
   "expected": 113,
-  "extra": 4,
-  "found": 97,
+  "extra": 0,
+  "found": 101,
   "found_wrong_date": 0,
-  "missed": 16
+  "missed": 12
  },
  "events": {
   "aldwych-theatre|Sinatra The Musical|2026-11-10": {
@@ -524,19 +524,8 @@
    "wrong": []
   },
   "barbican|NAZA|2026-10-16": {
-   "found": false,
-   "wrong": [
-    "title",
-    "date",
-    "end_date",
-    "kind",
-    "byday",
-    "time",
-    "price",
-    "url",
-    "sessions_known",
-    "start_known"
-   ]
+   "found": true,
+   "wrong": []
   },
   "cafe-oto|Dudú Kouaté & Ernst Reijseger – solos and duo|2026-11-13T19:30": {
    "found": false,
@@ -555,21 +544,15 @@
   },
   "cafe-oto|EFG London Jazz Festival: Robyn's Rocket – w/ Laura Jurd & Robyn Rocket + Little Kali + ATMoss + Live Visuals by Rucksack cinema and Jade|2026-11-17T19:30": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "cafe-oto|Infant Tree + KRAAK present: KRAAKLINGS w/ Horacio Pollard + Venediktos Tempelboom + Kiara Govaert|2026-11-16T19:30": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "cafe-oto|JIMI TENOR BAND – Two-Day Residency|2026-11-20": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "cafe-oto|Maxine Funke + Clayton Noone + Time Is Away (DJ)|2026-11-14T19:30": {
    "found": false,
@@ -648,9 +631,7 @@
   },
   "cafe-oto|Unpredictable presents: ✦ MEXICAN CONFLUENCES ✦ feat. Piña para la Niña|2026-11-15T19:30": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "cafe-oto|Upset The Rhythm presents: Wendy Eisenberg + Jasper Llewellyn|2026-11-09T19:30": {
    "found": false,
@@ -673,98 +654,63 @@
   },
   "camden-peoples-theatre|An Evening with Camden Youth Theatre|2026-12-01": {
    "found": true,
-   "wrong": [
-    "price",
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Boys Beware (WIP)|2026-11-25": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Camden Meeple's Theatre: Board Game Day|2026-12-05": {
    "found": true,
-   "wrong": [
-    "price",
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|HUG PIECE|2026-11-13": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Hot Gay Xmas Shit|2026-12-03": {
    "found": true,
-   "wrong": [
-    "price",
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Self and Other Fictions An Anthology|2026-12-08": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Sharp Edges|2026-11-11": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|This Offers No Solutions (WIP)|2026-11-24": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Trans People Are Awful Trans + Night|2026-11-18": {
    "found": true,
-   "wrong": [
-    "price",
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Tripping Out (WIP)|2026-11-20": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|TwitchKitsch|2026-12-04": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|VV Showdown|2026-12-02": {
    "found": true,
-   "wrong": [
-    "price",
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Vincent|2027-01-14": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|Washed Ashore (WIP)|2026-11-24": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "camden-peoples-theatre|White Gold|2026-11-25": {
    "found": true,
-   "wrong": [
-    "url"
-   ]
+   "wrong": []
   },
   "conway-hall|Edward Lloyd|2026-11-18T13:10": {
    "found": true,
@@ -800,15 +746,11 @@
   },
   "jazz-esse|Armir Lee MB Electric|2026-09-13T20:00": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "jazz-esse|N-CODE BAND & NADIA KUZNETSOVA|2026-09-14T20:00": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "jazz-esse|«Яков Окунь представляет»|2026-09-15T20:00": {
    "found": true,
@@ -820,27 +762,19 @@
   },
   "jazz-esse|Джазовый бранч с Меланией Кова|2026-09-13T15:00": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "jazz-esse|Квартет Андрея Красильникова|2026-09-17T20:00": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "jazz-esse|Культограм: «Кутеж по-московски»|2026-09-17T19:30": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "jazz-esse|Культограм: Наука и искусство. Трилогия - интеллектуальный стендап|2026-09-16T19:30": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "jazz-esse|Открытие 33-го концертного сезона - «Гнесин Джаз Квинтет»|2026-09-16T20:00": {
    "found": true,
@@ -848,41 +782,15 @@
   },
   "london-coliseum|Iphigénie en Tauride|2026-11-09T19:30": {
    "found": true,
-   "wrong": [
-    "end_date",
-    "kind",
-    "sessions_known"
-   ]
+   "wrong": []
   },
   "london-coliseum|Iphigénie en Tauride|2026-11-11T19:30": {
-   "found": false,
-   "wrong": [
-    "title",
-    "date",
-    "end_date",
-    "kind",
-    "byday",
-    "time",
-    "price",
-    "url",
-    "sessions_known",
-    "start_known"
-   ]
+   "found": true,
+   "wrong": []
   },
   "london-coliseum|Iphigénie en Tauride|2026-11-14T18:00": {
-   "found": false,
-   "wrong": [
-    "title",
-    "date",
-    "end_date",
-    "kind",
-    "byday",
-    "time",
-    "price",
-    "url",
-    "sessions_known",
-    "start_known"
-   ]
+   "found": true,
+   "wrong": []
   },
   "london-coliseum|Sessions at the London Coliseum: Black Country, New Road|2026-11-13T19:30": {
    "found": true,
@@ -1063,15 +971,11 @@
   },
   "synthetic-library-schedule|Baby Rhyme Time|2026-09-03T10:00": {
    "found": true,
-   "wrong": [
-    "kind"
-   ]
+   "wrong": []
   },
   "synthetic-library-schedule|Lego Club|2026-10-01T16:00": {
    "found": true,
-   "wrong": [
-    "kind"
-   ]
+   "wrong": []
   },
   "synthetic-library-schedule|Winter Book Fair|2026-12-12T11:00": {
    "found": true,
@@ -1079,72 +983,43 @@
   },
   "vam|Antique to Early Christian (in-person)|2026-11-09": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|British Theatre 2026: An Overview|2026-10-11": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|Cloak & Dagger Couture|2026-11-09": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|Freddie Mercury | Splendid Things|2026-11-09": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|Gardens and Art|2026-11-12": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|In Celebration of Winifred Atwell|2026-11-13": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|Lunchtime Lectures: Gilded Age Fashion|2026-11-12": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|Meet the Makers with Sheffield Museums|2026-11-13": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
   "vam|Metalworking Now (2026-27)|2026-11-09": {
    "found": true,
-   "wrong": [
-    "price"
-   ]
+   "wrong": []
   },
-  "vam|National Art Library and Archive talks Monday 11.30|2026-11-09T11:30": {
-   "found": false,
-   "wrong": [
-    "title",
-    "date",
-    "end_date",
-    "kind",
-    "byday",
-    "time",
-    "price",
-    "url",
-    "sessions_known",
-    "start_known"
-   ]
+  "vam|National Art Library and Archive talks|2026-11-09T11:30": {
+   "found": true,
+   "wrong": []
   },
   "young-vic|EUROTRASH|2026-11-16T19:30": {
    "found": true,
@@ -1179,12 +1054,7 @@
    "wrong": []
   }
  },
- "extras": [
-  "barbican|NAZA|2026-11-18T18:15",
-  "vam|National Art Library and Archive talks Monday|2026-12-28",
-  "vam|National Art Library and Archive talks Monday|2027-06-08",
-  "vam|National Art Library and Archive talks Monday|2027-08-31"
- ],
+ "extras": [],
  "fields": {
   "byday": {
    "f1": 1.0,
@@ -1192,8 +1062,8 @@
    "fp": 0,
    "p": 1.0,
    "r": 1.0,
-   "tn": 94,
-   "tp": 3
+   "tn": 97,
+   "tp": 4
   },
   "date": {
    "f1": 1.0,
@@ -1202,43 +1072,43 @@
    "p": 1.0,
    "r": 1.0,
    "tn": 0,
-   "tp": 97
+   "tp": 101
   },
   "end_date": {
-   "f1": 0.9811,
+   "f1": 1.0,
    "fn": 0,
-   "fp": 1,
-   "p": 0.963,
+   "fp": 0,
+   "p": 1.0,
    "r": 1.0,
-   "tn": 70,
-   "tp": 26
+   "tn": 73,
+   "tp": 28
   },
   "kind": {
-   "f1": 0.9691,
-   "fn": 3,
-   "fp": 3,
-   "p": 0.9691,
-   "r": 0.9691,
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
    "tn": 0,
-   "tp": 94
+   "tp": 101
   },
   "price": {
-   "f1": 0.7523,
-   "fn": 23,
-   "fp": 4,
-   "p": 0.9111,
-   "r": 0.6406,
-   "tn": 32,
-   "tp": 41
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
+   "tn": 35,
+   "tp": 66
   },
   "sessions_known": {
-   "f1": 0.9897,
-   "fn": 1,
-   "fp": 1,
-   "p": 0.9897,
-   "r": 0.9897,
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
    "tn": 0,
-   "tp": 96
+   "tp": 101
   },
   "start_known": {
    "f1": 1.0,
@@ -1247,7 +1117,7 @@
    "p": 1.0,
    "r": 1.0,
    "tn": 0,
-   "tp": 97
+   "tp": 101
   },
   "time": {
    "f1": 1.0,
@@ -1255,8 +1125,8 @@
    "fp": 0,
    "p": 1.0,
    "r": 1.0,
-   "tn": 39,
-   "tp": 58
+   "tn": 40,
+   "tp": 61
   },
   "title": {
    "f1": 1.0,
@@ -1265,16 +1135,16 @@
    "p": 1.0,
    "r": 1.0,
    "tn": 0,
-   "tp": 97
+   "tp": 101
   },
   "url": {
-   "f1": 0.8454,
-   "fn": 15,
-   "fp": 15,
-   "p": 0.8454,
-   "r": 0.8454,
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
    "tn": 0,
-   "tp": 82
+   "tp": 101
   }
  }
 }

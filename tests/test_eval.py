@@ -115,7 +115,9 @@ def test_failures_equal_known_failures(report):
 
 def test_known_failure_with_changed_value_is_new(report):
     known = load_known_failures()
-    k = next(k for k in known if k[3] == "price" and known[k]["got"] is not None)
+    if not known:
+        pytest.skip("KNOWN_FAILURES.yaml is empty: nothing to tamper with")
+    k = next((k for k in known if known[k]["got"] is not None), next(iter(known)))
     tampered = {**known, k: {**known[k], "got": "999"}}
     new, _, _ = _diff(report, tampered)
     assert new == [k]

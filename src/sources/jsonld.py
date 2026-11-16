@@ -8,7 +8,7 @@ from typing import Any, Iterator
 from ..config import VenueConfig
 from ..fetch.types import FetchResult
 from ..models import RawEvent, clean_text
-from ..normalize.urls import anchor_lines, match_title_url
+from ..normalize.urls import anchor_lines, is_listing_url, match_title_url, url_host
 from .base import SourceCtx, base_url, register_source
 
 __all__ = ["JsonLdSource", "event_nodes", "node_to_raw", "raws_from_html", "fill_listing_urls"]
@@ -151,14 +151,32 @@ def _venue(node: dict, cfg: VenueConfig) -> str:
     return name if name and name.lower() != cfg.name.lower() else ""
 
 
-def _url(node: dict, base: str) -> str:
-    """Event link from url / @id, absolute against the page URL."""
+def _offer_urls(node: dict, base: str) -> list[str]:
+    from urllib.parse import urljoin
+    return [urljoin(base, v) if base else v for o in _offers(node)
+            if (v := _str(o.get("url"))).startswith(("http", "/"))]
+
+
+def shared_offer_urls(nodes: list[dict], base: str = "") -> frozenset[str]:
+    """offers urls used by more than one Event node on the page (a basket / checkout page)."""
+    from collections import Counter
+    c = Counter(u for n in nodes for u in set(_offer_urls(n, base)))
+    return frozenset(u for u, k in c.items() if k > 1)
+
+
+def _url(node: dict, base: str, shared: frozenset[str] = frozenset()) -> str:
+    """Event link from url / @id, else from offers[].url (same-site first; never the listing,
+    a generic site page or a url shared by several nodes), absolute against the page URL."""
     from urllib.parse import urljoin
     for k in ("url", "@id"):
         v = _str(node.get(k))
         if v.startswith(("http", "/")):
-            return urljoin(base, v) if base else v
-    return ""
+            return urljoin(base, v) if base else v      # the listing itself is fixed by fill_listing_urls
+    offer_urls = [u for u in _offer_urls(node, base)
+                  if u not in shared and not (base and is_listing_url(u, base))]
+    host = url_host(base) if base else ""
+    same = [u for u in offer_urls if not host or url_host(u) == host]
+    return (same or offer_urls or [""])[0]
 
 
 def _types(node: dict) -> list[str]:
@@ -173,7 +191,8 @@ def category_text(node: dict) -> str:
     return (specific or words or [""])[0]
 
 
-def node_to_raw(node: dict, cfg: VenueConfig, base: str = "", currency: str = "Â£") -> RawEvent | None:
+def node_to_raw(node: dict, cfg: VenueConfig, base: str = "", currency: str = "Â£",
+                shared: frozenset[str] = frozenset()) -> RawEvent | None:
     """One Event node -> RawEvent; None without a name or a start date. No date filtering."""
     sch = _schedule(node)
     title = clean_text(_str(node.get("name")))
@@ -184,7 +203,7 @@ def node_to_raw(node: dict, cfg: VenueConfig, base: str = "", currency: str = "Â
     return RawEvent(
         title=title, date_text=start, end_text=_str(sch.get("endDate")) or _str(node.get("endDate")) or None,
         price_text=price_text(node, currency) or None, recurrence_text=recurrence_text(sch) or None,
-        url=_url(node, base) or None, desc=desc, venue=_venue(node, cfg) or None,
+        url=_url(node, base, shared) or None, desc=desc, venue=_venue(node, cfg) or None,
         sold_out=_sold_out(node), category_text=category_text(node),
         audience_text="kids" if "ChildrensEvent" in _types(node) else "",
         age_text=clean_text(_str(node.get("typicalAgeRange"))), source_kind="jsonld",
@@ -193,7 +212,9 @@ def node_to_raw(node: dict, cfg: VenueConfig, base: str = "", currency: str = "Â
 
 def raws_from_html(html: str, cfg: VenueConfig, base: str = "", currency: str = "Â£") -> list[RawEvent]:
     """RawEvents for every usable Event node in a page."""
-    return [r for r in (node_to_raw(n, cfg, base, currency) for n in event_nodes(html)) if r is not None]
+    nodes = event_nodes(html)
+    shared = shared_offer_urls(nodes, base)
+    return [r for r in (node_to_raw(n, cfg, base, currency, shared) for n in nodes) if r is not None]
 
 
 def fill_listing_urls(raws: list[RawEvent], html: str, base: str, listing: set[str],
@@ -221,8 +242,12 @@ class JsonLdSource:
         if fr is None or not fr.body:
             return []
         base = base_url(cfg, fr, ctx)
-        out = fill_listing_urls(raws_from_html(fr.body, cfg, base, ctx.city.currency), fr.body, base,
-                                {base, cfg.resolved_url(ctx.today.year)}, cfg.fix.url_pattern)
+        nodes = event_nodes(fr.body)
+        shared = shared_offer_urls(nodes, base)
+        raws = [r for r in (node_to_raw(n, cfg, base, ctx.city.currency, shared) for n in nodes) if r is not None]
+        if raws and len(raws) < len(nodes):     # some Event nodes without a start date: observability only
+            ctx.stats["jsonld.partial"] = ctx.stats.get("jsonld.partial", 0) + len(nodes) - len(raws)
+        out = fill_listing_urls(raws, fr.body, base, {base, cfg.resolved_url(ctx.today.year)}, cfg.fix.url_pattern)
         ctx.stats["jsonld.records"] = ctx.stats.get("jsonld.records", 0) + len(out)
         return out
 

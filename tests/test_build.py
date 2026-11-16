@@ -26,10 +26,10 @@ def _one(raw: RawEvent, cfg: VenueConfig | None = None, ctx: SourceCtx | None = 
     return evs[0]
 
 
-def test_range_with_weekday_is_weekly_run():
+def test_range_with_weekday_is_weekly_series():
     e = _one(RawEvent(title="Family Freestyle", date_text="13 Nov – 18 Dec, Fridays"))
     assert (e.kind, e.date, e.end_date, e.byday, e.sessions_known) == (
-        "run", date(2026, 11, 13), date(2026, 12, 18), [4], True)
+        "recurring", date(2026, 11, 13), date(2026, 12, 18), [4], True)
 
 
 def test_bare_range_sessions_unknown():
@@ -40,7 +40,7 @@ def test_bare_range_sessions_unknown():
 def test_range_means_weekly_derives_byday():
     cfg = _cfg(fix={"range_means_weekly": {"min_days": 28}})       # bare same-weekday ends: opt-in
     e = _one(RawEvent(title="Workshop", date_text="12 November 2026 – 17 December 2026"), cfg)
-    assert (e.kind, e.byday, e.sessions_known) == ("run", [3], True)   # both Thursdays
+    assert (e.kind, e.byday, e.sessions_known) == ("recurring", [3], True)   # both Thursdays: weekly series
     e = _one(RawEvent(title="Workshop", date_text="12 November 2026 – 17 December 2026"),
              _cfg(fix={"range_means_weekly": True}))
     assert (e.byday, e.sessions_known) == (None, False)
@@ -276,3 +276,24 @@ def test_short_range_sessions_known(text, known):
     cfg = VenueConfig(name="V", url="https://v.org/")
     (e,) = build_events([RawEvent(title="Show", date_text=text)], cfg, _ctx(date(2026, 11, 1)))
     assert (e.kind, e.sessions_known) == ("run", known)
+
+
+def test_merge_mode_drops_later_source_duplicates():
+    from datetime import timedelta
+    d = TODAY + timedelta(days=10)
+    day = d.strftime("%-d %B %Y")
+    jl = "Twas the Night Before Christmas / Bach to Baby Festive Family Concert"
+    raws = [RawEvent(title=jl, date_text=f"{d.isoformat()}T11:00:00", source_kind="jsonld"),
+            RawEvent(title="Twas the Night Before Christmas", date_text=day, time_text="11.00am",
+                     source_kind="llm"),                                   # same date + time: dropped
+            RawEvent(title="Christmastide", date_text=day, time_text="10.00am", source_kind="llm"),
+            RawEvent(title="CHRISTMASTIDE!", date_text=day, source_kind="adapter:x")]   # same title + date: dropped
+    ctx = _ctx()
+    evs = build_events(raws, _cfg(), ctx)
+    assert sorted(e.title for e in evs) == ["Christmastide", jl]
+    assert ctx.stats["build.merge_dropped"] == 2
+
+
+def test_single_source_untimed_same_day_kept():
+    raws = [RawEvent(title=t, date_text="20 Nov 2026", source_kind="llm") for t in ("A", "B")]
+    assert len(build_events(raws, _cfg(), _ctx())) == 2

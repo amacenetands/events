@@ -60,7 +60,7 @@ def test_detail_pages_to_raw_events(cache):
     by = {r.title: r for r in raws}
     naza = by["NAZA"]
     assert (naza.date_text, naza.time_text, naza.price_text, naza.url) == (
-        "2026-11-18", "18:15", "£15.50", "https://www.barbican.org.uk/whats-on/2026/event/naza")
+        "2026-10-16 – 2026-11-18", None, "£15.50", "https://www.barbican.org.uk/whats-on/2026/event/naza")
     mass = by["Ensemble Pygmalion: Mozart's Great Mass in C minor"]
     assert (mass.date_text, mass.time_text, mass.price_text) == ("2026-11-09", "20:00", "From £24")
     assert ctx.stats["follow_links.pages"] == 18 and ctx.stats["follow_links.http_404"] == 16
@@ -78,8 +78,25 @@ def test_build_from_follow_links(cache):
     raws, ctx = _run(date(2026, 11, 1))
     evs = build_events(raws, CFG, ctx)
     e = next(e for e in evs if e.title == "NAZA")
-    assert (e.date, e.time, e.price, e.kind, e.category, e.venue) == (
-        date(2026, 11, 18), "18:15", "£15.50", "one_off", "concert", "Barbican")
+    assert (e.date, e.end_date, e.time, e.price, e.kind, e.sessions_known, e.category, e.venue) == (
+        date(2026, 10, 16), date(2026, 11, 18), None, "£15.50", "run", False, "concert", "Barbican")
+
+
+def test_byline_range_needs_dash_and_upcoming_end():
+    from bs4 import BeautifulSoup
+    from src.sources.follow_links import _byline_range
+    import re
+    tpl = '<h1>X</h1><span><time datetime="2026-10-16T17:30:00Z">Fri 16 Oct</time>{sep}<time datetime="{end}">e</time></span>'
+    rx = re.compile("/event/")
+
+    class C:      # minimal ctx
+        today = date(2026, 11, 1)
+        class city:
+            tz = "Europe/London"
+    got = lambda sep, end: _byline_range(BeautifulSoup(tpl.format(sep=sep, end=end), "html.parser"), "https://x/e", rx, C)
+    assert got(" — ", "2026-11-18T18:15:00Z")[:2] == (date(2026, 10, 16), date(2026, 11, 18))
+    assert got(", ", "2026-11-18T18:15:00Z") is None            # a list of screenings, not a range
+    assert got(" — ", "2026-10-20T18:15:00Z") is None           # run already over
 
 
 def test_cache_hit_skips_network(cache):
@@ -189,3 +206,18 @@ def test_offline_reads_cached_detail_pages_only(cache):
     assert seen == [] and not ctx.errors
     assert [r.url for r in raws] == [url]
     assert ctx.stats["follow_links.offline_uncached"] >= 17
+
+
+
+def test_timed_session_beats_byline_range():
+    from src.sources.follow_links import raw_from_detail
+    from src.sources.base import SourceCtx
+    from src.config import get_city
+    ctx = SourceCtx(http=None, today=date(2026, 11, 1), window_days=90, city=get_city("london"))
+    head = ('<meta property="og:title" content="Film | Barbican"><span><time datetime="2026-10-16T17:30:00Z">16 Oct</time>'
+            ' — <time datetime="2026-11-18T18:15:00Z">18 Nov</time></span>')
+    run = raw_from_detail(head, "https://x.org/event/film", ctx)
+    assert (run.date_text, run.time_text) == ("2026-10-16 – 2026-11-18", None)
+    timed = raw_from_detail(head + '<ul><li><time datetime="2026-11-05T20:00:00Z">5 Nov 8pm</time></li></ul>',
+                            "https://x.org/event/film", ctx)
+    assert (timed.date_text, timed.time_text) == ("2026-11-05", "20:00")

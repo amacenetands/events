@@ -24,11 +24,12 @@ class Rec:
     url: str = ""
     desc: str = ""
     raw: str = ""
+    price: str = ""     # price text as found
 
     def line(self) -> str:
         if self.raw:
             return self.raw
-        body = " | ".join(x for x in (self.title, self.date, self.time, self.desc) if x)
+        body = " | ".join(x for x in (self.title, self.date, self.time, self.desc, self.price) if x)
         return body + (f" -> {self.url}" if self.url else "")
 
 

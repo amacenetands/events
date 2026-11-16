@@ -1,9 +1,10 @@
 """src.normalize.dates — corpus mined from cache/memory.db scrapes (venue in comment)."""
-from datetime import date as D
+from datetime import date as D, timedelta
 
 import pytest
 
 from src.normalize import DateSpec, occurrences, parse_date_specs, parse_date_text, weekday_of
+from src.normalize.dates import series_kind
 
 T = D(2026, 11, 15)   # Sunday
 ALL = frozenset(range(7))
@@ -19,14 +20,14 @@ CASES = [
     ("17 Jun – 20 Sep", "run", D(2026, 6, 17), D(2026, 9, 20), None, (), False),
     ("15–17 Nov", "run", D(2026, 11, 15), D(2026, 11, 17), None, (), False),
     ("Nov 15 - Dec 20", "run", D(2026, 11, 15), D(2026, 12, 20), None, (), False),
-    ("Thursdays, 19 Nov – 17 Dec", "run", D(2026, 11, 19), D(2026, 12, 17), frozenset({3}), (), True),
-    ("19 Nov – 17 Dec, every Thursday", "run", D(2026, 11, 19), D(2026, 12, 17), frozenset({3}), (), True),
-    ("Fridays 13 Nov to 18 Dec", "run", D(2026, 11, 13), D(2026, 12, 18), frozenset({4}), (), True),
+    ("Thursdays, 19 Nov – 17 Dec", "recurring", D(2026, 11, 19), D(2026, 12, 17), frozenset({3}), (), True),
+    ("19 Nov – 17 Dec, every Thursday", "recurring", D(2026, 11, 19), D(2026, 12, 17), frozenset({3}), (), True),
+    ("Fridays 13 Nov to 18 Dec", "recurring", D(2026, 11, 13), D(2026, 12, 18), frozenset({4}), (), True),
     ("every Saturday", "recurring", None, None, frozenset({5}), (), True),
     ("Saturdays", "recurring", None, None, frozenset({5}), (), True),
     ("weekly on Sundays", "recurring", None, None, frozenset({6}), (), True),
-    ("daily", "recurring", None, None, ALL, (), True),
-    ("every day", "recurring", None, None, ALL, (), True),
+    ("daily", "run", None, None, ALL, (), True),
+    ("every day", "run", None, None, ALL, (), True),
     ("weekends", "recurring", None, None, frozenset({5, 6}), (), True),
     ("15 November 2026", "one_off", D(2026, 11, 15), None, None, (), True),
     ("15th Nov", "one_off", D(2026, 11, 15), None, None, (), True),
@@ -78,9 +79,9 @@ CASES = [
     ("On 22/11/2026", "one_off", D(2026, 11, 22), None, None, (), True),                        # Gunnersbury
     ("09/11/2026", "one_off", D(2026, 11, 9), None, None, (), True),                            # Angel Comedy
     ("Wednesdays at 1.15 pm", "recurring", None, None, frozenset({2}), ("13:15",), True),        # Temple Church
-    ("Open Wednesday to Sunday 10am - 5pm", "recurring", None, None, frozenset({2, 3, 4, 5, 6}), ("10:00", "17:00"), True),  # Dickens Museum
-    ("Daily 11am and 1.30pm", "recurring", None, None, ALL, ("11:00", "13:30"), True),           # Kew
-    ("Monday to Saturday, 4pm - 8pm", "recurring", None, None, frozenset({0, 1, 2, 3, 4, 5}), ("16:00", "20:00"), True),  # Bush Theatre
+    ("Open Wednesday to Sunday 10am - 5pm", "run", None, None, frozenset({2, 3, 4, 5, 6}), ("10:00", "17:00"), True),  # Dickens Museum
+    ("Daily 11am and 1.30pm", "run", None, None, ALL, ("11:00", "13:30"), True),           # Kew
+    ("Monday to Saturday, 4pm - 8pm", "run", None, None, frozenset({0, 1, 2, 3, 4, 5}), ("16:00", "20:00"), True),  # Bush Theatre
     ("26, 27 June and 3, 4 July 2026", "recurring", D(2026, 6, 26), D(2026, 7, 4), None, (), True),  # Kew
     # Russian
     ("24 июня — 30 августа", "run", D(2027, 6, 24), D(2027, 8, 30), None, (), False),          # Музей Москвы
@@ -94,15 +95,15 @@ CASES = [
     ("27 августа c 19:00 до 21:00", "one_off", D(2027, 8, 27), None, None, ("19:00", "21:00"), True),  # Гутенберг
     ("13 Сент", "one_off", D(2027, 9, 13), None, None, (), True),                               # Эссе
     ("по субботам", "recurring", None, None, frozenset({5}), (), True),
-    ("каждый день", "recurring", None, None, ALL, (), True),
+    ("каждый день", "run", None, None, ALL, (), True),
     # more shapes
     ("Dec 20 - Jan 5", "run", D(2026, 12, 20), D(2027, 1, 5), None, (), False),
     ("1 Oct – 20 Nov", "run", D(2026, 10, 1), D(2026, 11, 20), None, (), False),
     ("Nov 15–20", "run", D(2026, 11, 15), D(2026, 11, 20), None, (), False),
     ("Every Thursday from 19 Nov", "recurring", D(2026, 11, 19), None, frozenset({3}), (), True),
     ("Sat 12 Dec, Sat 9 Jan", "recurring", D(2026, 12, 12), D(2027, 1, 9), frozenset({5}), (), True),
-    ("Sat & Sun, 21 Nov – 20 Dec", "run", D(2026, 11, 21), D(2026, 12, 20), frozenset({5, 6}), (), True),
-    ("Weekends 21 Nov – 20 Dec", "run", D(2026, 11, 21), D(2026, 12, 20), frozenset({5, 6}), (), True),
+    ("Sat & Sun, 21 Nov – 20 Dec", "recurring", D(2026, 11, 21), D(2026, 12, 20), frozenset({5, 6}), (), True),
+    ("Weekends 21 Nov – 20 Dec", "recurring", D(2026, 11, 21), D(2026, 12, 20), frozenset({5, 6}), (), True),
     ("15 Nov 2026 — 19:30", "one_off", D(2026, 11, 15), None, None, ("19:30",), True),
     ("15 November 2026 at 12 noon", "one_off", D(2026, 11, 15), None, None, ("12:00",), True),
     ("1st of December 2026", "one_off", D(2026, 12, 1), None, None, (), True),
@@ -312,7 +313,7 @@ def test_end_text_kwarg():
 
 def test_recurrence_text_kwarg():
     s = parse_date_text("19 Nov 2026", T, end_text="17 Dec 2026", recurrence_text="Thursdays")
-    assert _k(s) == ("run", D(2026, 11, 19), D(2026, 12, 17)) and s.byday == frozenset({3})
+    assert _k(s) == ("recurring", D(2026, 11, 19), D(2026, 12, 17)) and s.byday == frozenset({3})
 
 
 def test_iso_offset_converted_to_tz():
@@ -390,7 +391,7 @@ def test_from_cue_open_run(text, start):
 
 def test_weekday_after_long_range_is_byday():
     s = parse_date_text("19 Nov – 17 Dec, Thursday", T)
-    assert s.kind == "run" and s.byday == frozenset({3}) and s.sessions_known and not s.inconsistent
+    assert s.kind == "recurring" and s.byday == frozenset({3}) and s.sessions_known and not s.inconsistent
     s = parse_date_text("19 Nov – 17 Dec, Saturday", T)
     assert s.byday == frozenset({5}) and not s.inconsistent
 
@@ -410,11 +411,11 @@ def test_closed_days_on_run():
     assert s.kind == "run" and s.byday == frozenset({1, 2, 3, 4, 5, 6})
 
 
-@pytest.mark.parametrize("text,days", [("Weekdays 9am", {0, 1, 2, 3, 4}), ("Sat & Sun 11am", {5, 6}),
-                                       ("Сб, Вс 12:00", {5, 6})])
-def test_weekday_lists_are_recurring(text, days):
+@pytest.mark.parametrize("text,days,kind", [("Weekdays 9am", {0, 1, 2, 3, 4}, "run"), ("Sat & Sun 11am", {5, 6}, "recurring"),
+                                            ("Сб, Вс 12:00", {5, 6}, "recurring")])
+def test_weekday_lists_follow_series_kind(text, days, kind):
     s = parse_date_text(text, T)
-    assert (s.kind, s.byday, s.sessions_known) == ("recurring", frozenset(days), True)
+    assert (s.kind, s.byday, s.sessions_known) == (kind, frozenset(days), True)
 
 
 @pytest.mark.parametrize("text,days", [("First Thursday of every month", {3}), ("Every other Saturday", {5}),
@@ -485,3 +486,74 @@ def test_weekday_labels_on_range_ends_stay_labels():
     assert (s.start, s.end, s.byday) == (D(2026, 11, 19), D(2026, 11, 21), None)
     [s] = parse_date_specs("Sun 22 Nov", T)
     assert (s.kind, s.start) == ("one_off", D(2026, 11, 22))
+
+
+# ── weekly programmes (series contract: recurring + byday) and exclusion dates ──
+
+def test_weekday_until_is_recurring_from_unknown_start():
+    s = parse_date_text("Every Monday until 28 Dec", T)
+    assert (s.kind, s.start, s.end, s.byday, s.start_known, s.sessions_known) == (
+        "recurring", None, D(2026, 12, 28), frozenset({0}), False, True)
+
+
+@pytest.mark.parametrize("text", ["Daily until 3 January 2027", "Tue–Sun, 17 Nov – 20 Dec", "Mondays to Fridays, 19 Nov – 17 Dec",
+                                  "Mon–Fri until 17 Dec"])
+def test_not_a_weekly_programme(text):
+    assert parse_date_text(text, T).kind == "run"
+
+
+def test_excluded_dates_are_not_sessions():
+    [s] = parse_date_specs("Every Monday until 28th December 2026, excluding 8th June and 31st August", T)
+    assert (s.kind, s.start, s.end, s.byday) == ("recurring", None, D(2026, 12, 28), frozenset({0}))
+    assert {(d.month, d.day) for d in s.exdates} == {(6, 8), (8, 31)}
+    assert not s.instances
+
+
+def test_closed_date_in_run_is_exdate():
+    end = T + timedelta(days=40)
+    closed = T + timedelta(days=20)
+    text = f"{T.day} {T:%b} – {end.day} {end:%b} {end.year}, closed {closed.day} {closed:%b}"
+    [s] = parse_date_specs(text, T)
+    assert (s.kind, s.start, s.end, s.exdates) == ("run", T, end, (closed,))
+    assert closed not in occurrences(s, T, end)
+    assert len(occurrences(s, T, end)) == 40
+
+
+@pytest.mark.parametrize("text", ["except Mondays, 19 Nov – 17 Dec", "Daily 10am, closed Mondays"])
+def test_weekday_exclusion_unchanged(text):
+    s = parse_date_text(text, T)
+    assert s is not None and (s.byday is None or 0 not in s.byday)
+
+
+
+@pytest.mark.parametrize("byday,cue,kind", [
+    (None, True, "run"), (set(range(7)), True, "run"), ({0, 1, 2, 3, 4}, True, "run"), ({1, 2, 3, 4, 5, 6}, True, "run"),
+    ({5, 6}, True, "recurring"), ({3}, True, "recurring"), ({0, 2, 4, 5}, True, "recurring"), ({3}, False, "run"),
+])
+def test_series_kind(byday, cue, kind):
+    assert series_kind(byday, cue) == kind
+
+
+@pytest.mark.parametrize("text,days", [("Weekends", {5, 6}), ("Saturdays and Sundays until 10 Jan", {5, 6})])
+def test_weekend_series_recurring(text, days):
+    s = parse_date_text(text, T)
+    assert (s.kind, s.byday) == ("recurring", frozenset(days))
+
+
+@pytest.mark.parametrize("text,day", [("No performance on 24 Dec. Thursdays 7pm until 31 Dec", (12, 24)),
+                                      ("Not on 3 Dec. Thursdays until 17 Dec", (12, 3))])
+def test_exclusion_cue_does_not_leak_onto_weekdays(text, day):
+    [s] = parse_date_specs(text, T)
+    assert (s.kind, s.byday) == ("recurring", frozenset({3}))
+    assert [(d.month, d.day) for d in s.exdates] == [day]
+
+
+def test_excluded_range_expands_to_each_day():
+    [s] = parse_date_specs("Daily, closed 24-26 Dec", T)
+    assert [(d.month, d.day) for d in s.exdates] == [(12, 24), (12, 25), (12, 26)]
+
+
+def test_exclusion_list_stops_before_a_range():
+    [s] = parse_date_specs("Open daily except 25 Dec, 17 Nov – 10 Jan", T)
+    assert (s.kind, s.start, s.end) == ("run", D(2026, 11, 17), D(2027, 1, 10))
+    assert [(d.month, d.day) for d in s.exdates] == [(12, 25)]
