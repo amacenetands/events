@@ -1,13 +1,15 @@
 """Live fill-rate check (pipeline v3 §1.7): one JSON line per venue per crawl in cache/eval.jsonl.
 
-  rows = venue_rows(city, summary, events, listing_urls, prev)   # after every `main.py crawl`
-  append(rows)                                                    # cache/eval.jsonl
-  latest(city) / flagged(rows) / report(rows)                     # `main.py eval --live`, digest footer
+  rows = venue_rows(city, summary, events, listing_urls, prev, prev_db, stored)   # after `main.py crawl`
+  append(rows)                                       # cache/eval.jsonl, last KEEP_CRAWLS crawls per city
+  latest(city) / flagged(rows) / report(rows)        # `main.py eval --live`, CLI footer
 
-Row: {ts, city, venue, fetch, source, events, fill: {time, price, url_own, sessions_known},
-prev_events, delta_pct, flag}. `prev_events` is the venue's previous line (else the row count the
-events table held for it before this crawl). A venue is flagged when it drops to 0 from >0, or
-by >= DROP_PCT % against the previous count.
+Row: {ts, city, venue, tag, mode, fetch, source, events, stored, fill: {time, price, url_own,
+sessions_known}, prev_events, delta_pct, flag}. `events` = this crawl's events, `stored` = the rows
+the events table holds for the venue after the save (kept rows included). `prev_events` is the
+venue's last *good* line (fetch ok/not_modified/api and events > 0), else the table's count before
+this crawl. A failed fetch whose rows were kept is flagged "fetch failed, rows kept", never as a
+drop; a drop is flagged at 0 or >= DROP_PCT % against prev_events >= MIN_PREV.
 """
 from __future__ import annotations
 
@@ -20,6 +22,9 @@ from ..models import Event
 
 EVAL_LOG = Path(__file__).resolve().parents[2] / "cache" / "eval.jsonl"
 DROP_PCT = 50
+MIN_PREV = 5                   # venues with fewer previous events are never flagged as a drop
+GOOD_FETCH = frozenset({"ok", "not_modified", "api"})
+KEEP_CRAWLS = 30               # eval.jsonl keeps this many crawl timestamps per city
 FILL_FIELDS = ("time", "price", "url_own", "sessions_known")
 
 
@@ -45,7 +50,7 @@ def fill_rates(events: list[Event], listing_url: str | None) -> dict[str, float 
 
 def flag_reason(events: int, prev: int | None) -> str | None:
     """'0 (was N)' / '-P% (N→M)' / None."""
-    if not prev:
+    if not prev or prev < MIN_PREV:
         return None
     if events == 0:
         return f"0 (was {prev})"
@@ -55,22 +60,28 @@ def flag_reason(events: int, prev: int | None) -> str | None:
     return None
 
 
+def _good(r: dict) -> bool:
+    return r.get("fetch") in GOOD_FETCH and (r.get("events") or 0) > 0
+
+
 def load_prev(city: str, path: Path | None = None) -> dict[str, int]:
-    """{venue: events} from each venue's last line for `city`."""
+    """{venue: events} from each venue's last good line for `city` (any tag / mode)."""
     out: dict[str, int] = {}
     for r in _read(path):
-        if r.get("city") == city:
-            out[r["venue"]] = r.get("events", 0)
+        if r.get("city") == city and _good(r):
+            out[r["venue"]] = r["events"]
     return out
 
 
 def venue_rows(city: str, summary: dict[str, dict], events: Iterable[Event],
                listing_urls: dict[str, str], prev: dict[str, int],
-               prev_db: dict[str, int] | None = None, ts: str | None = None) -> list[dict]:
+               prev_db: dict[str, int] | None = None, stored: dict[str, int] | None = None,
+               tag: str | None = None, mode: str = "crawl", ts: str | None = None) -> list[dict]:
     """One row per venue in `summary` (crawl_sites' {venue: stats}) plus any other event source
-    (API feeds: fetch='api'). `events` are this crawl's stored events; `prev` the previous line's
-    counts, `prev_db` the events table counts before the save (fallback for a first line)."""
+    (API feeds: fetch='api'). `events` are this crawl's events; `prev` the last good lines,
+    `prev_db` the table counts before the save, `stored` the table counts after it."""
     ts = ts or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    stored = stored or {}
     by_src: dict[str, list[Event]] = {}
     for e in events:
         by_src.setdefault(e.source, []).append(e)
@@ -80,42 +91,64 @@ def venue_rows(city: str, summary: dict[str, dict], events: Iterable[Event],
         st = summary.get(n, {"fetch": "api", "source": "api"})
         evs = by_src.get(n, [])
         p = prev.get(n, (prev_db or {}).get(n))
-        delta = round((len(evs) - p) * 100 / p, 1) if p else None
-        rows.append({"ts": ts, "city": city, "venue": n, "fetch": st.get("fetch"),
-                     "source": st.get("source"), "events": len(evs),
+        fetch, kept = st.get("fetch"), stored.get(n, 0)
+        if fetch not in GOOD_FETCH:
+            flag, delta = ("fetch failed, rows kept" if kept else "fetch failed"), None
+        else:
+            delta = round((len(evs) - p) * 100 / p, 1) if p else None
+            flag = flag_reason(len(evs), p)
+            if flag and not evs and kept:
+                flag = f"no events this crawl, {kept} rows kept (was {p})"
+        rows.append({"ts": ts, "city": city, "venue": n, "tag": tag, "mode": mode, "fetch": fetch,
+                     "source": st.get("source"), "events": len(evs), "stored": kept,
                      "fill": fill_rates(evs, listing_urls.get(n)),
-                     "prev_events": p, "delta_pct": delta, "flag": flag_reason(len(evs), p)})
+                     "prev_events": p, "delta_pct": delta, "flag": flag})
     return rows
 
 
-def append(rows: list[dict], path: Path | None = None) -> None:
+def _trim(rows: list[dict], keep: int = KEEP_CRAWLS) -> list[dict]:
+    """Rows of each city's last `keep` crawl timestamps."""
+    by_city: dict[str, set[str]] = {}
+    for r in rows:
+        by_city.setdefault(r.get("city"), set()).add(r["ts"])
+    last = {c: set(sorted(ts)[-keep:]) for c, ts in by_city.items()}
+    return [r for r in rows if r["ts"] in last[r.get("city")]]
+
+
+def append(rows: list[dict], path: Path | None = None, keep: int = KEEP_CRAWLS) -> None:
+    """Add rows, then keep each city's last `keep` crawls (file rewritten atomically)."""
     path = path or EVAL_LOG
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a") as f:
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    allr = _trim(_read(path) + rows, keep)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in allr))
+    tmp.replace(path)
 
 
 def _read(path: Path | None) -> list[dict]:
+    """Parsed lines; malformed lines and lines without venue/ts are skipped."""
     path = path or EVAL_LOG
     if not path.exists():
         return []
     out = []
     for ln in path.read_text().splitlines():
         try:
-            out.append(json.loads(ln))
+            r = json.loads(ln)
         except ValueError:
             continue
+        if isinstance(r, dict) and r.get("venue") and r.get("ts"):
+            out.append(r)
     return out
 
 
 def latest(city: str, path: Path | None = None) -> list[dict]:
-    """Rows of the city's most recent crawl (same ts)."""
-    rows = [r for r in _read(path) if r.get("city") == city]
-    if not rows:
-        return []
-    last = max(r["ts"] for r in rows)
-    return [r for r in rows if r["ts"] == last]
+    """Each venue's latest line from untagged runs (a --tag crawl never hides the full crawl)."""
+    out: dict[str, dict] = {}
+    for r in _read(path):
+        if r.get("city") == city and not r.get("tag"):
+            if r["venue"] not in out or r["ts"] >= out[r["venue"]]["ts"]:
+                out[r["venue"]] = r
+    return list(out.values())
 
 
 def flagged(rows: list[dict]) -> list[dict]:
@@ -128,10 +161,11 @@ def _pct(x) -> str:
 
 def city_fill(rows: list[dict]) -> dict:
     """Event-weighted fill rates over the rows + venue counts."""
-    n = sum(r["events"] for r in rows)
-    out = {"venues": len(rows), "with_events": sum(1 for r in rows if r["events"]), "events": n}
+    n = sum(r.get("events") or 0 for r in rows)
+    out = {"venues": len(rows), "with_events": sum(1 for r in rows if r.get("events")), "events": n}
     for k in FILL_FIELDS:
-        out[k] = (round(sum((r["fill"].get(k) or 0) * r["events"] for r in rows) / n, 3) if n else None)
+        out[k] = (round(sum(((r.get("fill") or {}).get(k) or 0) * (r.get("events") or 0) for r in rows) / n, 3)
+                  if n else None)
     return out
 
 
@@ -145,7 +179,7 @@ def report(rows: list[dict]) -> str:
         by_city.setdefault(r["city"], []).append(r)
     for c, rs in by_city.items():
         f = city_fill(rs)
-        lines.append(f"{c} | {rs[0]['ts'][:16]} | {f['venues']} | {f['with_events']} | {f['events']} | "
+        lines.append(f"{c} | {max(r['ts'] for r in rs)[:16]} | {f['venues']} | {f['with_events']} | {f['events']} | "
                      + " | ".join(_pct(f[k]) for k in FILL_FIELDS))
     fl = flagged(rows)
     lines.append(f"\nflagged ({len(fl)}): venue | fetch | source | flag")

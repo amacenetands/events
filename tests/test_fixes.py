@@ -190,3 +190,23 @@ def test_apply_fixes_stored_pins_kept_rows_and_is_idempotent():
     assert wp.byday == [4] and wp.kind == "recurring" and wp.date.weekday() == 4 and wp.date > start
     assert next(e for e in once if e.source == "Unknown") is other
     assert apply_fixes_stored(once, [cfg], today) == once
+
+
+def test_apply_fixes_stored_skips_rows_the_latest_crawl_built():
+    from datetime import timedelta
+    from src.models import Event
+    from src.venues.fixes import apply_fixes_stored
+    today = date.today()
+    fri = today + timedelta(days=(4 - today.weekday()) % 7 + 7)
+    live_cfg = VenueConfig(name="SW", url="https://sw.example/", fix={"weekly": {"^Freestyle": [5]}})
+    off_cfg = VenueConfig(name="SB", url="https://sb.example/", disabled=True, fix={"weekly": {"^WordPlay": [4]}})
+    enriched = Event(title="Freestyle", venue="SW", source="SW", date=fri - timedelta(days=1), kind="recurring",
+                     byday=[3], url="https://sw.example/f", end_date=fri + timedelta(days=27))
+    stale = Event(title="WordPlay", venue="SB", source="SB", date=fri + timedelta(days=1), kind="run",
+                  end_date=fri + timedelta(days=36), url="https://sb.example/")
+    old_sw = enriched.model_copy(update={"title": "Freestyle old"})
+    out = apply_fixes_stored([enriched, stale, old_sw], [live_cfg, off_cfg], today,
+                             crawl_ids=["new", "new", "old"], latest_crawl="new")
+    assert out[0] is enriched                               # built by the latest crawl: untouched
+    assert out[1].byday == [4] and out[1].kind == "recurring"   # disabled venue: fixed even with new id
+    assert out[2].byday == [5]                              # older crawl's row: fixed

@@ -255,6 +255,8 @@ def test_main_readers_via_config(monkeypatch):
     api = [v.name for v in config.all_venues() if v.fetch.mode == "api"]
     assert api and main._stale_venues([Event(title="x", venue=api[0], date="2030-01-01", url="u",
                                              source=api[0])], 1) == [] and asked == []
+    assert main._stale_venues([Event(title="x", venue="Barbican", date="2030-01-01", url="u",
+                                     source="Barbican")], 1, api_fed={"Barbican"}) == [] and asked == []
 
 
 def test_api_sources_registry():
@@ -320,4 +322,6 @@ def test_step9_spektrix_venues_route_to_spektrix_first():
         body = "" if v.fetch.mode == "api" else "<html>x</html>"
         fr = FetchResult(FetchStatus.OK, url=v.url, body=body)
         assert source_plan(v, fr)[0] == "spektrix", n
-    assert vs["Kings Place"].fetch.mode == "api"
+    assert {n for n in ("Kings Place", "ICA", "Gate Theatre", "Jacksons Lane")
+            if vs[n].fetch.mode == "api"} == {"Kings Place", "ICA", "Gate Theatre", "Jacksons Lane"}
+    assert vs["The Other Palace"].fetch.mode != "api"     # its page still gives event links

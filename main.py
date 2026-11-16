@@ -117,6 +117,8 @@ async def crawl(
     to the events table. test_site: only that venue, events printed, nothing persisted.
     tag: only venues carrying it (a parked tag such as moscow-theatre included)."""
     t0 = _timing.now()
+    from src import llm as _llm
+    _llm.reset_usage()
     print(f"Crawl: {city}{f' (tag {tag})' if tag else ''}\n" + "=" * 40)
 
     errors: list[str] = []
@@ -162,24 +164,26 @@ async def crawl(
     print(f"Saved {len(scraped)} events for {city} (crawl {cid}); {len(errors)} sites with errors")
     for n in errors[:15]:
         print(f"  ! {n}")
-    _live_eval(city, summary, scraped, prev_db)
-    from src import llm as _llm
-    if _llm.USAGE["calls"]:
-        print(f"LLM: {_llm.USAGE}")
-        _timing.log_runtime(stage="llm_usage", city=city, **_llm.USAGE)
+    _live_eval(city, summary, scraped, prev_db, events_db.source_counts(city), tag=tag,
+               mode="parse_only" if parse_only else "crawl")
+    for backend, u in _llm.USAGE.items():
+        print(f"LLM {backend}: {u}")
+        _timing.log_runtime(stage="llm_usage", city=city, backend=backend, **u)
     secs = round(_timing.now() - t0, 1)
     print(f"⏱ Total: {secs:.0f}s", flush=True)
     _timing.log_runtime(stage="crawl", city=city, events=len(scraped), secs=secs)
     return len(scraped)
 
 
-def _live_eval(city: str, summary: dict, events: list[Event], prev_db: dict[str, int]) -> None:
-    """§1.7: one cache/eval.jsonl line per venue; print the venues flagged (0 / -50%)."""
+def _live_eval(city: str, summary: dict, events: list[Event], prev_db: dict[str, int],
+               stored: dict[str, int] | None = None, tag: str | None = None, mode: str = "crawl") -> None:
+    """§1.7: one cache/eval.jsonl line per venue; print the venues flagged (drop / fetch failed)."""
     from src.eval import live
     try:
         year = date.today().year
         urls = {v.name: v.resolved_url(year) for v in _config.all_venues()}
-        rows = live.venue_rows(city, summary, events, urls, live.load_prev(city), prev_db)
+        rows = live.venue_rows(city, summary, events, urls, live.load_prev(city), prev_db, stored,
+                               tag=tag, mode=mode)
         live.append(rows)
     except Exception as ex:   # noqa: BLE001 — bookkeeping must not fail a saved crawl
         print(f"  live eval skipped: {type(ex).__name__}: {ex}")
@@ -193,15 +197,28 @@ def _live_eval(city: str, summary: dict, events: list[Event], prev_db: dict[str,
 # query
 # ---------------------------------------------------------------------------
 
-def _stale_venues(events, max_age_days: float) -> list[tuple[str, float]]:
+def _api_fed(city: str) -> set[str]:
+    """Venues whose rows came from an API source (spektrix / api feeds) in the latest live eval:
+    their data does not depend on the listing page, so a stale page does not make them stale."""
+    try:
+        from src.eval import live
+        return {r["venue"] for r in live.latest(city)
+                if r.get("fetch") == "api" or "spektrix" in (r.get("source") or "")}
+    except Exception:
+        return set()
+
+
+def _stale_venues(events, max_age_days: float, api_fed: set[str] | None = None) -> list[tuple[str, float]]:
     """(venue, age_days) for venues whose rows are in `events` but whose page was last
     fetched > max_age_days ago (oldest first). Per-source, so sites that failed this crawl
-    and sites with no current rows never trigger a global stale warning."""
+    and sites with no current rows never trigger a global stale warning. Venues in `api_fed`
+    (rows from an API source) and `fetch: {mode: api}` venues are never stale."""
     try:
         from src import dedup
         year = date.today().year
+        skip = api_fed or set()
         urls = {v.name: v.resolved_url(year) for v in _config.all_venues()
-                if v.fetch.mode != "api"}        # api venues (Spektrix) never refresh a page
+                if v.fetch.mode != "api" and v.name not in skip}
         out = []
         for src in sorted({e.source for e in events if e.source in urls}):
             at = dedup.get_html_fetched_at(urls[src])
@@ -257,7 +274,8 @@ async def run_query(
     loaded = events_db.load_events(f.city)
     today, now = city_today(f), city_now(f)
     from src.venues.fixes import apply_fixes_stored
-    loaded.events = apply_fixes_stored(loaded.events, _config.all_venues(), today)   # rows not rebuilt this crawl
+    loaded.events = apply_fixes_stored(loaded.events, _config.all_venues(), today,   # rows not rebuilt
+                                       loaded.crawl_ids, loaded.crawl_id)                # by the latest crawl
     loaded.events = tidy(classify(loaded.events), today, {n.lower() for n in configured_site_names(city=f.city, include_disabled=True)})   # re-apply deterministic rules so new classifier flags need no recrawl
     age = events_db.age_days(loaded.crawled_at)
     if age is None:
@@ -267,7 +285,7 @@ async def run_query(
               f"Run: venv/bin/python main.py crawl --city {f.city}")
     else:
         print(f"Crawl: {f.city}, {_age_str(age)} old, {loaded.n_events} events")
-    stale = _stale_venues(loaded.events, max_age_days)
+    stale = _stale_venues(loaded.events, max_age_days, _api_fed(f.city))
     if stale:
         names = ", ".join(f"{n} ({_age_str(a)})" for n, a in stale[:5])
         more = f", +{len(stale) - 5} more" if len(stale) > 5 else ""
@@ -310,7 +328,10 @@ async def run_query(
         for e in base:
             counts[e.source] = counts.get(e.source, 0) + 1
         footer = coverage_summary(counts, configured_site_names(city=f.city))
-    footer = health_footer([(n, _age_str(a)) for n, a in stale], _live_flagged(f.city), f.lang) + footer
+    flagged = _live_flagged(f.city)
+    if flagged:
+        print(f"Live eval flagged {len(flagged)}: " + "; ".join(f"{n} ({w})" for n, w in flagged))
+    footer = health_footer([(n, _age_str(a)) for n, a in stale], [] if send else flagged, f.lang) + footer
 
     digest = generate_digest_v2(events, f, picks=picks, new_fps=new_fps, title=f.label, footer=footer,
                                reasons=reasons, scores=scores, today=today, lang=f.lang)

@@ -148,17 +148,23 @@ def apply_fixes(cfg: VenueConfig, events: list[Event], ctx) -> list[Event]:
     return out
 
 
-def apply_fixes_stored(events: list[Event], venues, today) -> list[Event]:
-    """Query-load pass: the `fix:` blocks over stored rows, so rows a crawl did not rebuild
-    (disabled / blocked venues keep old rows) follow the current config too. Idempotent."""
+
+def apply_fixes_stored(events: list[Event], venues, today, crawl_ids: list[str] | None = None,
+                       latest_crawl: str | None = None) -> list[Event]:
+    """Query-load pass: the `fix:` blocks over stored rows the latest crawl did not rebuild
+    (venue disabled, or the row's crawl id is not the city's latest), so kept rows follow the
+    current config. Freshly built rows already went through fixes → hooks → enrich and are
+    returned untouched. Order is preserved. Without crawl ids every row counts as not rebuilt."""
     from types import SimpleNamespace
     by_name = {v.name: v for v in venues}
     ctx = SimpleNamespace(today=today, stats={}, errors=[])
-    groups: dict[str, list[Event]] = {}
-    for e in events:
-        groups.setdefault(e.source, []).append(e)
     out: list[Event] = []
-    for src, evs in groups.items():
-        cfg = by_name.get(src)
-        out.extend(apply_fixes(cfg, evs, ctx) if cfg is not None else evs)
+    for i, e in enumerate(events):
+        cfg = by_name.get(e.source)
+        fresh = (crawl_ids is not None and latest_crawl is not None and crawl_ids[i] == latest_crawl
+                 and cfg is not None and not cfg.disabled)
+        if cfg is None or fresh:
+            out.append(e)
+        else:
+            out.extend(apply_fixes(cfg, [e], ctx))
     return out

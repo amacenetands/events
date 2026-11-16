@@ -89,10 +89,24 @@ async def _run_claude_async(prompt: str, *, model: str | None = None, timeout: f
         raise RuntimeError(f"claude CLI exit {proc.returncode}: {stderr.decode()[:300].strip()}")
     if not out:
         raise RuntimeError(f"claude CLI returned empty output (stderr: {stderr.decode()[:300].strip()})")
+    count_usage("claude")           # the CLI reports no token counts: calls only
     return out
 
 
-USAGE = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cache_hit_tokens": 0}   # deepseek, per process
+USAGE: dict[str, dict[str, int]] = {}   # backend -> {calls, prompt_tokens, completion_tokens, cache_hit_tokens}
+
+
+def count_usage(backend: str, prompt: int = 0, completion: int = 0, cache_hit: int = 0) -> None:
+    """Add one call's token counts (backends that report them) to USAGE[backend]."""
+    u = USAGE.setdefault(backend, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cache_hit_tokens": 0})
+    u["calls"] += 1
+    u["prompt_tokens"] += prompt or 0
+    u["completion_tokens"] += completion or 0
+    u["cache_hit_tokens"] += cache_hit or 0
+
+
+def reset_usage() -> None:
+    USAGE.clear()
 
 
 async def _run_deepseek_async(
@@ -124,10 +138,7 @@ async def _run_deepseek_async(
         r.raise_for_status()
         data = r.json()
     u = data.get("usage") or {}
-    USAGE["calls"] += 1
-    USAGE["prompt_tokens"] += u.get("prompt_tokens", 0)
-    USAGE["completion_tokens"] += u.get("completion_tokens", 0)
-    USAGE["cache_hit_tokens"] += u.get("prompt_cache_hit_tokens", 0)
+    count_usage("deepseek", u.get("prompt_tokens", 0), u.get("completion_tokens", 0), u.get("prompt_cache_hit_tokens", 0))
     content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
     if not content:
         raise RuntimeError(f"DeepSeek returned empty content (finish_reason={data.get('choices', [{}])[0].get('finish_reason')})")
@@ -151,6 +162,9 @@ async def _run_anthropic_async(
         max_tokens=max_output_tokens or 4096,
         messages=[{"role": "user", "content": prompt}],
     )
+    u = getattr(msg, "usage", None)
+    count_usage("anthropic", getattr(u, "input_tokens", 0), getattr(u, "output_tokens", 0),
+                getattr(u, "cache_read_input_tokens", 0) or 0)
     out = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
     if not out:
         raise RuntimeError(f"Claude API returned empty content (stop_reason={msg.stop_reason})")
@@ -191,15 +205,20 @@ async def _run_ollama_async(
         "options": options,
     }
     chunks: list[str] = []
+    final: dict = {}
     async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=timeout)) as client:
         async with client.stream("POST", f"{_OLLAMA_URL}/api/chat", json=payload) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
                 if line:
                     try:
-                        chunks.append(json.loads(line).get("message", {}).get("content", ""))
+                        d = json.loads(line)
                     except json.JSONDecodeError:
-                        pass
+                        continue
+                    chunks.append(d.get("message", {}).get("content", ""))
+                    if d.get("done"):
+                        final = d
+    count_usage("ollama", final.get("prompt_eval_count", 0), final.get("eval_count", 0))
     raw = "".join(chunks)
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
     return raw

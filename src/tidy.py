@@ -7,6 +7,7 @@ import re
 from collections import defaultdict
 from datetime import date, timedelta
 from urllib.parse import urlparse
+from .classify import _norm_title
 from .models import Event
 
 _GENERIC = {"performance", "performances", "event", "events", "matinee", "evening performance",
@@ -19,8 +20,8 @@ _NON_EVENT = re.compile(
 
 
 def norm_title(t: str) -> str:
-    """Lower-case letters/digits of any script (Cyrillic titles must not normalise to '')."""
-    return re.sub(r"[\W_]+", " ", (t or "").lower()).strip()
+    """classify's title key: letters/digits of any script, casefolded."""
+    return _norm_title(t or "")
 
 
 def is_noise(e: Event) -> bool:

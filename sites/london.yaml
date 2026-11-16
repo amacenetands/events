@@ -276,7 +276,7 @@ venues:
   type: arts-centre
   category_hint: gallery
   fetch:
-    mode: browser
+    mode: api                # page gave 0 events and no event links; Spektrix API is the source
     remove_selectors:
     - .cc-window
     - '#ica-status-banner'
@@ -2926,6 +2926,7 @@ venues:
 - name: Gate Theatre
   url: https://www.gatetheatre.co.uk/whats-on/
   adapter: {kind: spektrix, client: gate, domain: tickets.gatetheatre.co.uk}   # step 9: 0 events from the page, Spektrix API has them
+  fetch: {mode: api}      # page gives 0 events and no event links
   tags:
   - theatres
   category_hint: theatre
@@ -3078,6 +3079,7 @@ venues:
 - name: Jacksons Lane
   url: https://www.jacksonslane.org.uk/whats-on/
   adapter: {kind: spektrix, client: jacksonslane, domain: tickets.jacksonslane.org.uk}   # step 9: 0 events from the page, Spektrix API has them
+  fetch: {mode: api}      # page gives 0 events and no event links
   tags:
   - theatres
   category_hint: theatre

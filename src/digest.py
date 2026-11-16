@@ -246,13 +246,19 @@ def coverage_summary(counts: dict[str, int], all_sites: list[str]) -> str:
     return "\n".join(lines)
 
 
+STALE_CAP = 5
+
+
 def health_footer(stale: list[tuple[str, str]], flagged: list[tuple[str, str]], lang: str = "en") -> str:
-    """Footer: stale venues (name, age) beside the live-eval flagged ones (name, why); '' when both empty."""
+    """Footer: stale venues (name, age; first STALE_CAP, then "+N more") beside the live-eval
+    flagged ones (name, why; callers pass none for an emailed digest); '' when both empty."""
     if not stale and not flagged:
         return ""
     lines = ["", "---", f"## {_t(lang, 'health')}", ""]
     if stale:
-        lines.append(f"- {_t(lang, 'stale')}: " + ", ".join(f"{_esc(n)} ({_esc(a)})" for n, a in stale))
+        more = f", +{len(stale) - STALE_CAP} {_t(lang, 'more')}" if len(stale) > STALE_CAP else ""
+        lines.append(f"- {_t(lang, 'stale')}: "
+                     + ", ".join(f"{_esc(n)} ({_esc(a)})" for n, a in stale[:STALE_CAP]) + more)
     if flagged:
         lines.append(f"- {_t(lang, 'flagged')}: " + ", ".join(f"{_esc(n)} ({_esc(w)})" for n, w in flagged))
     return "\n".join(lines)

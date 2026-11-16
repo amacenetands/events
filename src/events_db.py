@@ -75,6 +75,8 @@ class Loaded:
     n_events: int
     n_bad: int = 0                     # undecodable rows skipped
     oldest_fetched_at: datetime | None = None
+    crawl_ids: list[str] | None = None   # per event (aligned with `events`): the crawl that wrote the row
+    crawl_id: str | None = None          # the city's latest crawl
 
 
 def _errored(sources: set[str], errors: list[str]) -> set[str]:
@@ -177,9 +179,9 @@ def source_counts(city: str) -> dict[str, int]:
 def load_events(city: str) -> Loaded:
     init_db()
     rows = _conn.execute(
-        "SELECT fingerprint, source, event_json, tags, first_seen FROM events WHERE city=?", (city,)
+        "SELECT fingerprint, source, event_json, tags, first_seen, crawl_id FROM events WHERE city=?", (city,)
     ).fetchall()
-    events, tags, first, bad = [], {}, {}, 0
+    events, tags, first, bad, cids = [], {}, {}, 0, []
     for r in rows:
         try:
             e = Event(**json.loads(r["event_json"]))
@@ -189,6 +191,7 @@ def load_events(city: str) -> Loaded:
         if is_banned_url(e.url):
             continue
         events.append(e)
+        cids.append(r["crawl_id"])
         tags[r["source"]] = set(json.loads(r["tags"] or "[]"))
         fp = r["fingerprint"]
         if fp not in first or r["first_seen"] < first[fp]:
@@ -196,7 +199,7 @@ def load_events(city: str) -> Loaded:
     if bad:
         print(f"WARNING: {bad} undecodable {city} event rows skipped")
     c = _conn.execute(
-        "SELECT crawled_at, n_events, oldest_fetched_at FROM crawls WHERE city=? ORDER BY crawled_at DESC LIMIT 1",
+        "SELECT crawl_id, crawled_at, n_events, oldest_fetched_at FROM crawls WHERE city=? ORDER BY crawled_at DESC LIMIT 1",
         (city,)).fetchone()
     at = datetime.fromisoformat(c["crawled_at"]) if c else None
     of = None
@@ -207,7 +210,7 @@ def load_events(city: str) -> Loaded:
                 of = of.replace(tzinfo=timezone.utc)
         except ValueError:
             of = None
-    return Loaded(events, tags, first, at, c["n_events"] if c else 0, bad, of)
+    return Loaded(events, tags, first, at, c["n_events"] if c else 0, bad, of, cids, c["crawl_id"] if c else None)
 
 
 def age_days(at: datetime | None) -> float | None:
