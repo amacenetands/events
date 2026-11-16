@@ -192,6 +192,9 @@ class FollowLinksSource:
                 if got is None:
                     missing.append(url)
                     return None
+                if cfg.follow and cfg.follow.detail:
+                    from .detail_parsers import DETAIL_PARSERS
+                    return DETAIL_PARSERS[cfg.follow.detail](got[0], got[1], ctx, pattern)
                 return raw_from_detail(got[0], got[1], ctx, pattern)
             except Exception:   # noqa: BLE001 — one bad detail page never kills the venue
                 _bump(ctx, "follow_links.failed")

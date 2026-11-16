@@ -153,6 +153,7 @@ class FollowCfg(_Strict):
     """`follow_links` source: the listing hides dates, detail pages ARE the extraction."""
     link_pattern: Optional[str] = None         # None → crawler default (r"/event/")
     max: int = LEGACY_MAX_LINKS
+    detail: Optional[Literal["delfont"]] = None   # named detail parser (src/sources/detail_parsers.py); None = <time datetime>
 
     _re = field_validator("link_pattern")(_check_regex)
 

@@ -56,6 +56,7 @@ venues:
   disabled: true
   disabled_reason: Cloudflare JS challenge blocks automated clients
 - name: Barbican
+  adapter: {kind: spektrix, client: barbicancentre, domain: spektrix.barbican.org.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.barbican.org.uk/whats-on
   tags:
   - family
@@ -91,6 +92,7 @@ venues:
     mode: api                # page is behind a Cloudflare challenge; the public Spektrix API is not
   about: King's Cross N1 — classical, jazz, world, folk, family concerts. Has lunchtime series.
 - name: Cadogan Hall
+  adapter: {kind: spektrix, client: cadoganhall, domain: tickets.cadoganhall.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.cadoganhall.com/whats-on/
   tags:
   - family
@@ -121,6 +123,7 @@ venues:
     - .skip-link
   about: Chamber music, lieder. Frequent morning and lunchtime concerts.
 - name: St Martin-in-the-Fields
+  adapter: {kind: spektrix, client: stmartininthefields, domain: tickets.stmartin-in-the-fields.org}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.stmartin-in-the-fields.org/calendar/
   tags:
   - family
@@ -223,6 +226,7 @@ venues:
     - .grecaptcha-badge
   about: Community music, often includes family and free events
 - name: Battersea Arts Centre
+  adapter: {kind: spektrix, client: bac, domain: tickets.bac.org.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.bac.org.uk/whats-on/
   tags:
   - family
@@ -251,6 +255,7 @@ venues:
     - .c-page-spinner
   about: Theatre and family shows, outdoor Globe season, workshops for kids and families
 - name: Hackney Empire
+  adapter: {kind: spektrix, client: hackneyempire, domain: tickets.hackneyempire.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.hackneyempire.co.uk/whats-on
   tags:
   - theatres
@@ -270,7 +275,7 @@ venues:
   about: Pantomime, variety, family shows and community theatre
 - name: ICA
   url: https://www.ica.art/events
-  adapter: {kind: spektrix, client: ica, domain: buy.ica.art}   # step 9: 0 events from the page, Spektrix API has them
+  adapter: {kind: spektrix, client: ica, domain: buy.ica.art, event_url: 'https://www.ica.art/{category}/{slug}'}   # step 9: 0 events from the page, Spektrix API has them
   tags:
   - family
   type: arts-centre
@@ -467,6 +472,7 @@ venues:
   hint: Always flag is_kids=true.
   about: Activities for under-5s — workshops, story times, messy play.
 - name: Discover Story Centre
+  adapter: {kind: spektrix, client: discover, domain: tickets.discover.org.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://discover.org.uk/things-to-see-and-do
   tags:
   - family
@@ -635,6 +641,7 @@ venues:
     - footer.footer
   about: Watch for talks, late openings, family events, kids workshops
 - name: Pitzhanger Manor
+  adapter: {kind: spektrix, client: pitzhangermanorandgallery, domain: tickets.pitzhanger.org.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.pitzhanger.org.uk/whats-on/current-events-exhibitions/
   tags:
   - family
@@ -1009,6 +1016,7 @@ venues:
   category_hint: concert
   about: Temple EC4 — Wednesday 13:15 lunchtime organ recitals, free admission. Also choir concerts.
 - name: Royal Academy of Music
+  adapter: {kind: spektrix, client: royalacademyofmusic, domain: ticketing.ram.ac.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.ram.ac.uk/whats-on
   tags:
   - daytime
@@ -1103,6 +1111,7 @@ venues:
     - .info-banner
   about: Holborn — lunchtime chamber music and classical concerts
 - name: St John's Smith Square
+  adapter: {kind: spektrix, client: sinfoniasmithsquare, domain: checkout.sinfoniasmithsq.org.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.sinfoniasmithsq.org.uk/whats-on/lunchtime-concerts/
   tags:
   - daytime
@@ -1161,6 +1170,7 @@ venues:
     - .secondary-nav
   about: Temple — gallery with lunchtime talks and occasional chamber concerts
 - name: Rich Mix
+  adapter: {kind: spektrix, client: richmix, domain: tickets.richmix.org.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.richmix.org.uk/whats-on
   tags:
   - daytime
@@ -1190,6 +1200,7 @@ venues:
   about: Greenford, Ealing — working farm + nature reserve, Apple Day (Oct), guided wildlife walks, forest school,
     Gruffalo Trail.
 - name: Questors Theatre Ealing
+  adapter: {kind: spektrix, client: questors, domain: tickets.questors.org.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.questors.org.uk/whatson.aspx
   tags:
   - theatres
@@ -1595,6 +1606,7 @@ venues:
   about: Central London church — regular concerts, annual New Year family concert, talks, cultural programme with
     creche
 - name: Lyric Hammersmith
+  adapter: {kind: spektrix, client: lyrichammersmith, domain: tickets.lyric.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://lyric.co.uk/whats-on/
   tags:
   - theatres
@@ -1603,6 +1615,7 @@ venues:
   about: West London family theatre — Little Lyric Saturday shows for under-11s, Young Lyric £5 tickets, half-term
     residencies
 - name: Donmar Warehouse
+  adapter: {kind: spektrix, client: donmarwarehouse, domain: tickets.donmarwarehouse.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.donmarwarehouse.com/whats-on/
   tags:
   - theatres
@@ -1663,6 +1676,7 @@ venues:
     - .u-yellow-bg
   about: Ambitious contemporary theatre — Islington, inventive programming
 - name: Whitechapel Gallery
+  adapter: {kind: spektrix, client: whitechapelgallery, domain: tickets.whitechapelgallery.org}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.whitechapelgallery.org/events-2-2/
   tags:
   - family
@@ -2016,6 +2030,7 @@ venues:
     mode: browser
   about: Mile End E1 — public lectures, open days, community events, science outreach across Tower Hamlets campus.
 - name: Little Angel Theatre
+  adapter: {kind: spektrix, client: littleangeltheatre, domain: tickets.littleangeltheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.littleangeltheatre.com/whats-on/
   tags:
   - family
@@ -2101,6 +2116,7 @@ venues:
   about: Tower Hamlets (Bethnal Green) E2 — 120-seat theatre, free gallery, Young & Talented theatre school ages
     6–16, community arts.
 - name: Park Theatre
+  adapter: {kind: spektrix, client: parktheatre, domain: tickets.parktheatre.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://parktheatre.co.uk/whats-on/
   tags:
   - theatres
@@ -2461,6 +2477,7 @@ venues:
   category_hint: theatre
   about: '120-seat Camden — Greek Cypriot heritage, courtyard bar [test: yes]'
 - name: Camden People's Theatre
+  adapter: {kind: spektrix, client: camdenpeoplestheatre, domain: tickets.cptheatre.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://cptheatre.co.uk/Whats-On
   tags:
   - theatres
@@ -2608,64 +2625,72 @@ venues:
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — Shaftesbury Avenue [test: yes]'
 - name: Noël Coward Theatre
   url: https://www.delfontmackintosh.co.uk/theatres/noel-coward-theatre
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — St Martin''s Lane [test: yes]'
 - name: Novello Theatre
   url: https://www.delfontmackintosh.co.uk/theatres/novello-theatre
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — Aldwych [test: yes]'
 - name: Prince Edward Theatre
   url: https://www.delfontmackintosh.co.uk/theatres/prince-edward-theatre
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — Old Compton Street [test: yes]'
 - name: Prince of Wales Theatre
   url: https://www.delfontmackintosh.co.uk/theatres/prince-of-wales-theatre
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — Coventry Street [test: yes]'
 - name: Sondheim Theatre
   url: https://www.delfontmackintosh.co.uk/theatres/sondheim-theatre
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — Shaftesbury Avenue (ex-Queen''s) [test: yes]'
 - name: Victoria Palace Theatre
   url: https://www.delfontmackintosh.co.uk/theatres/victoria-palace-theatre
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — near Victoria station [test: yes]'
 - name: Wyndham's Theatre
   url: https://www.delfontmackintosh.co.uk/theatres/wyndhams-theatre
   tags:
   - theatres
   category_hint: theatre
-  fetch:
-    mode: browser
+  extract:
+  - follow_links
+  follow: {link_pattern: '/whats-on/[a-z0-9-]+$', detail: delfont}   # listing has no dates; show pages carry 'Booking until' + schedule
   about: 'Delfont Mackintosh West End — Charing Cross Road [test: yes]'
 - name: Apollo Theatre
   url: https://theapollotheatre.co.uk/whats-on/
@@ -2820,6 +2845,7 @@ venues:
   category_hint: theatre
   about: 'Independent 350-seat West End — currently at Marble Arch temp venue [test: yes]'
 - name: Criterion Theatre
+  adapter: {kind: spektrix, client: criteriontheatre, domain: tickets.criterion-theatre.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.criterion-theatre.co.uk/whats-on
   tags:
   - theatres
@@ -2882,6 +2908,7 @@ venues:
   disabled: true
   disabled_reason: Cloudflare JS challenge blocks automated clients
 - name: Royal Court Theatre
+  adapter: {kind: spektrix, client: royalcourt, domain: tickets.royalcourttheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://royalcourttheatre.com/whats-on/
   tags:
   - theatres
@@ -2900,6 +2927,7 @@ venues:
   category_hint: theatre
   about: 'Nicholas Hytner/Nick Starr 900-seat theatre — Tower Bridge [test: yes]'
 - name: Bush Theatre
+  adapter: {kind: spektrix, client: bushtheatre, domain: tickets.bushtheatre.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.bushtheatre.co.uk/whats-on/
   tags:
   - theatres
@@ -2912,12 +2940,14 @@ venues:
   category_hint: theatre
   about: 'New writing theatre — Swiss Cottage, Main Stage + Downstairs studio [test: yes]'
 - name: Kiln Theatre
+  adapter: {kind: spektrix, client: tricycle, domain: tickets.kilntheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://kilntheatre.com/whats-on/
   tags:
   - theatres
   category_hint: theatre
   about: '292-seat subsidised theatre — Kilburn (ex-Tricycle Theatre) [test: yes]'
 - name: Arcola Theatre
+  adapter: {kind: spektrix, client: arcolatheatre, domain: boxoffice.arcolatheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.arcolatheatre.com/whats-on/
   tags:
   - theatres
@@ -2938,6 +2968,7 @@ venues:
   category_hint: theatre
   about: '70-seat off-West End studio — Piccadilly Circus [test: yes]'
 - name: King's Head Theatre
+  adapter: {kind: spektrix, client: kingsheadtheatre, domain: tickets.kingsheadtheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://kingsheadtheatre.com/whats-on
   tags:
   - theatres
@@ -2965,6 +2996,7 @@ venues:
   disabled: true
   disabled_reason: server refuses TLS/connect from this client (ConnectError)
 - name: Soho Theatre
+  adapter: {kind: spektrix, client: sohotheatre, domain: tickets.sohotheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://sohotheatre.com/whats-on/
   tags:
   - theatres
@@ -3011,12 +3043,14 @@ venues:
     mode: browser
   about: 'ATG Grade II Frank Matcham 840-seat theatre — Richmond [test: yes]'
 - name: Greenwich Theatre
+  adapter: {kind: spektrix, client: greenwichtheatre}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://greenwichtheatre.org.uk/whats-on/
   tags:
   - theatres
   category_hint: theatre
   about: '400-seat producing theatre — Greenwich [test: yes]'
 - name: Theatre Royal Stratford East
+  adapter: {kind: spektrix, client: stratfordeast, domain: tickets.stratfordeast.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.stratfordeast.com/whats-on/
   tags:
   - theatres
@@ -3031,6 +3065,7 @@ venues:
     mode: browser
   about: '400-seat venue — comedy, cabaret, theatre, musicals [test: yes]'
 - name: Rose Theatre Kingston
+  adapter: {kind: spektrix, client: rosetheatrekingston, domain: tickets.rosetheatre.org}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.rosetheatre.org/whats-on
   tags:
   - theatres
@@ -3078,19 +3113,21 @@ venues:
   about: '200-seat fringe theatre — Marylebone, eclectic programme [test: yes]'
 - name: Jacksons Lane
   url: https://www.jacksonslane.org.uk/whats-on/
-  adapter: {kind: spektrix, client: jacksonslane, domain: tickets.jacksonslane.org.uk}   # step 9: 0 events from the page, Spektrix API has them
+  adapter: {kind: spektrix, client: jacksonslane, domain: tickets.jacksonslane.org.uk, event_url: 'https://www.jacksonslane.org.uk/events/{slug}/'}   # step 9: 0 events from the page, Spektrix API has them
   fetch: {mode: api}      # page gives 0 events and no event links
   tags:
   - theatres
   category_hint: theatre
   about: 'Circus/theatre/dance venue — Highgate [test: yes]'
 - name: Brixton House
+  adapter: {kind: spektrix, client: ovalhouse, domain: tickets.brixtonhouse.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://brixtonhouse.co.uk/whats-on/
   tags:
   - theatres
   category_hint: theatre
   about: 'Replaced Ovalhouse — Brixton, diverse programming [test: yes]'
 - name: The Coronet Theatre
+  adapter: {kind: spektrix, client: theprintroom, domain: tickets.thecoronettheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.thecoronettheatre.com/whats-on/
   tags:
   - theatres
@@ -3183,6 +3220,7 @@ venues:
   category_hint: theatre
   about: 'Multi-arts venue — Brentford, theatre/dance/film/comedy [test: yes]'
 - name: Arts Depot
+  adapter: {kind: spektrix, client: artsdepot, domain: tickets.artsdepot.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.artsdepot.co.uk/whats-on/
   tags:
   - theatres
@@ -3207,6 +3245,7 @@ venues:
   category_hint: theatre
   about: 'Inclusive theatre company — Southgate [test: yes]'
 - name: Tara Theatre
+  adapter: {kind: spektrix, client: taraarts, domain: tickets.taratheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://taratheatre.com/whats-on/
   tags:
   - theatres
@@ -3311,6 +3350,7 @@ venues:
   type: museum
   about: Doughty Street — talks, family events, Christmas programme
 - name: Polka Theatre
+  adapter: {kind: spektrix, client: polka, domain: boxoffice.polkatheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.polkatheatre.com/whats-on
   tags:
   - family
@@ -3319,6 +3359,7 @@ venues:
   category_hint: kids
   about: Wimbledon children's theatre
 - name: Unicorn Theatre
+  adapter: {kind: spektrix, client: unicorntheatre, domain: tickets.unicorntheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://unicorntheatre.com/whats-on
   tags:
   - family

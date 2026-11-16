@@ -475,3 +475,59 @@ def test_collapse_timed_entry_slots():
 def test_parking_addons():
     assert S.is_addon({"name": "Blue Badge Parking"}) and S.is_addon({"name": "Car Park"})
     assert S.is_addon({"name": "Parking"}) and not S.is_addon({"name": "Parking Lot"})
+
+
+def test_star_prefixed_and_hire_addons():
+    for n in ("**Pizzas", "*Drinks", "Cushion Hire", "BEN PRICING (FOR TESTING ONLY)"):
+        assert S.is_addon({"name": n}), n
+    assert not S.is_addon({"name": "Starstruck"}) and not S.is_addon({"name": "Hire Me: a play"})
+
+
+# ── audience / url mapping ───────────────────────────────────────────────────
+
+def _ev(name="Show", **kw):
+    return {"id": "E1", "name": name, "webUrl": "", **kw}
+
+
+def test_classify_audience_from_attributes_and_name():
+    assert S.classify_event(_ev(attribute_Genre="Jacksons Juniors"))[1] == "kids"
+    assert S.classify_event(_ev("Baby Explorers"))[1] == "kids"
+    assert S.classify_event(_ev("Nine Lessons Family Show"))[1] == "family"
+    assert S.classify_event(_ev(attribute_Audience="Family, Kids"))[1] == "family, kids"
+    assert S.classify_event(_ev("Junior Doctors Strike Night"))[1] == ""
+
+
+def test_classify_age_and_category():
+    assert S.classify_event(_ev(attribute_ClassAgeRange="5-11"))[2] == "5-11"
+    assert S.classify_event(_ev(description="Suitable for families, ages 3+. Runs 45 min."))[2] == "3+"
+    assert S.classify_event(_ev("Baby Disco", description="A fun hour for 4-7 years olds"))[2] == "4-7"
+    # prose ages without a kids/family signal are access notes, not an audience
+    assert S.classify_event(_ev(description="Recommended age: 7+"))[2] == ""
+    assert S.classify_event(_ev(description="Strong language. 16+"))[2] == ""
+    assert S.classify_event(_ev(description="Strictly 18+ only"))[2] == "18+"
+    assert S.classify_event(_ev(description="Tickets from £5+ per head, no age restriction"))[2] == ""
+    assert S.classify_event(_ev(attribute_Category="Films", attribute_Genre="Theatre"))[0] == "Theatre"
+    assert S.classify_event(_ev(attribute_EventType="Show"))[0] == ""
+
+
+def test_classify_description_needs_explicit_audience_phrase():
+    assert S.classify_event(_ev(description="A family drama about grief."))[1] == ""
+    assert S.classify_event(_ev(description="Perfect for families with young children."))[1] == "family"
+
+
+def test_raw_carries_audience_and_age():
+    ev = _ev("Pinocchio", attribute_Genre="Christmas Kids", description="Ages 5+")
+    r = S.event_to_raw(ev)
+    assert (r.audience_text, r.age_text) == ("kids", "5+")
+    r = S.instance_to_raw(ev, {"start": "2026-12-15T16:30:00"})
+    assert (r.audience_text, r.age_text) == ("kids", "5+")
+
+
+def test_event_url_template_only_when_web_url_empty():
+    tpl = "https://v.example/{category}/{slug}/{id}"
+    ev = _ev("There's a Café: Show!", attribute_Category="Live Music")
+    assert S._url(ev, tpl) == "https://v.example/live-music/theres-a-cafe-show/E1"
+    assert S._url({**ev, "webUrl": " https://own/x "}, tpl) == "https://own/x"
+    assert S._url(ev) == ""
+    assert S._url(ev, "https://v/{bogus}") == ""
+    assert S.event_to_raw(ev, tpl).url.endswith("/E1")

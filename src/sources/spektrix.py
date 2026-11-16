@@ -26,6 +26,7 @@ import asyncio
 import logging
 import re
 import time
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -37,7 +38,7 @@ import httpx
 from ..config import VenueConfig
 from ..fetch.headers import HEADERS
 from ..fetch.types import FetchResult
-from ..models import RawEvent, clean_text
+from ..models import RawEvent, clean_text, norm_category
 from ..normalize.urls import anchor_lines, match_title_url
 from .base import SourceCtx, base_url, register_source
 
@@ -175,10 +176,12 @@ def fingerprint(html: str | None, url: str = "") -> str | None:
 
 # ── event filtering / mapping (pure) ─────────────────────────────────────────
 
-# Always an add-on, whatever the venue programmes.
+# Always an add-on, whatever the venue programmes. A leading `*` is the box-office
+# convention for merch/hidden items ('**Pizzas', '*Drinks').
 _ADDON_GENERIC = re.compile(
     r"\b(headsets?|listening device|vouchers?|gift (?:cards?|vouchers?|memberships?)|"
-    r"packages?|secure my booking|test event|blue badge|car park(?:ing)?|parking (?:space|permit|pass|ticket|voucher)s?)\b|^\W*parking\W*$", re.I)
+    r"packages?|secure my booking|test event|blue badge|car park(?:ing)?|parking (?:space|permit|pass|ticket|voucher)s?|"
+    r"(?:cushion|seat|locker|coat|blanket) hire|name[- ]a[- ]seat|for testing only|do not use)\b|^\W*parking\W*$|^\s*\*", re.I)
 # Add-on only when the rest of the name is a sibling show's title ("<Show> Programme").
 _ADDON_SUFFIX = re.compile(
     r"^\W*(?:(?:and|&|\+|with)\W+)?(?:programmes?|programs?|playtexts?|play ?texts?|scripts?|"
@@ -338,34 +341,126 @@ def _desc(ev: dict[str, Any]) -> str | None:
     return first_sentence(ev.get("description")) or first_sentence(ev.get("htmlDescription"))
 
 
-def _url(ev: dict[str, Any]) -> str:
+def slugify(text: str) -> str:
+    """'Stévenin: Husbands' -> 'stevenin-husbands'; apostrophes vanish ("There's" -> "theres")."""
+    t = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", re.sub(r"['’`]", "", t.lower())).strip("-")
+
+
+def _attr_values(ev: dict[str, Any]) -> list[tuple[str, str]]:
+    """(attribute name, value) of the event's non-empty, non-flag string attributes."""
+    out = []
+    for k, v in ev.items():
+        if k.startswith("attribute_") and isinstance(v, str) and v.strip() and v.strip().lower() not in ("true", "false"):
+            out.append((k[10:], clean_text(v).strip()))
+    return out
+
+
+def _url(ev: dict[str, Any], tpl: str | None = None) -> str:
+    """webUrl, else the venue's `event_url` template ({id} {slug} {name} {category}
+    = slug of attribute_Category/Genre/EventType), else ''."""
     u = ev.get("webUrl")
-    return u.strip() if isinstance(u, str) else ""
+    u = u.strip() if isinstance(u, str) else ""
+    if u or not tpl:
+        return u
+    attrs = {k.lower(): v for k, v in _attr_values(ev)}
+    cat = next((attrs[k] for k in ("category", "genre", "eventtype") if k in attrs), "")
+    try:
+        return tpl.format(id=ev.get("id") or "", slug=slugify(_name(ev) or ""),
+                          name=_name(ev) or "", category=slugify(cat))
+    except (KeyError, IndexError, ValueError):
+        return ""
 
 
-def event_to_raw(ev: dict[str, Any]) -> RawEvent:
+# Audience words stated (mapped to 'kids' / 'family', the words build.py reads) in the event's own attributes or name. No bare "junior(s)" in a
+# name ("Junior Doctors"), no "relaxed" (an access label, not an audience).
+_AUD_ATTR = re.compile(r"\b(kids?|child(?:ren)?(?:'s)?|babies|baby|toddlers?|juniors?|famil(?:y|ies)|under[- ]?5s?|youth)\b", re.I)
+_AUD_NAME = re.compile(r"\b(kids?|child(?:ren)?(?:'s)?|babies|baby|toddlers?|famil(?:y|ies)|under[- ]?5s?)\b", re.I)
+# Audience claims in prose: only unambiguous phrasing ("a family drama" does not count).
+_AUD_DESC = re.compile(r"\b(?:for|suitable for|perfect for|ideal for|aimed at)\s+(?:all\s+)?(famil(?:y|ies))\b"
+                       r"|\b(?:suitable for|aimed at|designed for)\s+(?:young\s+)?(kids|children|babies|toddlers)\b"
+                       r"|\b(family[- ](?:friendly|show|performance|workshop))\b", re.I)
+_AGE_ATTR = re.compile(r"age|audience", re.I)
+_AGE_TXT = (
+    re.compile(r"\bages?[sd]?\s*(?:range|guidance|recommendation)?\s*:?\s*(\d{1,2}\s*(?:[-–—]|to)\s*\d{1,2}|\d{1,2}\s*\+?)(?!\d|:|\.\d)", re.I),
+    re.compile(r"(?<![£\d.])\b(\d{1,2}\s*(?:[-–—]|to)\s*\d{1,2})\s*(?:years?|yrs?)(?:[- ]olds?)?\b", re.I),
+    re.compile(r"(?<![£\d.])\b(\d{1,2}\s*\+)\s*(?:years?|yrs?)\b", re.I),
+    re.compile(r"(?<![£\d.])\b(\d{1,2}\s*\+)(?=\s*(?:only|$|[.,;)]))", re.I),
+)
+_CAT_ATTR = ("category", "genre", "artform", "eventtype", "type")
+
+
+def _age_in(text: str) -> str | None:
+    for rx in _AGE_TXT:
+        m = rx.search(text)
+        if m:
+            return re.sub(r"\s+", "", m.group(1))
+    return None
+
+
+def classify_event(ev: dict[str, Any]) -> tuple[str, str, str]:
+    """(category_text, audience_text, age_text) from the event's attributes, name and
+    description. Generic: no per-venue knowledge; blank when nothing is stated."""
+    attrs = _attr_values(ev)
+    by_key = {k.lower(): v for k, v in attrs}
+    cat = ""
+    for key in _CAT_ATTR:
+        v = by_key.get(key, "")
+        if v and norm_category(v) != "other":
+            cat = v
+            break
+    aud: list[str] = []
+
+    def add(it: Iterable[re.Match]) -> None:
+        for m in it:
+            w = "family" if next(g for g in m.groups() if g).lower().startswith("famil") else "kids"
+            if w not in aud:
+                aud.append(w)
+    for k, v in attrs:
+        if not (_AGE_ATTR.search(k) and re.search(r"\d", v)):      # age fields feed age_text
+            add(_AUD_ATTR.finditer(v))
+    add(_AUD_NAME.finditer(_name(ev) or ""))
+    desc = " ".join(t for t in (clean_text(ev.get("description")) if isinstance(ev.get("description"), str) else "",
+                                clean_text(ev.get("htmlDescription")) if isinstance(ev.get("htmlDescription"), str) else "") if t)
+    add(_AUD_DESC.finditer(desc))
+    age = next((v for k, v in attrs if _AGE_ATTR.search(k) and re.search(r"\d", v)), "")
+    if not age:
+        # Prose ages only count when they speak to the audience: "Age guidance: 7+" on an
+        # opera means "no under-7s", not "kids", and "16+" would read as family downstream.
+        t = _age_in(_name(ev) or "") or _age_in(desc) or ""
+        lo = re.match(r"\d+", t)
+        if t and lo and (aud or int(lo.group()) >= 18):
+            age = t
+    return cat, ", ".join(sorted(aud)), age
+
+
+def event_to_raw(ev: dict[str, Any], url_tpl: str | None = None) -> RawEvent:
     """One RawEvent for a whole run (no instance call)."""
     first = _parse_dt(ev.get("firstInstanceDateTime"))
     last = _parse_dt(ev.get("lastInstanceDateTime"))
+    cat, aud, age = classify_event(ev)
     return RawEvent(
         title=_name(ev) or "",
         date_text=first.date().isoformat() if first else None,
         end_text=last.date().isoformat() if last and first and last.date() != first.date() else None,
-        url=_url(ev), desc=_desc(ev), source_kind=SOURCE_KIND,
+        url=_url(ev, url_tpl), desc=_desc(ev), source_kind=SOURCE_KIND,
+        category_text=cat, audience_text=aud, age_text=age,
     )
 
 
 def instance_to_raw(ev: dict[str, Any], inst: dict[str, Any],
-                    status: dict[str, Any] | None = None) -> RawEvent | None:
+                    status: dict[str, Any] | None = None, url_tpl: str | None = None) -> RawEvent | None:
     """One RawEvent per session; None for cancelled/undated instances."""
     start = _parse_dt(inst.get("start"))
     title = _name(ev)
     if start is None or not title or _truthy(inst.get("cancelled")):
         return None
+    cat, aud, age = classify_event(ev)
     return RawEvent(
         title=title, date_text=start.date().isoformat(), time_text=start.strftime("%H:%M"),
-        price_text=price_text(inst), url=_url(ev), desc=_desc(ev),
+        price_text=price_text(inst), url=_url(ev, url_tpl), desc=_desc(ev),
         sold_out=sold_out(inst, status), source_kind=SOURCE_KIND,
+        category_text=cat, audience_text=aud, age_text=age,
     )
 
 
@@ -483,14 +578,14 @@ def _in_range(inst: Any, start: date, end: date, now: datetime | None) -> bool:
 
 
 def _to_raws(ev: dict[str, Any], insts: Iterable[Any], start: date, end: date,
-             now: datetime | None, stats: SpektrixStats) -> list[tuple[RawEvent, str | None]]:
+             now: datetime | None, stats: SpektrixStats, url_tpl: str | None = None) -> list[tuple[RawEvent, str | None]]:
     """(RawEvent, instance id) per in-window session; malformed instances are counted."""
     out = []
     for inst in insts:
         try:
             if not _in_range(inst, start, end, now):
                 continue
-            raw = instance_to_raw(ev, inst)
+            raw = instance_to_raw(ev, inst, url_tpl=url_tpl)
         except Exception as e:                               # noqa: BLE001 — one bad instance
             _err(stats, f"instance {str(inst.get('id') if isinstance(inst, dict) else '?')}: {e}")
             continue
@@ -586,10 +681,12 @@ async def fetch_events(client: str | SpektrixClient, *, http: httpx.AsyncClient,
                        check_availability: bool = False, status_cap: int = STATUS_CAP,
                        now: datetime | None = None, delay: float = INSTANCE_DELAY,
                        timeout: float = CLIENT_TIMEOUT,
-                       stats: SpektrixStats | None = None) -> list[RawEvent]:
+                       stats: SpektrixStats | None = None,
+                       event_url: str | None = None) -> list[RawEvent]:
     """RawEvents for one Spektrix client in [start, end] (inclusive dates). Sessions that
     started before `now` (default: the current local time) are dropped. Never raises on API
-    errors: a dead client returns [], a bad event is skipped and counted in `stats`."""
+    errors: a dead client returns [], a bad event is skipped and counted in `stats`.
+    `event_url`: template for events with an empty webUrl (see `_url`)."""
     sc = client if isinstance(client, SpektrixClient) else SpektrixClient(client)
     stats = stats if stats is not None else SpektrixStats()
     s, e = _as_date(start), _as_date(end)
@@ -601,14 +698,14 @@ async def fetch_events(client: str | SpektrixClient, *, http: httpx.AsyncClient,
     stats.events_seen = len(raw_events)
     events, stats.events_dropped = select_events(raw_events, s, e, max_events, stats)
     if not with_instances:
-        return _safe_map(event_to_raw, events, stats)
+        return _safe_map(lambda e: event_to_raw(e, event_url), events, stats)
     by_event = await _bulk_instances(http, stats.base, s, e, stats)
     stats.bulk = by_event is not None
     if by_event is None:
         by_event = await _per_event_instances(http, stats.base, events, s, e, stats,
                                               delay=delay, timeout=timeout)
     now = now if now is not None else datetime.now()
-    per_event = [_to_raws(ev, by_event.get(ev["id"], ()), s, e, now, stats) for ev in events]
+    per_event = [_to_raws(ev, by_event.get(ev["id"], ()), s, e, now, stats, event_url) for ev in events]
     pairs = [p for ps in per_event for p in ps]
     if check_availability:
         await _fill_status(http, stats.base, pairs, stats, delay, status_cap)
@@ -677,7 +774,8 @@ class SpektrixSource:
                 ctx.stats["spektrix.offline"] = ctx.stats.get("spektrix.offline", 0) + 1
                 return []
             st = SpektrixStats()
-            out = await fetch_events(sc, http=ctx.http, start=ctx.today,
+            tpl = (cfg.adapter or {}).get("event_url")
+            out = await fetch_events(sc, http=ctx.http, event_url=tpl if isinstance(tpl, str) else None, start=ctx.today,
                                      end=ctx.today + timedelta(days=ctx.window_days),
                                      stats=st, **{"now": datetime.combine(ctx.today, datetime.min.time()),
                                                   **self.fetch_kw})
