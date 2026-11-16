@@ -295,7 +295,7 @@ Branch `rewrite/pipeline-v3`. Each step: Opus builder → Opus reviewer → test
 | 4 | query/rank/digest honour `byday` / `sessions_known`; prune expired | done ddb3d5f (series contract: recurring+byday = series, instance = recurring+byday None; event_days via occurrences; schedule_label EN/RU; prune_past keeps open series/TBC; A3 baseline: 156 range-only runs in cache) |
 | 5 | venue hooks + `fix:` block; `notes` migration; `sites/<city>.yaml`; city config everywhere | done c66678a (865 tests): hook registry bound via explicit `hook:` only, no built-in hooks shipped (sadlers_wells → config, green_note → hint + `build.kept_variant`); `fix:` byday/weekly/time_default/range_means_weekly (bool or {min_days,title_re}); `sites.yaml` deleted (slipped into 406faaa), London 300 / Moscow 90, St Paul's dupe merged; `notes` → `about` + `hint` (28 hints); city = file membership; weekday-range-beside-date-range → byday; Southbank WordPlay pinned Fri via fix.weekly; Sadler's Wells ranges stay sessions_known=False until step 6 |
 | 6 | enrich pass (detail pages) | |
-| 7 | fixtures + gold + `main.py eval` | built: 14 venues / 92 gold events, offline harness, drift, KNOWN_FAILURES (45); first-run F1 date .98 time .98 price .67 url .83 byday .40; review running |
+| 7 | fixtures + gold + `main.py eval` | done d1da798 (877 tests): 14 venues / 103 gold events, offline + socket-blocked, configs from sites/<city>.yaml, time-aware matching, extras in drift, KNOWN_FAILURES carry `got`, LLM replies hash-stamped; 87 found / 16 missed / 4 extra; F1 date 1.00 time 1.00 price .68 url .83 kind .97; §1.7 live fill-rate check not built; store.py lazy connect deferred |
 | 8 | `/new-city` skill; Moscow migrated | |
 | 9 | full crawl; before/after metrics | |
 
