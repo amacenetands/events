@@ -1,4 +1,6 @@
-"""VenueConfig / cities.yaml / load_venues — incl. legacy sites.yaml round-trip."""
+"""VenueConfig / cities.yaml / load_venues over sites/<city>.yaml."""
+from datetime import date
+
 import pytest
 import yaml
 
@@ -6,53 +8,37 @@ from pydantic import ValidationError
 
 from src import config
 from src.config import LEGACY_MAX_LINKS, VenueConfig, from_legacy, load_venues
-from src.sources.html_sites import SITES_YAML, _load_sites, configured_site_names
+from src.sources import html_sites
+from src.sources.html_sites import _load_sites, configured_site_names
 
 PIPELINES = [None, "moscow", "moscow-theatre", "family", "theatres", "evening", "daytime", "museums"]
-_LEGACY_FALSE = ("js_required", "stealth", "skip", "disabled", "must_determine_venue", "follow_event_links")
 
 
-def _raw_entries() -> list[dict]:
-    with open(SITES_YAML) as fh:
-        return yaml.safe_load(fh)["html_sites"]
+def _raw_entries(city: str | None = None) -> list[dict]:
+    """Raw yaml entries of one city's file (None: every city, cities.yaml order)."""
+    out = []
+    for c in ([config.get_city(city)] if city else config.load_cities().values()):
+        with open(c.sites_path) as fh:
+            out += yaml.safe_load(fh)["venues"]
+    return out
 
 
-def _norm(d: dict) -> dict:
-    """Legacy dict modulo key order, absent-vs-default and notes/pipeline shape."""
-    d = dict(d)
-    for k in _LEGACY_FALSE:
-        if not d.get(k):
-            d.pop(k, None)
-    if d.get("weight") in (None, 1):
-        d.pop("weight", None)
-    if not d.get("remove_selectors"):
-        d.pop("remove_selectors", None)
-    if d.get("follow_event_links") and d.get("max_links") is None:
-        d["max_links"] = LEGACY_MAX_LINKS
-    if d.get("category_hint") is None:
-        d["category_hint"] = "other"
-    p = d.pop("pipeline", None)
-    if p is not None:
-        d["pipeline"] = [p] if isinstance(p, str) else list(p)
-    if d.get("notes") is not None:
-        d["notes"] = str(d["notes"])
-    return {k: v for k, v in d.items() if v is not None}
-
-
-def test_every_entry_loads():
+def test_every_entry_loads_and_round_trips():
     entries = _raw_entries()
-    assert len(entries) >= 391
-    for d in entries:
-        from_legacy(d)
-
-
-def test_round_trip_all_entries():
+    assert len(entries) >= 390
     bad = []
-    for d in _raw_entries():
-        got = from_legacy(d).to_legacy_dict()
-        if _norm(got) != _norm(d):
-            bad.append((d["name"], _norm(d), _norm(got)))
+    for d in entries:
+        v = from_legacy(d)
+        if VenueConfig(**v.model_dump()) != v or "notes" in d or "pipeline" in d:
+            bad.append(d["name"])
     assert not bad, bad[:3]
+
+
+def test_to_legacy_dict_never_emits_notes():
+    v = VenueConfig(name="A", url="u", about="human", hint="Flag kids events.")
+    d = v.to_legacy_dict()
+    assert "notes" not in d and d["hint"] == "Flag kids events." and d["about"] == "human"
+    assert from_legacy({"name": "B", "url": "u", "notes": "n"}).about == "n"       # legacy input still loads
 
 
 def test_unknown_key_raises_naming_venue():
@@ -121,23 +107,24 @@ def test_load_venues_filters():
     assert "mutated" not in load_venues("london")[0].tags
 
 
-# ── _load_sites: behaviour-preserving vs the pre-v3 loader ─────────────────────
+# ── _load_sites: the pipeline-tag rule over the per-city files ─────────────────
 
-def _legacy_reference(pipeline, include_disabled):
-    """The pre-v3 _load_sites membership rule, restated (names only, file order)."""
+def _reference(pipeline, include_disabled):
+    """pipeline=None: the default city's file; a tag routed to a city: that city's entries
+    carrying it; any other tag: default-city entries carrying it (names, file order)."""
+    city = config.city_for_tag(pipeline)
+    parked = set(config.get_city(city).parked_tags) - {pipeline}
     def tags(s):
-        p = s.get("pipeline")
-        return set() if p is None else (set(p) if isinstance(p, list) else {p})
-    sites = [s for s in _raw_entries() if not s.get("skip") and (include_disabled or not s.get("disabled"))]
-    if pipeline:
-        return [s["name"] for s in sites if pipeline in tags(s)]
-    return [s["name"] for s in sites if not (tags(s) & {"moscow", "moscow-theatre"})]
+        return set(s.get("tags") or ())
+    sites = [s for s in _raw_entries(city) if not s.get("skip") and (include_disabled or not s.get("disabled"))
+             and not (tags(s) & parked)]
+    return [s["name"] for s in sites if pipeline is None or pipeline in tags(s)]
 
 
 @pytest.mark.parametrize("pipeline", PIPELINES)
 @pytest.mark.parametrize("include_disabled", [False, True])
-def test_load_sites_matches_legacy_rule(pipeline, include_disabled):
-    assert configured_site_names(pipeline, include_disabled) == _legacy_reference(pipeline, include_disabled)
+def test_load_sites_matches_tag_rule(pipeline, include_disabled):
+    assert configured_site_names(pipeline, include_disabled) == _reference(pipeline, include_disabled)
 
 
 def test_load_sites_shape():
@@ -151,8 +138,10 @@ def test_load_sites_shape():
 
 @pytest.fixture
 def tmp_config(tmp_path, monkeypatch):
-    def make(cities: dict, sites: list[dict]):
-        (tmp_path / "sites.yaml").write_text(yaml.safe_dump({"html_sites": sites}, allow_unicode=True))
+    def make(cities: dict, sites: dict[str, list[dict]]):
+        (tmp_path / "sites").mkdir(exist_ok=True)
+        for name, entries in sites.items():
+            (tmp_path / "sites" / f"{name}.yaml").write_text(yaml.safe_dump({"venues": entries}, allow_unicode=True))
         (tmp_path / "cities.yaml").write_text(yaml.safe_dump(cities, allow_unicode=True))
         monkeypatch.setattr(config, "CITIES_YAML", tmp_path / "cities.yaml")
         config.clear_cache()
@@ -161,30 +150,28 @@ def tmp_config(tmp_path, monkeypatch):
     config.clear_cache()
 
 
-def _city(**kw):
-    return {"label": "L", "display_name": "D", "tz": "UTC", "sites": "sites.yaml", **kw}
+def _city(name="london", **kw):
+    return {"label": "L", "display_name": "D", "tz": "UTC", "sites": f"sites/{name}.yaml", **kw}
 
 
-def test_year_placeholder_resolved(tmp_config):
-    from datetime import date
+def test_year_placeholder_resolved(tmp_config, monkeypatch):
+    monkeypatch.setattr(html_sites, "city_today", lambda c: date(2031, 3, 1))
     tmp_config({"london": _city()},
-               [{"name": "Fest", "url": "https://fest.example/{YEAR}/programme", "pipeline": "family"}])
+               {"london": [{"name": "Fest", "url": "https://fest.example/{YEAR}/programme", "tags": ["family"]}]})
     [s] = _load_sites(None)
-    assert s["url"] == f"https://fest.example/{date.today().year}/programme"
+    assert s["url"] == "https://fest.example/2031/programme"
     assert load_venues("london")[0].url.endswith("/{YEAR}/programme")      # config keeps raw
 
 
-def test_city_override_and_tag_rules(tmp_config):
+def test_file_membership_and_tag_rules(tmp_config, capsys):
     tmp_config(
-        {"london": _city(exclude_tags=["ru", "ru-theatre"]),
-         "spb": _city(require_tags=["ru", "ru-theatre"], exclude_tags=["closed"],
-                      parked_tags=["ru-theatre"], crawl_tags=["ru"])},
-        [{"name": "A", "url": "u", "pipeline": "family"},
-         {"name": "B", "url": "u", "pipeline": "ru"},
-         {"name": "C", "url": "u", "pipeline": ["ru", "closed"]},                 # exclude beats require
-         {"name": "D", "url": "u", "pipeline": "ru-theatre"},                     # parked
-         {"name": "E", "url": "u", "pipeline": "ru", "city": "london"},           # explicit city wins
-         {"name": "F", "url": "u", "pipeline": "family", "city": "spb"}],
+        {"london": _city(), "spb": _city("spb", require_tags=["ru", "ru-theatre"], parked_tags=["ru-theatre"],
+                                         crawl_tags=["ru"])},
+        {"london": [{"name": "A", "url": "u1", "tags": ["family"]},
+                    {"name": "E", "url": "u5", "tags": ["ru"]}],                  # in london's file: london's
+         "spb": [{"name": "B", "url": "u2", "tags": ["ru"]},
+                 {"name": "D", "url": "u4", "tags": ["ru-theatre"]},             # parked
+                 {"name": "F", "url": "u6", "tags": ["family"]}]},
     )
     def names(c, **kw):
         return [v.name for v in load_venues(c, **kw)]
@@ -193,10 +180,30 @@ def test_city_override_and_tag_rules(tmp_config):
     assert names("spb", tags=["ru-theatre"]) == ["D"]
     assert names("spb", tags=["ru"]) == ["B"]
     assert config.legacy_pipeline_tag("spb") == "ru" and config.city_for_tag("ru-theatre") == "spb"
+    assert config.main(["--check"]) == 0
+    tmp_config({"london": _city(), "spb": _city("spb")},
+               {"london": [{"name": "A", "url": "u1", "city": "spb"}, {"name": "A", "url": "u1"}], "spb": []})
+    assert config.main(["--check"]) == 1
+    out = capsys.readouterr().out
+    assert "says city 'spb', file is 'london'" in out and "listed 2 times" in out
+
+
+def test_check_hooks(tmp_config, capsys, monkeypatch):
+    from src import venues
+    monkeypatch.setattr(venues, "VENUE_HOOKS", {"used_hall": venues.VenueHook(), "orphan": venues.VenueHook()})
+    monkeypatch.setattr(venues, "_loaded", True)
+    tmp_config({"london": _city()}, {"london": [{"name": "A", "url": "u", "hook": "used_hall"},
+                                                 {"name": "B", "url": "v", "hook": "missing"}]})
+    assert config.main(["--check"]) == 1
+    out = capsys.readouterr().out
+    assert "hook 'missing' is not registered" in out and "hook 'orphan' is registered but no venue" in out
+    assert "used_hall" not in out
+    with pytest.raises(ValidationError):
+        VenueConfig(name="x", url="u", hook="Sadler's Wells")          # explicit ASCII slugs only
 
 
 def test_legacy_pipeline_tag_rejects_multiple(tmp_config):
-    tmp_config({"london": _city(crawl_tags=["a", "b"])}, [])
+    tmp_config({"london": _city(crawl_tags=["a", "b"])}, {"london": []})
     with pytest.raises(ValueError):
         config.legacy_pipeline_tag("london")
 
@@ -223,7 +230,7 @@ def test_classify_hints_via_config(monkeypatch):
     monkeypatch.setattr(classify, "_hints", None)
     h = classify._site_hints()
     assert set(h) == {n.lower() for n in _all_names()}
-    assert h == {d["name"].lower(): d["category_hint"] for d in _raw_entries()}
+    assert h == {d["name"].lower(): d.get("category_hint", "other") for d in _raw_entries()}
 
 
 def test_main_readers_via_config(monkeypatch):
@@ -231,13 +238,14 @@ def test_main_readers_via_config(monkeypatch):
     from src import dedup
     from src.models import Event
     assert set(main._tags_by_source()) == _all_names()
-    seen: list[str] = []
-    monkeypatch.setattr(dedup, "oldest_fetched_at", lambda urls: seen.extend(urls), raising=False)
-    for city in config.city_names():
-        seen.clear()
-        tag = main._city_tag(city)
-        main._oldest_fetched(tag)
-        assert seen == [v.url for v in load_venues(city, tags=[tag] if tag else None)]
+    from datetime import datetime, timezone
+    from src.fetch.types import FetchResult, FetchStatus
+    old, new = datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 2, tzinfo=timezone.utc)
+    frs = {"A": FetchResult(FetchStatus.OK, fetched_at=new), "B": FetchResult(FetchStatus.OK, fetched_at=old),
+           "C": FetchResult(FetchStatus.OK, fetched_at=datetime(2020, 1, 1, tzinfo=timezone.utc))}
+    used = [Event(title="x", venue=n, date="2030-01-01", url="u", source=n) for n in ("A", "B")]
+    assert main._oldest_fetched(frs, used) == old.isoformat()    # C produced nothing: ignored
+    assert main._oldest_fetched(frs, []) is None
     asked: list[str] = []
     monkeypatch.setattr(dedup, "get_html_fetched_at", lambda u: asked.append(u), raising=False)
     evs = [Event(title="x", venue=n, date="2030-01-01", url="u", source=n) for n in ("Barbican", "Nope")]
@@ -264,3 +272,19 @@ def test_cli_check(capsys):
     assert "london:" in capsys.readouterr().out
     assert config.main(["--dump", "Barbican"]) == 0
     assert "follow_links" in capsys.readouterr().out
+
+
+def test_per_city_sites_files():
+    for c in config.load_cities().values():
+        assert c.sites_path.name == f"{c.name}.yaml" and c.sites_path.exists()
+    lon, mos = config.get_city("london"), config.get_city("moscow")
+    assert lon.geo == (51.5074, -0.1278) and (lon.pricey, mos.pricey) == (100, 10000)
+    with pytest.raises(ValidationError):
+        config.CityConfig(name="x", label="x", display_name="x", tz="UTC", sites="s", geo=(95, 0))
+    v = from_legacy({"name": "A", "url": "u", "hook": "a_hall", "fix": {"weekly": {"WordPlay": [4]}, "byday": [6, 5]}})
+    assert v.hook == "a_hall" and v.fix.weekly == {"WordPlay": [4]} and v.fix.byday == [5, 6]
+    assert "hook" not in v.to_legacy_dict()
+    rw = VenueConfig(name="A", url="u", fix={"range_means_weekly": {"min_days": 28, "title_re": "Club"}}).fix
+    assert rw.range_means_weekly.min_days == 28
+    with pytest.raises(ValidationError):
+        VenueConfig(name="A", url="u", fix={"range_means_weekly": {"title_re": "("}})

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate per-venue remove_selectors for sites.yaml.
+Generate per-venue remove_selectors for sites/<city>.yaml.
 
 Fetches each static site's HTML, extracts structural skeleton (tags + classes/ids),
-asks Claude Haiku to identify non-event CSS selectors to strip, then patches sites.yaml.
+asks Claude Haiku to identify non-event CSS selectors to strip, then patches sites/<city>.yaml.
 
 Usage:
   python scripts/gen_selectors.py                     # all static sites
@@ -22,7 +22,6 @@ from pathlib import Path
 import subprocess
 
 import httpx
-import yaml
 from bs4 import BeautifulSoup
 from markdownify import markdownify
 
@@ -30,7 +29,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.fetch.headers import HEADERS
 from src.sources.reduce import _clean_html
 
-SITES_YAML = Path(__file__).parent.parent / "sites.yaml"
 CONCURRENCY = 6
 TIMEOUT = 20.0
 
@@ -83,7 +81,7 @@ Your task: identify CSS selectors for elements that are NOT event listings — t
 - Booking widgets, "plan your visit" sections unrelated to specific events
 
 Return ONLY a JSON array of CSS selector strings (or an empty array [] if nothing to add).
-These will be added to the site's `remove_selectors` field in sites.yaml.
+These will be added to the site's `remove_selectors` field in sites/<city>.yaml.
 Keep selectors simple and specific. Examples: ["div.cookie-banner", ".newsletter-signup", "#hero-promo"]
 
 Page: {venue_name}
@@ -168,53 +166,22 @@ def _ask_claude(site_data: dict) -> list[str]:
         return []
 
 
-def _patch_sites_yaml(patches: dict[str, list[str]], dry_run: bool) -> None:
-    """Update sites.yaml with new remove_selectors entries."""
-    text = SITES_YAML.read_text()
-    lines = text.splitlines()
-    output = []
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        output.append(line)
-        # Detect venue name line
-        name_m = re.match(r"(\s*)- name:\s*[\"']?(.+?)[\"']?\s*$", line)
-        if name_m:
-            indent = name_m.group(1) + "  "  # 2 extra spaces for field indent
-            venue_name = name_m.group(2)
-            if venue_name in patches:
-                new_sels = patches[venue_name]
-                # Scan forward to check if remove_selectors already exists in this block
-                j = i + 1
-                block_has_sel = False
-                while j < len(lines):
-                    next_line = lines[j]
-                    if re.match(r"\s*- name:", next_line):
-                        break  # next venue block
-                    if "remove_selectors:" in next_line:
-                        block_has_sel = True
-                        break
-                    j += 1
-                if not block_has_sel and new_sels:
-                    sel_lines = [f"{indent}remove_selectors:"]
-                    for s in new_sels:
-                        sel_lines.append(f"{indent}  - \"{s}\"")
-                    if dry_run:
-                        print(f"\n[DRY-RUN] Would add to {venue_name}:")
-                        for sl in sel_lines:
-                            print(f"  {sl}")
-                    else:
-                        output.extend(sel_lines)
-        i += 1
-
+def _patch_sites_yaml(patches: dict[str, tuple[Path, list[str]]], dry_run: bool) -> None:
+    """Add remove_selectors (under `fetch:`) to venues in their sites/<city>.yaml."""
+    from src.config import insert_venue_keys
+    for name, (path, sels) in patches.items():
+        if dry_run:
+            print(f"\n[DRY-RUN] Would add to {name} ({path.name}): fetch.remove_selectors={sels}")
+        elif not insert_venue_keys(path, name, fetch={"remove_selectors": sels}):
+            print(f"  ! {name}: not found in {path.name}")
     if not dry_run:
-        SITES_YAML.write_text("\n".join(output) + "\n")
-        print(f"\nPatched sites.yaml with {len(patches)} venues.")
+        print(f"\nPatched {len(patches)} venues.")
 
 
 async def run(venue_filter: str | None, dry_run: bool, threshold: int, js_sites: bool = False) -> None:
-    data = yaml.safe_load(SITES_YAML.read_text())
-    all_sites = data.get("html_sites", [])
+    from src.config import legacy_site_dicts
+    path_of = {d["name"]: c.sites_path for c, d in legacy_site_dicts()}
+    all_sites = [d for _, d in legacy_site_dicts()]
 
     if js_sites:
         sites = [s for s in all_sites if not s.get("skip") and s.get("js_required")]
@@ -257,8 +224,8 @@ async def run(venue_filter: str | None, dry_run: bool, threshold: int, js_sites:
             f"  {site_data['name']}: {site_data['raw_len']:,} → md={site_data['md_len']:,} ({pct}%) "
             f"→ +{len(new_only)} selectors: {new_only}"
         )
-        if new_only:
-            patches[site_data["name"]] = merged
+        if new_only and not existing:      # venues with selectors already are left alone
+            patches[site_data["name"]] = (path_of[site_data["name"]], merged)
 
     if patches:
         _patch_sites_yaml(patches, dry_run=dry_run)
@@ -272,7 +239,7 @@ async def run(venue_filter: str | None, dry_run: bool, threshold: int, js_sites:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Generate remove_selectors for sites.yaml")
+    p = argparse.ArgumentParser(description="Generate remove_selectors for sites/<city>.yaml")
     p.add_argument("--venue", metavar="NAME", help="Filter to venues matching this substring")
     p.add_argument("--dry-run", action="store_true", help="Print proposed changes, don't write")
     p.add_argument("--threshold", type=int, default=8000, help="Only analyze sites with md chars above this (default 8000)")

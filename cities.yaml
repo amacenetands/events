@@ -3,19 +3,22 @@ london:
   display_name: London
   tz: Europe/London
   lang: en
-  sites: sites.yaml          # per-city file comes in a later step; both cities read sites.yaml for now
-  exclude_tags: [moscow, moscow-theatre]
+  sites: sites/london.yaml   # a venue belongs to the city whose file lists it
+  pricey: 100                # rank: a price above this is expensive
   crawl_tags: []             # crawl = every London venue
   api_sources: [skiddle, songkick]
   songkick_metro: 24426
+  geo: [51.5074, -0.1278]    # Skiddle search centre
 moscow:
   label: "Moscow Events"
   display_name: Москва
   tz: Europe/Moscow
   lang: ru
   currency: "₽"
-  sites: sites.yaml
-  require_tags: [moscow, moscow-theatre]
+  pricey: 10000
+  sites: sites/moscow.yaml
+  require_tags: [moscow, moscow-theatre]   # these tags route to Moscow (city_for_tag)
   parked_tags: [moscow-theatre]   # theatres parked: only via explicit --tag moscow-theatre
   crawl_tags: [moscow]
   api_sources: []
+  geo: [55.7558, 37.6173]

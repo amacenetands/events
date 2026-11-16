@@ -467,3 +467,21 @@ def test_range_borrowing_from_later_anchor():
 def test_range_borrow_never_moves_start_into_long_past():
     s = parse_date_specs("Booking Bands for Nov - Feb, Click to Apply ALL EVENTS November 2026", T)[0]
     assert (s.kind, s.start, s.end) == ("run", D(2026, 11, 1), D(2027, 2, 28))
+
+
+@pytest.mark.parametrize("text,lang", [
+    ("Tue–Sun, 17 Nov – 20 Dec 2026", "en"), ("Tue-Sun 17 Nov - 20 Dec 2026", "en"),
+    ("17 Nov – 20 Dec 2026, Tue–Sun", "en"),
+    ("вт–вс, 17 ноября – 20 декабря 2026", "ru"), ("17 ноября – 20 декабря 2026, вт–вс", "ru"),
+])
+def test_weekday_range_before_or_after_date_range(text, lang):
+    [s] = parse_date_specs(text, T, lang=lang)
+    assert (s.kind, s.start, s.end, s.byday, s.sessions_known) == (
+        "run", D(2026, 11, 17), D(2026, 12, 20), frozenset({1, 2, 3, 4, 5, 6}), True)
+
+
+def test_weekday_labels_on_range_ends_stay_labels():
+    [s] = parse_date_specs("Thu 19 Nov – Sat 21 Nov 2026", T)
+    assert (s.start, s.end, s.byday) == (D(2026, 11, 19), D(2026, 11, 21), None)
+    [s] = parse_date_specs("Sun 22 Nov", T)
+    assert (s.kind, s.start) == ("one_off", D(2026, 11, 22))

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Validate all venues in sites.yaml — check URLs are reachable and flag issues.
+Validate all venues in sites/<city>.yaml — check URLs are reachable and flag issues.
 
 Usage:
   python scripts/validate_venues.py             # all venues
@@ -13,9 +13,8 @@ import sys
 from pathlib import Path
 
 import httpx
-import yaml
 
-SITES_YAML = Path(__file__).parent.parent / "sites.yaml"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 TIMEOUT = 15.0
 CONCURRENCY = 8
 
@@ -51,8 +50,8 @@ async def check_url(client: httpx.AsyncClient, name: str, url: str) -> dict:
 
 
 async def run(dead_only: bool, fix_skip: bool) -> int:
-    data = yaml.safe_load(SITES_YAML.read_text())
-    sites = data.get("html_sites", [])
+    from src.config import legacy_site_dicts
+    sites = [d for _, d in legacy_site_dicts()]
 
     to_check = []
     skipped_entries = []
@@ -96,7 +95,7 @@ async def run(dead_only: bool, fix_skip: bool) -> int:
         print(f"\nAll {len(ok) + len(warned)} venues reachable ({len(warned)} bot-blocked).")
 
     if js_sites:
-        print(f"\nJS-required (validated by crawl4ai, not HTTP check):")
+        print(f"\nJS-required (validated by browser fetch, not HTTP check):")
         for n in js_sites:
             print(f"  - {n}")
 

@@ -7,7 +7,7 @@ from ..models import Event
 API = "https://api.songkick.com/api/3.0"
 
 
-def _parse_event(raw: dict) -> Event | None:
+def _parse_event(raw: dict, city_name: str = "") -> Event | None:
     try:
         start = raw.get("start") or {}
         date_str = start.get("date", "")
@@ -20,7 +20,7 @@ def _parse_event(raw: dict) -> Event | None:
             time_str = time_str[:5]
 
         venue_data = raw.get("venue") or {}
-        venue_name = venue_data.get("displayName", "London")
+        venue_name = venue_data.get("displayName") or city_name or "?"
 
         title = raw.get("displayName", "")
         if not title:
@@ -47,11 +47,12 @@ def _parse_event(raw: dict) -> Event | None:
         return None
 
 
-async def fetch_songkick(metro: int | None = None) -> list[Event]:
-    """Upcoming events in a Songkick metro area (default: London's from cities.yaml)."""
+async def fetch_songkick(metro: int | None = None, city: str | None = None) -> list[Event]:
+    """Upcoming events in a Songkick metro area (default: the city's from cities.yaml)."""
+    from ..config import get_city
+    c = get_city(city)
     if metro is None:
-        from ..config import get_city
-        metro = get_city("london").songkick_metro
+        metro = c.songkick_metro
     if not metro:
         print("  [Songkick] No metro id configured — skipping")
         return []
@@ -81,7 +82,7 @@ async def fetch_songkick(metro: int | None = None) -> list[Event]:
             data = r.json().get("resultsPage", {})
             raw_events = data.get("results", {}).get("event") or []
             for raw in raw_events:
-                e = _parse_event(raw)
+                e = _parse_event(raw, c.display_name)
                 if e:
                     events.append(e)
             total = data.get("totalEntries", 0)

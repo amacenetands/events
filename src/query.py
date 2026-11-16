@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from .classify import is_elsewhere
-from .config import get_city
+from .config import DEFAULT_CITY, get_city
 from .models import Event
 
 ALL_KINDS = frozenset({"one_off", "run", "recurring"})
@@ -20,7 +20,7 @@ PRESETS_YAML = Path(__file__).parent.parent / "pipelines.yaml"
 
 @dataclass(frozen=True)
 class Filter:
-    city: str = "london"                       # london | moscow
+    city: str = DEFAULT_CITY                   # a cities.yaml key
     kinds: frozenset = ALL_KINDS
     audience: str = "any"                      # any | family | kids | adult
     min_age_max: int | None = None             # keep events with min_age None or <= this
@@ -30,7 +30,7 @@ class Filter:
     days: str = "any"                          # any | weekday | weekend | mon..sun[,..]
     categories: frozenset = frozenset()
     venues: frozenset = frozenset()            # lowercase venue/source names
-    venue_tags: frozenset = frozenset()        # sites.yaml pipeline tags (e.g. museums)
+    venue_tags: frozenset = frozenset()        # venue tags (e.g. museums)
     drop_religious: bool = True
     new_only: bool = False                     # drop one-offs/recurring already sent (history)
     # presentation hints carried with a saved filter (not used by query())
@@ -294,8 +294,8 @@ def query(
             continue
         if e.online and not f.include_online:
             continue
-        if is_elsewhere(e):
-            continue                                  # touring dates outside London
+        if is_elsewhere(e, f.city):
+            continue                                  # touring dates outside the city
         if not _audience_ok(e, f):
             continue
         if cats and e.category not in cats:

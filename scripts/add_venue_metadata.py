@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""Add map + type metadata fields to all venues in sites.yaml."""
-import re
+"""Add `type:` metadata to venues in sites/<city>.yaml (map is derived, see VenueConfig.map_url)."""
+
 import sys
 from pathlib import Path
-from urllib.parse import quote_plus
 
-import yaml
 
-SITES_YAML = Path(__file__).parent.parent / "sites.yaml"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 EXPLICIT_TYPES = {
@@ -106,73 +104,23 @@ def infer_type(name: str, category_hint: str, pipeline) -> str:
     return "venue"
 
 
-def map_url(name: str) -> str:
-    q = quote_plus(f"{name} London")
-    return f"https://maps.google.com/?q={q}"
-
-
 def patch_yaml(dry_run: bool = False) -> None:
-    text = SITES_YAML.read_text()
-    data = yaml.safe_load(text)
-    sites = data.get("html_sites", [])
-
-    # Build lookup: name → (map, type)
-    meta: dict[str, tuple[str, str]] = {}
-    for s in sites:
-        name = s["name"]
-        t = infer_type(name, s.get("category_hint", "other"), s.get("pipeline"))
-        meta[name] = (map_url(name), t)
-
-    lines = text.splitlines()
-    output = []
-    i = 0
+    """Add `type:` to venues of sites/<city>.yaml that lack it. `map` is not written:
+    VenueConfig.map_url() derives the Google Maps search from name + city."""
+    from src.config import get_city, insert_venue_keys, venues_from_file, city_names
     patched = 0
-
-    while i < len(lines):
-        line = lines[i]
-        output.append(line)
-
-        name_m = re.match(r"(\s*)- name:\s*[\"']?(.+?)[\"']?\s*$", line)
-        if name_m:
-            indent = name_m.group(1) + "  "
-            venue_name = name_m.group(2)
-
-            if venue_name in meta:
-                # Scan forward to check if map/type already exist in this block
-                j = i + 1
-                block_has_map = False
-                block_has_type = False
-                while j < len(lines):
-                    next_line = lines[j]
-                    if re.match(r"\s*- name:", next_line):
-                        break
-                    if re.match(r"\s*map:", next_line):
-                        block_has_map = True
-                    if re.match(r"\s*type:", next_line):
-                        block_has_type = True
-                    j += 1
-
-                m_url, m_type = meta[venue_name]
-                new_lines = []
-                if not block_has_map:
-                    new_lines.append(f'{indent}map: "{m_url}"')
-                if not block_has_type:
-                    new_lines.append(f'{indent}type: "{m_type}"')
-
-                if new_lines:
-                    if dry_run:
-                        print(f"\n[DRY] {venue_name}: +map={m_url} +type={m_type}")
-                    else:
-                        output.extend(new_lines)
-                    patched += 1
-
-        i += 1
-
-    if not dry_run:
-        SITES_YAML.write_text("\n".join(output) + "\n")
-        print(f"Patched {patched} venues in sites.yaml.")
-    else:
-        print(f"\n[DRY-RUN] Would patch {patched} venues.")
+    for city in city_names():
+        path = get_city(city).sites_path
+        for v in venues_from_file(path):
+            if v.type:
+                continue
+            t = infer_type(v.name, v.category_hint, v.tags)
+            if dry_run:
+                print(f"[DRY] {city}: {v.name}: +type={t}")
+            else:
+                insert_venue_keys(path, v.name, top={"type": t})
+            patched += 1
+    print(("[DRY-RUN] Would patch" if dry_run else "Patched") + f" {patched} venues.")
 
 
 if __name__ == "__main__":

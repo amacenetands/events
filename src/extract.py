@@ -50,7 +50,7 @@ BATCH_CHAR_BUDGET = int(os.environ.get("BATCH_CHAR_BUDGET", "12000"))
 # NOT alter the input text still invalidate cached extractions. Bump
 # EXTRACT_VERSION on to_raws / post-processing changes; _PROMPT_VERSION is
 # derived automatically from the prompt below, so editing the schema/date-rules
-# busts the cache on its own. Per-site `cache_version` in sites.yaml busts one
+# busts the cache on its own. Per-site `cache_version` in sites/<city>.yaml busts one
 # venue. See _text_hash.
 EXTRACT_VERSION = "8"  # 8: raw-string RawEvent schema (normalize does dates); 7: kind/audience schema; 6: reducer + chunks
 

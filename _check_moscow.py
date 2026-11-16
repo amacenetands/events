@@ -1,5 +1,5 @@
 """Moscow venue reachability check — async httpx, max 8 concurrent."""
-import asyncio, yaml, httpx
+import asyncio, httpx
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -29,9 +29,8 @@ async def check(client, sem, entry):
             return name, None, None, str(e)
 
 async def main():
-    with open("sites.yaml") as f:
-        d = yaml.safe_load(f)
-    moscow = [s for s in d["html_sites"] if s.get("pipeline") == "moscow"]
+    from src.config import legacy_site_dicts
+    moscow = [s for _, s in legacy_site_dicts("moscow") if s.get("pipeline") == "moscow"]
     sem = asyncio.Semaphore(8)
     limits = httpx.Limits(max_connections=16, max_keepalive_connections=8)
     async with httpx.AsyncClient(headers=HEADERS, limits=limits, verify=False) as client:

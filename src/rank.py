@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from typing import Any
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -38,8 +39,7 @@ W_ONE_OFF = 2.0
 W_RUN = 0.5
 W_THEATRE_RECURRING = 0.5
 W_AVOID = -3.0             # title/description hits a profile `avoid` phrase
-W_PRICEY = -4.0            # ticket/course price >= PRICEY_GBP
-PRICEY_GBP = 100
+W_PRICEY = -4.0            # ticket/course price >= CityConfig.pricey (in the city's currency)
 W_INTEREST = 1.0           # title hits a profile `interests` phrase
 W_CHECK_DAYS = -2.5        # run > CHECK_DAYS_SPAN days with unknown session days (range-only listing)
 CHECK_DAYS_SPAN = 7
@@ -60,6 +60,12 @@ class RankCtx:
     seen_titles: set | None = None                     # titles from older crawls (None = unknown)
     weights: dict = field(default_factory=dict)        # venue/source name (lower) -> 1..3
     profile: dict = field(default_factory=dict)
+    city: Any = field(default_factory=lambda: _default_city())      # CityConfig (currency, pricey)
+
+
+def _default_city():
+    from .config import get_city
+    return get_city(None)
 
 
 @dataclass
@@ -94,13 +100,16 @@ def load_profile(path: Path = PROFILE_YAML) -> dict:
 
 def build_ctx(first_seen: dict[str, str] | None, events: list[Event], today: date | None = None,
               profile: dict | None = None, weights: dict | None = None,
-              now: datetime | None = None) -> RankCtx:
+              now: datetime | None = None, city: str | None = None) -> RankCtx:
     """first_seen: fingerprint -> iso ts (events table). Novelty only if an older crawl exists.
     today/now should be in the city's timezone (see query.city_today/city_now)."""
     today = today or (now.date() if now else date.today())
     ctx = RankCtx(today=today, now=now or datetime.combine(today, datetime.now().time()),
                   weights=load_weights() if weights is None else weights,
                   profile=load_profile() if profile is None else profile)
+    if city is not None:
+        from .config import get_city
+        ctx.city = get_city(city)
     if first_seen:
         cut = (datetime.now(timezone.utc) - timedelta(days=NEW_DAYS)).isoformat()
         if min(first_seen.values()) < cut:
@@ -148,8 +157,9 @@ def score_parts(e: Event, f, ctx: RankCtx) -> dict[str, float]:
         p["soon"] = W_SOON
     elif e.kind == "one_off" and e.date == ctx.today:
         p["soon"] = W_SOON
-    pm = re.search(r"£\s*(\d[\d,]*)", e.price or "")
-    if pm and int(pm.group(1).replace(",", "")) >= PRICEY_GBP:
+    cur = re.escape(ctx.city.currency)        # "£120" or "12 000 ₽"
+    pm = re.search(cur + r"\s*(\d[\d,  ]*)|(\d[\d,  ]*?)\s*" + cur, e.price or "")
+    if pm and int(re.sub(r"[,  ]", "", pm.group(1) or pm.group(2))) >= ctx.city.pricey:
         p["pricey"] = W_PRICEY
     if e.time:
         p["timed"] = W_HAS_TIME

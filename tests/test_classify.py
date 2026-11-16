@@ -160,3 +160,14 @@ def test_rank_prompt_rules_and_compact_rows():
     adult = build_prompt(pool, {"kids_ages": [6]}, 2, Filter(city="london", when="today", audience="adult"), today)
     assert "Kids ages" not in adult and "made for kids" not in adult
     assert [e.title for e, _ in parse_llm("1. E2|closing\nE1|why", pool)] == ["Play Days (Nov-Dec 2026)", "Kids Concert"]
+
+
+def test_is_elsewhere_uses_the_city_with_word_boundaries():
+    from src.classify import is_elsewhere
+    from src.models import Event
+    def E(v):
+        return Event(title="t", venue=v, date="2026-12-01", url="u", source="S")
+    assert is_elsewhere(E("Cheltenham, Petworth, Rugby"))
+    assert not is_elsewhere(E("Bath, Rugby, London"))
+    assert is_elsewhere(E("Bath, Londonderry, Rugby"))                          # word boundary
+    assert is_elsewhere(E("Bath, Rugby, London"), "moscow")                    # current city only

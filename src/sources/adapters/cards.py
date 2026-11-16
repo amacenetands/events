@@ -1,4 +1,4 @@
-"""CardListAdapter: CSS-selector driven. sites.yaml:
+"""CardListAdapter: CSS-selector driven. sites/<city>.yaml:
   adapter: {kind: cards, card: ".ev", title: "h3", date: ".d", time: ".t", link: "a", desc: ".cat"}"""
 from __future__ import annotations
 from bs4 import BeautifulSoup

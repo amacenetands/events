@@ -112,6 +112,9 @@ _FROM_CUE = re.compile(r"(?:\b(?:from|starts?|starting|begins?|beginning|commenc
 _ONWARDS = re.compile(r"^\s*(?:onwards?|and\s+beyond)\b", re.I)
 _PRE_WD = re.compile(r"(?:" + _WD_ONE.pattern + r")[,.]?\s*$", re.I)
 _POST_WD = re.compile(r"^[\s,•·|(]*(?:" + _WD_ONE.pattern + r")\)?", re.I)
+# 'Tue–' right before a weekday+date: a weekday range ('Tue–Sun, 17 Nov – 20 Dec'), not a date label
+_WD_SPAN_HEAD = re.compile(r"(?:" + _WD_ANY.pattern.replace("?P<d", "?P<s") + r")\s*(?:[–—−-]|to|по)\s*$", re.I)
+_WD_SPAN_TAIL = re.compile(r"\s*(?:[–—−-]|to|по)\s*(?:" + _WD_ANY.pattern.replace("?P<d", "?P<t") + r")", re.I)
 _WD_LIST_HEAD = re.compile(r"(?:" + _WD_ANY.pattern.replace("?P<d", "?P<l") + r")\s*(?:&|and|,|/|\+|и)\s*$", re.I)
 _T_STRICT = r"\d{1,2}(?:[:.]\d\d(?:\s?[ap]\.?m\.?)?|\s?[ap]\.?m\.?)"
 _TIME_RANGE = re.compile(r"(?:" + _T_STRICT + r"|\d{1,2})\s*(?:[–—−-]|to|until|till|до)\s*" + _T_STRICT
@@ -295,12 +298,14 @@ def _attach_weekdays(text: str, ms: list[_M]) -> None:
         pre = _PRE_WD.search(before)
         head = before[:pre.start()] if pre else ""
         if (pre and not _WD_PLURAL.search(pre.group(0)) and not _EVERY_TAIL.search(head)
-                and not _WD_LIST_HEAD.search(head)):
+                and not _WD_LIST_HEAD.search(head) and not _WD_SPAN_HEAD.search(head)):
             mm.wd = _wd_index(pre)
             mm.start = lo + pre.start()
             continue
         hi = ms[i + 1].start if i + 1 < len(ms) else len(text)
         post = _POST_WD.match(text[mm.end:hi])
+        if post and _WD_SPAN_TAIL.match(text[mm.end + post.end():hi]):
+            post = None                         # '20 Dec, Tue–Sun': a weekday range, not a label
         if post and not _WD_PLURAL.search(post.group(0)):
             mm.wd = _wd_index(post)
             mm.wd_post = True

@@ -53,7 +53,7 @@ def _html(conn: sqlite3.Connection, *, site: str | None = None, url: str | None 
         from src.config import all_venues
         v = next((v for v in all_venues() if v.name == site), None)
         if v is None:
-            raise SystemExit(f"no venue named {site!r} in sites.yaml")
+            raise SystemExit(f"no venue named {site!r} in sites/<city>.yaml")
         row = conn.execute("select html from scrapes where url=?", (v.resolved_url(date.today().year),)).fetchone()
     if not row:
         raise SystemExit(f"not cached: {site or url}")

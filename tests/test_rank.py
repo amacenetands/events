@@ -100,3 +100,15 @@ def test_closing_needs_started_and_stale_penalty():
     fresh = ev("s", kind="run", d=TODAY - timedelta(days=10))
     assert R.score_parts(stale, f, c)["stale"] == R.W_STALE
     assert "stale" not in R.score_parts(fresh, f, c)
+
+
+def test_pricey_uses_city_currency_and_threshold():
+    from src.config import get_city
+    f = Filter()
+    lon, mos = ctx(), ctx(city=get_city("moscow"))
+    assert R.score_parts(ev("a", price="£120"), f, lon).get("pricey")
+    assert not R.score_parts(ev("b", price="£60"), f, lon).get("pricey")
+    assert not R.score_parts(ev("c", price="5 000 ₽"), f, lon).get("pricey")    # not London's currency
+    assert R.score_parts(ev("d", price="₽ 12 000"), f, mos).get("pricey")
+    assert not R.score_parts(ev("e", price="₽ 3 000"), f, mos).get("pricey")
+    assert R.score_parts(ev("g", price="от 15 000 ₽"), f, mos).get("pricey")

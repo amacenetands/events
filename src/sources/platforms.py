@@ -68,7 +68,7 @@ def eventbrite_org(html: str, url: str = "") -> Scored | None:
     """Organiser id when `url` is an organiser page (1.0), or when one organiser owns
     ≥ 60% of ≥ 2 organiser links. A search page (/d/...) mixing many organisers —
     London Transport Museum's cached page — returns None.
-    TODO(C4): organiser-events API source; LTM needs its organiser id in sites.yaml."""
+    TODO(C4): organiser-events API source; LTM needs its organiser id in sites/<city>.yaml."""
     m = _EB_ORG.search(url)
     if m:
         return m.group(1), 1.0

@@ -21,7 +21,7 @@ def _ctx(today: date = TODAY, window: int = 365) -> SourceCtx:
 
 
 def _one(raw: RawEvent, cfg: VenueConfig | None = None, ctx: SourceCtx | None = None):
-    evs = build_event(raw, cfg or _cfg(), ctx or _ctx())
+    evs = build_events([raw], cfg or _cfg(), ctx or _ctx())     # incl. the `fix:` block
     assert len(evs) == 1, evs
     return evs[0]
 
@@ -38,9 +38,12 @@ def test_bare_range_sessions_unknown():
 
 
 def test_range_means_weekly_derives_byday():
-    cfg = _cfg(fix={"range_means_weekly": True})
+    cfg = _cfg(fix={"range_means_weekly": {"min_days": 28}})       # bare same-weekday ends: opt-in
     e = _one(RawEvent(title="Workshop", date_text="12 November 2026 – 17 December 2026"), cfg)
     assert (e.kind, e.byday, e.sessions_known) == ("run", [3], True)   # both Thursdays
+    e = _one(RawEvent(title="Workshop", date_text="12 November 2026 – 17 December 2026"),
+             _cfg(fix={"range_means_weekly": True}))
+    assert (e.byday, e.sessions_known) == (None, False)
 
 
 def test_range_means_weekly_needs_matching_weekdays():
@@ -81,7 +84,7 @@ def test_time_default_and_field_time_precedence():
 
 def test_drop_title_re_and_generic_titles():
     cfg = _cfg(fix={"drop_title_re": "^Gift Vouchers"})
-    assert build_event(RawEvent(title="Gift vouchers for Xmas", date_text="20 Nov 2026"), cfg, _ctx()) == []
+    assert build_events([RawEvent(title="Gift vouchers for Xmas", date_text="20 Nov 2026")], cfg, _ctx()) == []
     assert build_event(RawEvent(title="Concert - Sat 21 Nov", date_text="21 Nov 2026"), cfg, _ctx()) == []
     assert build_event(RawEvent(title="Gift of the Magi", date_text="20 Nov 2026"), cfg, _ctx())
 
@@ -250,3 +253,15 @@ def test_safe_records_swallows_and_reports():
     assert asyncio.run(safe_records(Boom(), _cfg(), None, ctx)) == []
     assert ctx.stats == {"boom.raised": 1}
     assert ctx.errors == ["Test Venue: source boom raised RuntimeError: bad page"]
+
+
+def test_same_key_variants_kept_within_one_source():
+    """Matinée + evening cards with no times (Green Note 2026-11-09): same title/date, other description."""
+    t = "Folk and Roots Presents: The Rheingans Sisters"
+    raws = [RawEvent(title=t, date_text="15 November 2026", desc="(Matinée)", source_kind="llm"),
+            RawEvent(title=t, date_text="15 November 2026", desc="Evening", source_kind="llm"),
+            RawEvent(title=t, date_text="15 November 2026", desc="Evening", source_kind="llm"),     # exact repeat
+            RawEvent(title=t, date_text="15 November 2026", desc="from JSON-LD", source_kind="jsonld")]
+    ctx = _ctx()
+    evs = build_events(raws, _cfg(), ctx)
+    assert [e.description for e in evs] == ["(Matinée)", "Evening"] and ctx.stats["build.kept_variant"] == 1

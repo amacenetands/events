@@ -41,16 +41,18 @@ Legacy one-shot (crawl cached sites then query with the preset; emails unless --
 
 ## Adding new venues
 
-Edit `/Users/dtonkonog/code/london_events/sites.yaml`:
+Edit `/Users/dtonkonog/code/london_events/sites/london.yaml` (or `sites/moscow.yaml`):
 
 ```yaml
-- name: "Venue Name"
-  url: "https://venue.com/events"
-  category_hint: "concert"   # concert | exhibition | kids | gallery | theatre | other
-  js_required: false         # true if JS needed to render events
-  skip: false
-  notes: "Optional context for Claude extraction"
+- name: Venue Name
+  url: https://venue.co.uk/whats-on/
+  tags: [family]             # optional: family, museums, theatres, evening, daytime
+  category_hint: concert     # theatre | concert | exhibition | lecture | gallery | kids | festival | comedy | other
+  fetch: {mode: browser}     # omit for plain http; browser / browser_stealth for JS sites
+  hint: "Times are on the detail page"   # optional, sent to the LLM: format/what to skip only
+  about: "Brief human description"       # never sent to the LLM
 ```
+Then `venv/bin/python -m src.config --check`.
 
 ## Troubleshooting
 

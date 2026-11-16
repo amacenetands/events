@@ -41,7 +41,7 @@ from src import config as _config
 
 
 def _city_tag(city: str) -> str | None:
-    """sites.yaml pipeline arg for a city's crawl (cities.yaml: None for London, "moscow")."""
+    """Legacy pipeline tag for a city's crawl (cities.yaml: None for London, "moscow")."""
     return _config.legacy_pipeline_tag(city)
 
 
@@ -101,7 +101,7 @@ async def crawl(
     if fetch_only:
         await sites
         return 0
-    api = [] if test_site else [src() for src in api_sources_for(_config.get_city(city).api_sources)]   # cities.yaml
+    api = [] if test_site else [src(city=city) for src in api_sources_for(_config.get_city(city).api_sources)]   # cities.yaml
     results = await asyncio.gather(*api, sites, return_exceptions=True)
     scraped: list[Event] = []
     for r in results[:-1]:
@@ -224,7 +224,7 @@ async def run_query(
     print(f"Filter: {describe(f, today)}\n  {len(loaded.events)} crawled → {len(events)} match"
           + (f" ({hid} untimed one-offs hidden: no start time, not daytime-inferable)" if hid else ""))
 
-    ctx = rankmod.build_ctx(loaded.first_seen, loaded.events, today=today, now=now)
+    ctx = rankmod.build_ctx(loaded.first_seen, loaded.events, today=today, now=now, city=f.city)
     new_fps = ctx.new_fps
 
     rank_on = (True if (f.rank if do_rank is None else do_rank) is None else (f.rank if do_rank is None else do_rank)) or llm_rank
@@ -339,7 +339,7 @@ def cmd_query(argv):
     p.add_argument("--days", choices=["any", "weekday", "weekend"])
     p.add_argument("--category", help="comma list: concert,theatre,exhibition,talk,workshop,tour,film,comedy,festival,other")
     p.add_argument("--venue", help="comma list of venue names")
-    p.add_argument("--venue-tag", help="comma list of sites.yaml tags (museums, theatres, family...)")
+    p.add_argument("--venue-tag", help="comma list of venue tags (sites/<city>.yaml) (museums, theatres, family...)")
     p.add_argument("--min-age-max", type=int)
     p.add_argument("--new-only", action="store_true", help="skip one-offs already sent (history)")
     p.add_argument("--keep-religious", action="store_true")

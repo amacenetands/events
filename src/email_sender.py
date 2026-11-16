@@ -65,7 +65,10 @@ def build_message(digest_markdown: str, subject: str, sender: str) -> MIMEMultip
     return msg
 
 
-def send_digest(digest_markdown: str, dry_run: bool = False, label: str = "London Events") -> None:
+def send_digest(digest_markdown: str, dry_run: bool = False, label: str | None = None) -> None:
+    if label is None:
+        from .config import get_city
+        label = get_city(None).label
     gmail_user = os.environ.get("GMAIL_USER", "")
     app_password = os.environ.get("GMAIL_APP_PASSWORD", "")
 

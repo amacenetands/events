@@ -1,14 +1,14 @@
 ---
 name: validate-venues
 description: |
-  Validate all venues in sites.yaml — HTTP-check every URL, report dead links,
+  Validate all venues in sites/<city>.yaml — HTTP-check every URL, report dead links,
   suggest marking broken ones skip:true. Trigger: "validate venues", "check urls",
   "which venues are broken", "/validate-venues".
 ---
 
 # Venue Validator
 
-Checks every URL in `sites.yaml` with real HTTP requests. Reports dead/unreachable
+Checks every URL in `sites/<city>.yaml` with real HTTP requests. Reports dead/unreachable
 venues so you can mark them `skip: true` or update the URL.
 
 ## Run it
@@ -43,7 +43,7 @@ python3 scripts/validate_venues.py --dead-only --fix-skip
 
 For each dead venue:
 1. Try opening the URL manually to find new events page
-2. If new URL found: update `sites.yaml`
+2. If new URL found: update the venue in `sites/<city>.yaml`
 3. If venue defunct: set `skip: true` with a note explaining why
 4. Run again to confirm fixed
 

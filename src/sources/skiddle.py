@@ -20,7 +20,7 @@ _CATEGORY_MAP = {
 }
 
 
-def _parse_event(raw: dict) -> Event | None:
+def _parse_event(raw: dict, city_name: str = "", currency: str = "£") -> Event | None:
     try:
         event_date_str = raw.get("date", "")
         if not event_date_str:
@@ -28,13 +28,13 @@ def _parse_event(raw: dict) -> Event | None:
         event_date = date.fromisoformat(event_date_str)
 
         venue = raw.get("venue") or {}
-        venue_name = venue.get("name") or "London"
+        venue_name = venue.get("name") or city_name or "?"
 
         etype = raw.get("EventCode", "LIVE")
         category = _CATEGORY_MAP.get(etype, "other")
 
         price_val = raw.get("entryprice", "")
-        price_str = "Free" if price_val in ("0", "0.00", "") else f"£{price_val}" if price_val else None
+        price_str = "Free" if price_val in ("0", "0.00", "") else f"{currency}{price_val}" if price_val else None
 
         title = raw.get("eventname", "")
         if not title:
@@ -60,7 +60,13 @@ def _parse_event(raw: dict) -> Event | None:
         return None
 
 
-async def fetch_skiddle() -> list[Event]:
+async def fetch_skiddle(city: str | None = None) -> list[Event]:
+    """Events within 10 miles of the city's `geo` centre (cities.yaml)."""
+    from ..config import get_city
+    c = get_city(city)
+    if not c.geo:
+        print(f"  [Skiddle] No geo for {c.name} — skipping")
+        return []
     key = os.environ.get("SKIDDLE_API_KEY", "")
     if not key:
         print("  [Skiddle] No key — skipping")
@@ -70,8 +76,8 @@ async def fetch_skiddle() -> list[Event]:
     end = start + timedelta(days=10)
     params = {
         "api_key": key,
-        "latitude": 51.5074,
-        "longitude": -0.1278,
+        "latitude": c.geo[0],
+        "longitude": c.geo[1],
         "radius": 10,
         "startdate": start.isoformat(),
         "enddate": end.isoformat(),
@@ -88,7 +94,7 @@ async def fetch_skiddle() -> list[Event]:
 
     events = []
     for raw in data.get("results", []):
-        e = _parse_event(raw)
+        e = _parse_event(raw, c.display_name, c.currency)
         if e:
             events.append(e)
 

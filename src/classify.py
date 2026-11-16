@@ -31,10 +31,18 @@ _ONLINE_T = re.compile(r"\b(?:live-?stream(?:ed)?|online|virtual(?!\s+reality)|w
 _TOWN_LIST = re.compile(r"^[A-Z][a-z]+(?: [A-Z][a-z]+)?(?:, [A-Z][a-z]+(?: [A-Z][a-z]+)?){2,}$")
 
 
-def is_elsewhere(e) -> bool:
-    """Event listed at non-London touring venues rather than the source venue."""
+def _city_re(city: str | None) -> re.Pattern:
+    from .config import get_city
+    c = get_city(city)
+    return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(w) for w in {c.name, c.display_name}) + r")(?!\w)", re.I)
+
+
+def is_elsewhere(e, city: str | None = None) -> bool:
+    """Event listed at touring venues (a list of towns) not naming `city` (default city),
+    rather than at the source venue."""
     v = (e.venue or "").strip()
-    return bool(_TOWN_LIST.match(v)) and "london" not in v.lower() and v.lower() != (e.source or "").lower()
+    return (bool(_TOWN_LIST.match(v)) and not _city_re(city).search(v)
+            and v.lower() != (e.source or "").lower())
 
 
 _POSTCODE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b", re.I)

@@ -2,7 +2,7 @@
 
 The reducer turns a venue's raw HTML into compact event records before the LLM.
 Default is `auto` (JSON harvest -> repeated cards -> flat date lines). For venues
-where that is lossy, add an `adapter:` block to the site in `sites.yaml`.
+where that is lossy, add an `adapter:` block to the site in `sites/<city>.yaml`.
 
 ## 1. YAML only (cards)
 ```yaml
@@ -29,6 +29,6 @@ class MyVenue(Adapter):
     def records(self, html, site_cfg):
         return [Rec(title=t, date="2026-12-01", url="/x") for t in ...]
 ```
-then `adapter: {kind: my_venue}` in sites.yaml. Modules in `venues/` auto-import.
+then `adapter: {kind: my_venue}` in sites/<city>.yaml. Post-extraction fix-ups are not adapters: see `src/venues/` (hooks) and the `fix:` block. Modules in `venues/` auto-import.
 
-Check results with `venv/bin/python scripts/reduce_regress.py` (read-only over cache/memory.db).
+Check results with `venv/bin/python -m pytest tests/test_reduce.py tests/test_sources_adapter.py`.

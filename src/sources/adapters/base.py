@@ -6,7 +6,7 @@ REGISTRY: dict[str, type["Adapter"]] = {}
 
 
 def register(kind: str):
-    """Class decorator: make an Adapter available as `adapter: {kind: <kind>}` in sites.yaml."""
+    """Class decorator: make an Adapter available as `adapter: {kind: <kind>}` in sites/<city>.yaml."""
     def deco(cls):
         REGISTRY[kind] = cls
         cls.kind = kind

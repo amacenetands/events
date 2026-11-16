@@ -1,4 +1,4 @@
-"""JsonAdapter: events in an inline <script> JSON blob or JS literal. sites.yaml:
+"""JsonAdapter: events in an inline <script> JSON blob or JS literal. sites/<city>.yaml:
   adapter: {kind: json, script: "script#data", js_after: "new Cal(", path: "a.b.*",
             title: title, date: start, time: t, url: url}"""
 from __future__ import annotations

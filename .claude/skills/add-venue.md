@@ -1,7 +1,7 @@
 ---
 name: add-venue
 description: |
-  Add a new venue to sites.yaml with auto-generated remove_selectors.
+  Add a new venue to sites/<city>.yaml with auto-generated remove_selectors.
   Trigger: "add venue", "add [venue name] to pipeline", "/add-venue".
 ---
 
@@ -9,17 +9,18 @@ description: |
 
 Steps when user asks to add a new venue to the events pipeline:
 
-## 1. Add entry to sites.yaml
+## 1. Add entry to sites/<city>.yaml (sites/london.yaml, sites/moscow.yaml)
 
 ```yaml
-- name: "Venue Name"
-  url: "https://venue.co.uk/whats-on/"
-  category_hint: "concert"   # concert | exhibition | theatre | family | other
-  js_required: false         # set true if site uses JS rendering
-  skip: false
-  pipeline: family           # optional: family, museums — omit for general
-  notes: "Brief description of what this venue does"
+- name: Venue Name
+  url: https://venue.co.uk/whats-on/
+  tags: [family]             # optional: family, museums, theatres, evening, daytime
+  category_hint: concert     # theatre | concert | exhibition | lecture | gallery | kids | festival | comedy | other
+  fetch: {mode: browser}     # omit for plain http; browser / browser_stealth for JS sites
+  hint: "Times are on the detail page"   # optional, sent to the LLM: format/what to skip only
+  about: "Brief human description"       # never sent to the LLM
 ```
+Then `venv/bin/python -m src.config --check`.
 
 ## 2. Validate URL reachable
 
@@ -27,7 +28,7 @@ Steps when user asks to add a new venue to the events pipeline:
 python scripts/validate_venues.py --venue "Venue Name"
 ```
 
-If 403: likely JS-rendered or Cloudflare-blocked — set `js_required: true`.
+If 403: likely JS-rendered or Cloudflare-blocked — set `fetch: {mode: browser}`.
 
 ## 3. Generate remove_selectors
 
@@ -38,10 +39,10 @@ python scripts/gen_selectors.py --venue "Venue Name" --dry-run
 python scripts/gen_selectors.py --venue "Venue Name"
 ```
 
-For JS sites (crawl4ai), generate selectors manually:
+For JS sites (browser fetch), generate selectors manually:
 - Inspect the page in browser DevTools
 - Identify non-event divs: nav menus, cookie bars, hero banners, newsletter widgets
-- Add to sites.yaml under `remove_selectors:`
+- Add to the venue in sites/<city>.yaml under `fetch: {remove_selectors: [...]}`
 
 ```yaml
   remove_selectors:
@@ -63,7 +64,7 @@ Each extracted event MUST have all five fields populated:
 - **url** — direct link to the individual event page, not the whats-on listing root
 - **description** — brief summary of what the event is
 
-If any of these are missing for most events, the page structure needs investigation — the LLM extraction prompt may need a `notes:` hint in sites.yaml explaining where dates/times appear on this site.
+If any of these are missing for most events, the page structure needs investigation — the LLM extraction prompt may need a `hint:` in sites/<city>.yaml explaining where dates/times appear on this site.
 
 If 0 results:
 - Check if site needs `js_required: true`

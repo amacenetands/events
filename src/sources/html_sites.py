@@ -10,7 +10,6 @@ ordered `extract` sources (pipeline v3 §1.2).
 import asyncio
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -22,8 +21,8 @@ from ..fetch.types import FetchResult, FetchStatus
 from ..models import Event
 from .base import SourceCtx, get_source, safe_records
 from .build import build_events
+from ..venues import run_hook
 
-SITES_YAML = Path(__file__).parent.parent.parent / "sites.yaml"
 WINDOW_DAYS = 90               # API sources (spektrix) fetch this far ahead; page sources never filter
 VENUE_CONCURRENCY = 32         # venues parsed at once (LLM / detail-page fetches have their own limits)
 # Sources that read the listing page; skipped when there is no body (api mode, nothing stored).
@@ -151,12 +150,16 @@ async def crawl_sites(
     _t0 = timing.now()
     city, venues = _venues(pipeline, test_site)
     if test_site and not venues:
-        print(f"  [crawl] Site '{test_site}' not found in sites.yaml")
+        print(f"  [crawl] Site '{test_site}' not found in {city.sites}")
         return SitesResult()
     today = city_today(city)
     offline = parse_only and not fetch_only
     res = SitesResult()
     async with httpx.AsyncClient() as client:
+        ctxs = {v.name: SourceCtx(http=client, today=today, window_days=WINDOW_DAYS, city=city,
+                                  force=force_download, force_parse=force_parse, offline=offline)
+                for v in venues}
+        venues = [run_hook("pre_fetch", v, v, ctxs[v.name]) for v in venues]     # venue hooks
         if frs is not None:
             res.frs = frs
         elif offline:
@@ -176,8 +179,9 @@ async def crawl_sites(
         async def one(cfg) -> tuple[list[Event], dict]:
             fr = res.frs.get(cfg.name) or FetchResult(FetchStatus.ERROR, url=cfg.url, note="not fetched")
             async with sem:
-                vctx = SourceCtx(http=client, today=today, window_days=WINDOW_DAYS, city=city,
-                                 force=force_download, force_parse=force_parse, offline=offline)
+                vctx = ctxs[cfg.name]
+                fr = run_hook("pre_source", cfg, fr, vctx) or FetchResult(
+                    FetchStatus.ERROR, url=cfg.url, note="dropped by venue hook")
                 try:
                     return await parse_venue(cfg, fr, vctx)
                 except Exception as ex:   # noqa: BLE001 — a build bug must not sink the crawl

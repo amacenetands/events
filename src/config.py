@@ -1,9 +1,10 @@
 """City + venue configuration (pipeline v3).
 
-`cities.yaml` names each city's tz/lang/sites file and how its venues are picked
-out of a shared sites file (`exclude_tags` / `require_tags` / `parked_tags`).
-Venues are validated into `VenueConfig`; `from_legacy` / `to_legacy_dict` bridge
-today's sites.yaml keys so the existing crawler keeps consuming plain dicts.
+`cities.yaml` names each city's tz/lang/currency and its sites file `sites/<city>.yaml`.
+A venue belongs to the city whose file lists it (an explicit `city:` must agree); tags only
+select within a city (`parked_tags`, `tags=`) and route a tag to its city (`city_for_tag`).
+Venues are validated into `VenueConfig`; `from_legacy` also accepts the pre-v3 keys and
+`to_legacy_dict` gives the plain dict older consumers read.
 
 Nothing is read at import time; loads are lazy and cached (`clear_cache()` resets).
 
@@ -30,7 +31,7 @@ LEGACY_MAX_LINKS = 120          # html_sites._follow_event_links: site.get("max_
 
 SourceKind = Literal["jsonld", "microdata", "time_tags", "next_data", "adapter",
                      "follow_links", "spektrix", "ics", "llm"]
-# Values present in sites.yaml (2026-11-15) + "other". classify maps them to categories.
+# Values present in the venue files (2026-11-15) + "other". classify maps them to categories.
 CategoryHint = Literal["theatre", "concert", "exhibition", "lecture", "gallery", "kids",
                        "festival", "comedy", "other"]
 
@@ -47,13 +48,21 @@ class CityConfig(BaseModel):
     tz: str
     lang: str = "en"
     currency: str = "£"                        # symbol for prices given without one (JSON-LD offers)
-    sites: str = "sites.yaml"                  # relative to cities.yaml
-    exclude_tags: tuple[str, ...] = ()         # venues with any of these are not in the city
-    require_tags: tuple[str, ...] = ()         # venues need one of these to be in the city
+    pricey: int = 100                          # rank: a price above this (in `currency`) is expensive
+    sites: str                                 # venues file, relative to cities.yaml
+    require_tags: tuple[str, ...] = ()         # tags that route to this city (city_for_tag)
     parked_tags: tuple[str, ...] = ()          # in the city, but only when asked for by tags=
     crawl_tags: tuple[str, ...] = ()           # legacy `pipeline=` for the city crawl (≤1)
     api_sources: tuple[str, ...] = ()
     songkick_metro: Optional[int] = None
+    geo: Optional[tuple[float, float]] = None  # (lat, lon) centre for radius-based APIs (Skiddle)
+
+    @field_validator("geo")
+    @classmethod
+    def _geo(cls, v: Optional[tuple[float, float]]) -> Optional[tuple[float, float]]:
+        if v is not None and not (-90 <= v[0] <= 90 and -180 <= v[1] <= 180):
+            raise ValueError(f"geo must be (lat -90..90, lon -180..180), got {v!r}")
+        return v
 
     @property
     def sites_path(self) -> Path:
@@ -139,15 +148,49 @@ class EnrichCfg(_Strict):
     link_pattern: Optional[str] = None
 
 
+def _check_days(v: Optional[list[int]]) -> Optional[list[int]]:
+    if v is not None and (not v or any(not 0 <= d <= 6 for d in v)):
+        raise ValueError(f"weekdays must be a non-empty list of 0..6 (0=Mon), got {v!r}")
+    return sorted(set(v)) if v is not None else None
+
+
+class RangeWeeklyCfg(_Strict):
+    """Opt-in: a bare range whose two ends fall on one weekday is a weekly series on it."""
+    min_days: int = Field(0, ge=0)             # only ranges at least this long
+    title_re: Optional[str] = None             # only titles matching (search, case-insensitive)
+
+    _re = field_validator("title_re")(_check_regex)
+
+
 class FixCfg(_Strict):
-    """Declarative post-extraction fixes (consumed from step 5)."""
-    range_means_weekly: bool = False
-    time_default: Optional[str] = None
+    """Declarative post-build fixes, applied by src/venues/fixes.apply_fixes (date_order: in build).
+    `weekly` keys are regexes matched with re.search (case-insensitive) — anchor with ^ for a
+    prefix. `byday` / `weekly` touch runs and series only: a one_off is never changed."""
+    # true: a run whose date text names one weekday plus a recurrence cue ("Fridays", "every",
+    # "weekly") with both ends on it is weekly; else sessions_known=False. The object form
+    # also accepts bare same-weekday ends (see RangeWeeklyCfg).
+    range_means_weekly: bool | RangeWeeklyCfg = False
+    time_default: Optional[str] = None         # "19:30" for timed events with no time
     date_order: Literal["dmy", "mdy", "ymd"] = "dmy"
-    url_pattern: Optional[str] = None
-    drop_title_re: Optional[str] = None
+    url_pattern: Optional[str] = None          # event URLs not matching → listing URL
+    drop_title_re: Optional[str] = None        # drop events whose title matches (case-insensitive)
+    byday: Optional[list[int]] = None          # force these weekdays (0=Mon) on every run/series
+    weekly: Optional[dict[str, list[int]]] = None   # title regex → weekdays, e.g. {"WordPlay": [4]}
 
     _re = field_validator("url_pattern", "drop_title_re")(_check_regex)
+    _days = field_validator("byday")(_check_days)
+
+    @field_validator("time_default")
+    @classmethod
+    def _hhmm(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", v):
+            raise ValueError(f"time_default must be HH:MM, got {v!r}")
+        return v
+
+    @field_validator("weekly")
+    @classmethod
+    def _weekly(cls, v: Optional[dict[str, list[int]]]) -> Optional[dict[str, list[int]]]:
+        return None if v is None else {_check_regex(k): _check_days(d) for k, d in v.items()}
 
 
 class VenueConfig(_Strict):
@@ -159,10 +202,11 @@ class VenueConfig(_Strict):
     weight: int = Field(1, ge=1, le=3)
     type: Optional[str] = None
     map: Optional[str] = None
-    # Human notes. Target: never sent to the LLM. Until the notes migration (step 5)
-    # it is still emitted as legacy `notes`, which the extract prompt includes.
+    # Human context; never meant for the LLM (legacy `notes` loads here). The migration
+    # (scripts/migrate_sites.py) moves extraction-relevant text into `hint`.
     about: Optional[str] = None
-    hint: Optional[str] = None                  # LLM-facing hint (not yet consumed)
+    hint: Optional[str] = None                  # LLM-facing hint: dates/times/prices/format/what to skip
+    hook: Optional[str] = None                  # registered src/venues hook slug (ASCII, explicit only)
     fetch: FetchCfg = Field(default_factory=FetchCfg)
     extract: list[SourceKind] = Field(default_factory=lambda: ["jsonld", "adapter", "llm"])
     merge: bool = False                         # union every `extract` source (default: first non-empty wins)
@@ -177,13 +221,25 @@ class VenueConfig(_Strict):
     must_determine_venue: bool = False
     cache_version: Optional[str | int] = None
 
+    @field_validator("hook")
+    @classmethod
+    def _hook(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not re.fullmatch(r"[a-z][a-z0-9_]*", v):
+            raise ValueError(f"hook must be an ASCII slug [a-z][a-z0-9_]*, got {v!r}")
+        return v
+
     def resolved_url(self, year: int | str) -> str:
         return self.url.replace("{YEAR}", str(year))
+
+    def map_url(self, city_display: str) -> str:
+        """`map`, else the Google Maps search the legacy metadata script generated."""
+        return self.map or derived_map(self.name, city_display)
 
     def to_legacy_dict(self) -> dict[str, Any]:
         """Inverse of from_legacy: the plain dict today's crawler consumes.
         Optional keys are emitted only when set, so `.get(k, default)` behaves as before.
-        Not emitted (no legacy consumer): city, hint, enrich, fix, disabled_reason."""
+        `hint` (LLM-facing) and `about` (human) are passed as is; `notes` is never emitted.
+        Not emitted (no legacy consumer): city, hook, enrich, fix, disabled_reason."""
         d: dict[str, Any] = {"name": self.name, "url": self.url, "category_hint": self.category_hint}
         mode = self.fetch.mode
         d["js_required"] = mode in ("browser", "browser_stealth")
@@ -195,8 +251,9 @@ class VenueConfig(_Strict):
             d["delay"] = self.fetch.delay
         if self.fetch.wait_for is not None:
             d["wait_for"] = self.fetch.wait_for
-        if self.about is not None:
-            d["notes"] = self.about
+        for k in ("hint", "about"):
+            if getattr(self, k) is not None:
+                d[k] = getattr(self, k)
         if self.tags:
             d["pipeline"] = self.tags[0] if len(self.tags) == 1 else list(self.tags)
         if self.adapter is not None:
@@ -219,7 +276,12 @@ class VenueConfig(_Strict):
         return d
 
 
-# Every key found in sites.yaml (2026-11-15: 18 keys over 391 entries) + the three
+def derived_map(name: str, city_display: str) -> str:
+    from urllib.parse import quote_plus
+    return f"https://maps.google.com/?q={quote_plus(f'{name} {city_display}')}"
+
+
+# Every key found in the pre-v3 sites.yaml (2026-11-15: 18 keys over 391 entries) + the three
 # the crawler reads but no entry sets yet (delay, wait_for, cache_version).
 LEGACY_KEYS = frozenset({
     "name", "url", "map", "type", "must_determine_venue", "category_hint", "js_required",
@@ -228,12 +290,12 @@ LEGACY_KEYS = frozenset({
     "delay", "wait_for", "cache_version",
 })
 # v3-native keys accepted as-is (so a partly migrated file still loads).
-NATIVE_KEYS = frozenset({"city", "tags", "about", "hint", "fetch", "extract", "merge", "follow",
+NATIVE_KEYS = frozenset({"city", "tags", "about", "hint", "hook", "fetch", "extract", "merge", "follow",
                          "enrich", "fix", "disabled_reason"})
 
 
 def from_legacy(d: dict[str, Any]) -> VenueConfig:
-    """Map a sites.yaml entry (legacy keys) to VenueConfig. Unknown key → ValueError."""
+    """Map a venue entry (v3-native or pre-v3 legacy keys) to VenueConfig. Unknown key → ValueError."""
     name = d.get("name", "<unnamed>")
     unknown = set(d) - LEGACY_KEYS - NATIVE_KEYS
     if unknown:
@@ -286,7 +348,9 @@ def from_legacy(d: dict[str, Any]) -> VenueConfig:
 def _read_entries(path: Path) -> list[dict[str, Any]]:
     with open(path) as fh:
         data = yaml.safe_load(fh) or {}
-    return data.get("html_sites", []) if isinstance(data, dict) else list(data)
+    if isinstance(data, dict):
+        return data.get("venues", data.get("html_sites", []))
+    return list(data)
 
 
 @lru_cache(maxsize=None)
@@ -305,14 +369,8 @@ def clear_cache() -> None:
 
 
 def _in_city(v: VenueConfig, c: CityConfig) -> bool:
-    if v.city is not None:
-        return v.city.lower() == c.name
-    t = set(v.tags)
-    if t & set(c.exclude_tags):
-        return False
-    if c.require_tags and not (t & set(c.require_tags)):
-        return False
-    return True
+    """A venue in c's file is c's venue; an explicit `city:` must agree (--check flags it)."""
+    return v.city is None or v.city.lower() == c.name
 
 
 def load_venues(city: str, *, include_disabled: bool = False,
@@ -342,29 +400,109 @@ def all_venues() -> list[VenueConfig]:
     out: list[VenueConfig] = []
     for c in load_cities().values():
         p = str(c.sites_path)
-        if p not in seen:
+        if p not in seen and c.sites_path.exists():
             seen.add(p)
             out.extend(v.model_copy(deep=True) for v in _load_file(p))
     return out
 
 
+def legacy_site_dicts(city: str | None = None) -> list[tuple[CityConfig, dict[str, Any]]]:
+    """(city, to_legacy_dict()) for every entry of one city's file (None: every city), file order.
+    For maintenance scripts that read venues; skip/disabled included."""
+    cities = [get_city(city)] if city else list(load_cities().values())
+    return [(c, v.to_legacy_dict()) for c in cities if c.sites_path.exists()
+            for v in _load_file(str(c.sites_path))]
+
+
+def insert_venue_keys(path: Path, name: str, *, top: dict[str, Any] | None = None,
+                      fetch: dict[str, Any] | None = None) -> bool:
+    """Add keys to venue `name` in a sites/<city>.yaml text-wise (comments survive): `top`
+    after the `- name:` line, `fetch` under its `fetch:` block (created when missing).
+    Existing keys are the caller's business. False when the venue is not in the file."""
+    lines = Path(path).read_text().splitlines()
+    want = re.compile(r"-\s+name:\s*[\"']?" + re.escape(name) + r"[\"']?\s*$")
+    start = next((i for i, ln in enumerate(lines) if want.fullmatch(ln)), None)
+    if start is None:
+        return False
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("- ")), len(lines))
+
+    def block(d: dict[str, Any], indent: str) -> list[str]:
+        dumped = yaml.safe_dump(d, allow_unicode=True, sort_keys=False, width=110)
+        return [indent + ln for ln in dumped.splitlines()]
+
+    if fetch:
+        f = next((i for i in range(start + 1, end) if lines[i] == "  fetch:"), None)
+        if f is None:
+            lines[end:end] = ["  fetch:"] + block(fetch, "    ")
+        else:
+            lines[f + 1:f + 1] = block(fetch, "    ")
+    if top:
+        lines[start + 1:start + 1] = block(top, "  ")
+    Path(path).write_text("\n".join(lines) + "\n")
+    clear_cache()
+    return True
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
+def _validate_file(path: Path, city: CityConfig) -> tuple[list[VenueConfig], int]:
+    """(valid venues, errors) for one city's sites file."""
+    if not path.exists():
+        print(f"ERROR {city.name}: {city.sites} missing")
+        return [], 1
+    ok: list[VenueConfig] = []
+    errors = 0
+    for d in _read_entries(path):
+        try:
+            v = from_legacy(d)
+        except ValueError as e:
+            errors += 1
+            print(f"ERROR {path.name}: {e}")
+            continue
+        if not _in_city(v, city):
+            errors += 1
+            print(f"ERROR {path.name}: venue {v.name!r} says city {v.city!r}, file is {city.name!r}")
+        ok.append(v)
+    return ok, errors
+
+
+def _check_hooks(venues: list[VenueConfig], partial: bool) -> int:
+    """cfg.hook must be registered; with every city loaded, each registered hook must be used."""
+    from .venues import load_venue_hooks
+    hooks = load_venue_hooks()
+    errors = 0
+    for v in venues:
+        if v.hook and v.hook not in hooks:
+            errors += 1
+            print(f"ERROR venue {v.name!r}: hook {v.hook!r} is not registered (src/venues/)")
+    if not partial:
+        for slug in sorted(set(hooks) - {v.hook for v in venues}):
+            errors += 1
+            print(f"ERROR hook {slug!r} is registered but no venue sets `hook: {slug}`")
+    return errors
+
+
 def _check(city: str | None) -> int:
+    """Validate every city's sites file, venue/city agreement, duplicate urls and hooks."""
     cities = [get_city(city)] if city else list(load_cities().values())
     errors = 0
+    loaded: list[VenueConfig] = []
     for c in cities:
-        entries = _read_entries(c.sites_path)
-        ok = []
-        for d in entries:
-            try:
-                ok.append(from_legacy(d))
-            except ValueError as e:
-                errors += 1
-                print(f"ERROR {e}")
-        active = load_venues(c.name) if not errors else []
-        print(f"{c.name}: {len(entries)} entries in {c.sites}, {len(ok)} valid, "
-              f"{len(active)} active (not skip/disabled/parked, in city)")
+        vs, e = _validate_file(c.sites_path, c)
+        errors += e
+        loaded += vs
+        print(f"{c.name}: {len(vs)} entries in {c.sites}, {len(vs) - e} valid")
+    seen: dict[tuple[str, str], int] = {}
+    for v in loaded:
+        seen[(v.name, v.url)] = seen.get((v.name, v.url), 0) + 1
+    for (name, url), n in seen.items():
+        if n > 1:
+            errors += 1
+            print(f"ERROR venue {name!r} ({url}) listed {n} times")
+    errors += _check_hooks(loaded, partial=city is not None)
+    if not errors:
+        for c in cities:
+            print(f"{c.name}: {len(load_venues(c.name))} active (not skip/disabled/parked)")
     return 1 if errors else 0
 
 
