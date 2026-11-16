@@ -1,0 +1,14 @@
+name: Conway Hall
+url: https://www.conwayhall.org.uk/upcomingconcerts/
+city: london
+extract:
+- jsonld
+- adapter
+- llm
+source: jsonld
+today: 2026-11-09
+venue:
+  category_hint: concert
+notes: >-
+  Page fetched 2026-11-09, cut to section.uk-section-small (event cards) + all JSON-LD.
+  JSON-LD Events carry no url; the cards link /whats-on/event/<slug>/ (More Info).

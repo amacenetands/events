@@ -15,7 +15,7 @@ def _fmt(d: dt.date) -> str:
 class ColiseumAdapter(Adapter):
     direct = True
 
-    def records(self, html: str, site_cfg: dict) -> list[Rec]:
+    def records(self, html: str, site_cfg: dict, today: dt.date | None = None) -> list[Rec]:
         sc = BeautifulSoup(html, "html.parser").select_one("script#json-data")
         if sc is None:
             return []
@@ -23,7 +23,7 @@ class ColiseumAdapter(Adapter):
             data = json.loads(sc.string or sc.get_text())
         except ValueError:
             return []
-        today, out = dt.date.today(), []
+        today, out = today or dt.date.today(), []
         for prod in data if isinstance(data, list) else []:
             by_title: dict[str, list] = {}
             for b in prod.get("bookings") or []:

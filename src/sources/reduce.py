@@ -34,11 +34,11 @@ def chunk_lines(lines: list[str], size: int = CHUNK_CHARS) -> list[str]:
     return out
 
 
-def reduce_site(html: str, site: dict, pre_text: str | None = None) -> Reduced:
+def reduce_site(html: str, site: dict, pre_text: str | None = None, today=None) -> Reduced:
     name = site.get("name", "?")
     set_site_host(site.get("url"))
     if not html:
-        recs = text_records(pre_text or "")
+        recs = text_records(pre_text or "", today=today)
         adapter_name = "text"
     else:
         try:
@@ -46,11 +46,11 @@ def reduce_site(html: str, site: dict, pre_text: str | None = None) -> Reduced:
         except KeyError:              # kind served by a source, not an adapter (e.g. spektrix)
             adapter = AutoAdapter()
         adapter_name = adapter.kind
-        recs = adapter.dedupe([r for r in adapter.records(html, site)])
+        recs = adapter.dedupe([r for r in adapter.records(html, site, today=today)])
         if not recs and adapter.kind != "auto":
             print(f"  [reduce] {name}: adapter {adapter.kind!r} found 0 records — falling back to auto")
             adapter, adapter_name = AutoAdapter(), "auto"
-            recs = adapter.records(html, site)
+            recs = adapter.records(html, site, today=today)
     lines = [r.line() for r in recs]
     chunks = chunk_lines(lines)
     if len(chunks) > MAX_CHUNKS:

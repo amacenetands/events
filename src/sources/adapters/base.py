@@ -1,5 +1,6 @@
 """Adapter base: Rec record, registry, Adapter ABC. See README.md."""
 from __future__ import annotations
+import datetime as dt
 import dataclasses as dc
 
 REGISTRY: dict[str, type["Adapter"]] = {}
@@ -36,7 +37,9 @@ class Adapter:
     kind = ""
     direct = False   # fully structured records -> build Events without the LLM
 
-    def records(self, html: str, site_cfg: dict) -> list[Rec]:
+    def records(self, html: str, site_cfg: dict, today: dt.date | None = None) -> list[Rec]:
+        """Records of one page. `today` (crawl date; None = wall clock) for adapters that drop
+        past dates or infer years."""
         raise NotImplementedError
 
     @staticmethod

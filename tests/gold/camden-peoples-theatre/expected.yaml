@@ -1,0 +1,167 @@
+- title: Sharp Edges
+  date: '2026-11-11'
+  end_date: '2026-11-14'
+  kind: run
+  byday: null
+  time: null
+  price: £12 – £18
+  url: https://cptheatre.co.uk/whatson/Sharp-Edges
+  sessions_known: false
+  start_known: true
+  evidence: 'JSON-LD Event name=''Sharp Edges'' startDate=2026-11-11 endDate=2026-11-14 offers.price=''12 - 18'' offers.url=https://cptheatre.co.uk/whatson/Sharp-Edges (body is JS-rendered: no time on page)'
+- title: HUG PIECE
+  date: '2026-11-13'
+  end_date: '2026-11-14'
+  kind: run
+  byday: null
+  time: null
+  price: £12 – £18
+  url: https://cptheatre.co.uk/whatson/HUG-PIECE-26
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''HUG PIECE'' startDate=2026-11-13 endDate=2026-11-14 offers.price=''12 - 18'' offers.url=https://cptheatre.co.uk/whatson/HUG-PIECE-26 (body is JS-rendered: no time on page)'
+- title: Trans People Are Awful Trans + Night
+  date: '2026-11-18'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: PWYC from £1
+  url: https://cptheatre.co.uk/whatson/Trans-People-Are-Awful-Trans-Night
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''Trans People Are Awful Trans + Night'' startDate=2026-11-18 endDate=2026-11-18 offers.price=''PWYC from 1'' offers.url=https://cptheatre.co.uk/whatson/Trans-People-Are-Awful-Trans-Night (body is JS-rendered: no time on
+    page)'
+- title: Tripping Out (WIP)
+  date: '2026-11-20'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: £10
+  url: https://cptheatre.co.uk/whatson/Tripping-Out-WIP
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''Tripping Out (WIP)'' startDate=2026-11-20 endDate=2026-11-20 offers.price=''10'' offers.url=https://cptheatre.co.uk/whatson/Tripping-Out-WIP (body is JS-rendered: no time on page)'
+- title: Washed Ashore (WIP)
+  date: '2026-11-24'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: £10
+  url: https://cptheatre.co.uk/whatson/Washed-Ashore-WIP
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''Washed Ashore (WIP)'' startDate=2026-11-24 endDate=2026-11-24 offers.price=''10'' offers.url=https://cptheatre.co.uk/whatson/Washed-Ashore-WIP (body is JS-rendered: no time on page)'
+- title: This Offers No Solutions (WIP)
+  date: '2026-11-24'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: £10
+  url: https://cptheatre.co.uk/whatson/This-Offers-No-Solutions-WIP
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''This Offers No Solutions (WIP)'' startDate=2026-11-24 endDate=2026-11-24 offers.price=''10'' offers.url=https://cptheatre.co.uk/whatson/This-Offers-No-Solutions-WIP (body is JS-rendered: no time on page)'
+- title: Boys Beware (WIP)
+  date: '2026-11-25'
+  end_date: '2026-11-26'
+  kind: run
+  byday: null
+  time: null
+  price: £10
+  url: https://cptheatre.co.uk/whatson/Boys-Beware-WIP
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''Boys Beware (WIP)'' startDate=2026-11-25 endDate=2026-11-26 offers.price=''10'' offers.url=https://cptheatre.co.uk/whatson/Boys-Beware-WIP (body is JS-rendered: no time on page)'
+- title: White Gold
+  date: '2026-11-25'
+  end_date: '2026-11-28'
+  kind: run
+  byday: null
+  time: null
+  price: £12 – £18
+  url: https://cptheatre.co.uk/whatson/White-Gold
+  sessions_known: false
+  start_known: true
+  evidence: 'JSON-LD Event name=''White Gold'' startDate=2026-11-25 endDate=2026-11-28 offers.price=''12 - 18'' offers.url=https://cptheatre.co.uk/whatson/White-Gold (body is JS-rendered: no time on page)'
+- title: An Evening with Camden Youth Theatre
+  date: '2026-12-01'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: PWYC from £3
+  url: https://cptheatre.co.uk/whatson/An-Evening-with-Camden-Youth-Theatre
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''An Evening with Camden Youth Theatre'' startDate=2026-12-01 endDate=2026-12-01 offers.price=''PWYC from 3'' offers.url=https://cptheatre.co.uk/whatson/An-Evening-with-Camden-Youth-Theatre (body is JS-rendered: no time
+    on page)'
+- title: VV Showdown
+  date: '2026-12-02'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: PWYC from £5
+  url: https://cptheatre.co.uk/whatson/VV-Showdown
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''VV Showdown'' startDate=2026-12-02 endDate=2026-12-02 offers.price=''PWYC from 5'' offers.url=https://cptheatre.co.uk/whatson/VV-Showdown (body is JS-rendered: no time on page)'
+- title: Hot Gay Xmas Shit
+  date: '2026-12-03'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: PWYC from £5
+  url: https://cptheatre.co.uk/whatson/Hot-Gay-Xmas-Shit
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''Hot Gay Xmas Shit'' startDate=2026-12-03 endDate=2026-12-03 offers.price=''PWYC from 5'' offers.url=https://cptheatre.co.uk/whatson/Hot-Gay-Xmas-Shit (body is JS-rendered: no time on page)'
+- title: TwitchKitsch
+  date: '2026-12-04'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: null
+  url: https://cptheatre.co.uk/whatson/TwitchKitsch
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''TwitchKitsch'' startDate=2026-12-04 endDate=2026-12-04 offers.price=''No booking required'' offers.url=https://cptheatre.co.uk/whatson/TwitchKitsch (body is JS-rendered: no time on page)'
+- title: 'Camden Meeple''s Theatre: Board Game Day'
+  date: '2026-12-05'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: PWYC from £5
+  url: https://cptheatre.co.uk/whatson/Board-Game-Day
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name="Camden Meeple''s Theatre: Board Game Day" startDate=2026-12-05 endDate=2026-12-05 offers.price=''PWYC from 5'' offers.url=https://cptheatre.co.uk/whatson/Board-Game-Day (body is JS-rendered: no time on page)'
+- title: Self and Other Fictions An Anthology
+  date: '2026-12-08'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: £12
+  url: https://cptheatre.co.uk/whatson/Self-and-Other-Fictions-An-Anthology
+  sessions_known: true
+  start_known: true
+  evidence: 'JSON-LD Event name=''Self and Other Fictions An Anthology'' startDate=2026-12-08 endDate=2026-12-08 offers.price=''12'' offers.url=https://cptheatre.co.uk/whatson/Self-and-Other-Fictions-An-Anthology (body is JS-rendered: no time on page)'
+- title: Vincent
+  date: '2027-01-14'
+  end_date: '2027-01-23'
+  kind: run
+  byday: null
+  time: null
+  price: £20
+  url: https://cptheatre.co.uk/whatson/Vincent
+  sessions_known: false
+  start_known: true
+  evidence: 'JSON-LD Event name=''Vincent'' startDate=2027-01-14 endDate=2027-01-23 offers.price=''20'' offers.url=https://cptheatre.co.uk/whatson/Vincent (body is JS-rendered: no time on page)'

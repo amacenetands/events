@@ -265,3 +265,14 @@ def test_same_key_variants_kept_within_one_source():
     ctx = _ctx()
     evs = build_events(raws, _cfg(), ctx)
     assert [e.description for e in evs] == ["(Matinée)", "Evening"] and ctx.stats["build.kept_variant"] == 1
+
+
+@pytest.mark.parametrize("text,known", [
+    ("13 – 14 November 2026", True),        # 2-day range: both days are sessions
+    ("25 November 2026 – 26 November 2026", True),
+    ("10 – 14 November 2026", False),       # longer bare range: sessions unknown
+])
+def test_short_range_sessions_known(text, known):
+    cfg = VenueConfig(name="V", url="https://v.org/")
+    (e,) = build_events([RawEvent(title="Show", date_text=text)], cfg, _ctx(date(2026, 11, 1)))
+    assert (e.kind, e.sessions_known) == ("run", known)

@@ -1,0 +1,33 @@
+- title: Baby Rhyme Time
+  date: 2026-09-03
+  end_date: 2027-03-25
+  kind: recurring
+  byday: [Thu]
+  time: "10:00"
+  price: Free
+  url: https://library.example.org/events/baby-rhyme-time
+  sessions_known: true
+  start_known: true
+  evidence: 'Baby Rhyme Time Thursdays 10am, 3 September 2026 – 25 March 2027. Free ; JSON-LD startDate 2026-09-03, eventSchedule byDay [schema.org/Thursday] startTime 10:00:00 P1W, offers.price 0'
+- title: Lego Club
+  date: 2026-10-01
+  end_date: 2027-02-25
+  kind: recurring
+  byday: [Thu]
+  time: "16:00"
+  price: £2
+  url: https://library.example.org/events/lego-club
+  sessions_known: true
+  start_known: true
+  evidence: 'Lego Club Thursdays 4pm, 1 October 2026 – 25 February 2027. £2. ; JSON-LD eventSchedule byDay "Thursday" (plain string) startTime 16:00 scheduleTimezone Europe/London'
+- title: Winter Book Fair
+  date: 2026-12-12
+  end_date: null
+  kind: one_off
+  byday: null
+  time: "11:00"
+  price: £4 – £12
+  url: https://library.example.org/events/winter-book-fair
+  sessions_known: true
+  start_known: true
+  evidence: 'Winter Book Fair Saturday 12 December 2026, 11am–4pm. Tickets £4–£12. ; JSON-LD offers [4, 12]'

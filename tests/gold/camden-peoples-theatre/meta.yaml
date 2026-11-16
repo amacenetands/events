@@ -1,0 +1,13 @@
+name: Camden People's Theatre
+url: https://cptheatre.co.uk/Whats-On
+city: london
+extract:
+- jsonld
+- adapter
+- llm
+source: jsonld
+today: 2026-11-09
+venue:
+  category_hint: theatre
+notes: >-
+  Page fetched 2026-11-09. Body is JS-rendered (no visible text): JSON-LD is the only source. Event pages are offers.url; prices like "PWYC from 1" (lowest = 1).

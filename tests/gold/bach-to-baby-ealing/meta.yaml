@@ -1,0 +1,13 @@
+name: Bach to Baby Ealing
+url: https://www.bachtobaby.com/ealing-music-concerts-for-baby-and-family
+city: london
+extract:
+- jsonld
+- adapter
+- llm
+source: jsonld
+today: 2026-11-06
+venue:
+  category_hint: kids
+notes: >-
+  Page fetched 2026-11-06. JSON-LD has only the first concert; the HTML lists two more (19 Dec 10.00am / 11.30am) with no JSON-LD node, so jsonld winning alone loses them.

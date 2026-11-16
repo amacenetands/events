@@ -43,7 +43,7 @@ def raws_from_html(html: str, cfg: VenueConfig, ctx: SourceCtx, base: str = "") 
         return []
     token = set_site_host(site["url"])
     try:
-        recs = [r for r in Adapter.dedupe(adapter.records(html, site)) if r.title]
+        recs = [r for r in Adapter.dedupe(adapter.records(html, site, today=ctx.today)) if r.title]
     finally:
         _SITE_HOST.reset(token)
     if not recs:

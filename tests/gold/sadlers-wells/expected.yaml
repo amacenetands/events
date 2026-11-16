@@ -1,0 +1,154 @@
+- title: Germán Cornejo’s Tango After Dark
+  date: '2026-11-09'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/g-cornejo-tango-after-dark/
+  sessions_known: true
+  start_known: true
+  evidence: 'card: Germán Cornejo’s Tango After Dark | 9 November 2026 | Sadler''s Wells Theatre'
+- title: HUMANHOOD - Vortex
+  date: '2026-11-10'
+  end_date: '2026-11-14'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/humanhood-vortex/
+  sessions_known: false
+  start_known: true
+  evidence: 'card: HUMANHOOD - Vortex | 10 – 14 November 2026 | Sadler''s Wells East'
+- title: My Fierce Ignorant Step - Christos Papadopoulos
+  date: '2026-11-13'
+  end_date: '2026-11-14'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/my-fierce-ignorant-step-christos-papadopoulos/
+  sessions_known: true
+  start_known: true
+  evidence: 'card: My Fierce Ignorant Step - Christos Papadopoulos | 13 – 14 November 2026 | Sadler''s Wells Theatre (2-day range: both days)'
+- title: Martha Graham Dance Company - Inner Landscape - Programme A
+  date: '2027-01-20'
+  end_date: '2027-01-23'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/martha-graham-dance-programme-a/
+  sessions_known: false
+  start_known: true
+  evidence: '[C] Martha Graham Dance Company - Inner Landscape - Programme A | 20 – 23 January 2027 | Sadler''s Wells Theatre (no time/price on listing)'
+- title: The Snowman
+  date: '2026-11-21'
+  end_date: '2027-01-03'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/the-snowman-2026/
+  sessions_known: false
+  start_known: true
+  evidence: '[C] The Snowman | 21 November – 3 January 2027 | Peacock Theatre (no time/price on listing)'
+- title: Wang Yeu-Kwn / Shimmering Production - Islands
+  date: '2027-02-02'
+  end_date: '2027-02-03'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/shimmering-production-islands/
+  sessions_known: true
+  start_known: true
+  evidence: '[C] Wang Yeu-Kwn / Shimmering Production - Islands | 2 – 3 February 2027 | Lilian Baylis Studio (no time/price on listing)'
+- title: Ebony Scrooge - ZooNation
+  date: '2026-11-24'
+  end_date: '2027-01-03'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/ebony-scrooge-zoonation-2026/
+  sessions_known: false
+  start_known: true
+  evidence: '[C] Ebony Scrooge - ZooNation | 24 November – 3 January 2027 | Sadler''s Wells East (no time/price on listing)'
+- title: Family Freestyle at Sadler's Wells East
+  date: '2026-11-12'
+  end_date: '2026-12-17'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/family-freestyle-sadlers-wells-east-2027/
+  sessions_known: false
+  start_known: true
+  evidence: '[C] Family Freestyle at Sadler''s Wells East | 12 November 2026 – 17 December 2026 | Sadler''s Wells East (no time/price on listing) (no weekday on the listing; both range ends are Thursdays)'
+- title: Culture Club
+  date: '2026-11-13'
+  end_date: '2027-03-19'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: false
+  start_known: true
+  evidence: '[C] Culture Club | 13 November – 19 March 2027 | Sadler''s Wells Theatre (no time/price on listing) (no weekday on the listing; both range ends are Fridays)'
+- title: BalletBoyz - Six Lethargies
+  date: '2026-11-18'
+  end_date: '2026-11-21'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/balletboyz-six-lethargies/
+  sessions_known: false
+  start_known: true
+  evidence: '[C] BalletBoyz - Six Lethargies | 18 – 21 November 2026 | Sadler''s Wells Theatre (no time/price on listing)'
+- title: Georgia Tegou - In the Quiet of Us
+  date: '2026-11-19'
+  end_date: '2026-11-21'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/georgia-tegou-in-the-quiet-of-us/
+  sessions_known: false
+  start_known: true
+  evidence: '[C] Georgia Tegou - In the Quiet of Us | 19 – 21 November 2026 | Lilian Baylis Studio (no time/price on listing)'
+- title: Take a Bow Productions – Let’s Take a Bow
+  date: '2026-11-22'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/lets-take-a-bow-nov-2026/
+  sessions_known: true
+  start_known: true
+  evidence: '[C] Take a Bow Productions – Let’s Take a Bow | 22 November 2026 | Sadler''s Wells Theatre (no time/price on listing)'
+- title: 'Rhythms of the Divine: Mevlevi Sema Ceremony and Turkish Sufi Music Concert'
+  date: '2026-11-23'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/mevlevi-sema-ceremony-and-turkish-sufi-music-concert/
+  sessions_known: true
+  start_known: true
+  evidence: '[C] Rhythms of the Divine: Mevlevi Sema Ceremony and Turkish Sufi Music Concert | 23 November 2026 | Sadler''s Wells Theatre (no time/price on listing)'
+- title: Aditi Mangaldas Dance Company - WITHIN
+  date: '2026-11-27'
+  end_date: '2026-11-28'
+  kind: run
+  byday: null
+  time: null
+  price: null
+  url: https://www.sadlerswells.com/whats-on/aditi-mangaldas-dance-company-within/
+  sessions_known: true
+  start_known: true
+  evidence: '[C] Aditi Mangaldas Dance Company - WITHIN | 27 – 28 November 2026 | Sadler''s Wells Theatre (no time/price on listing)'

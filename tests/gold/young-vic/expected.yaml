@@ -1,0 +1,88 @@
+- title: EUROTRASH
+  date: '2026-11-16'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '19:30'
+  price: From £12
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=10601APSKMRRDLKDGKBKNPNLTDRGCSHLR start=2026-11-16T19:30:00 isOnSale=True prices 12..62 (API has no webEventId -> listing url)
+- title: EUROTRASH
+  date: '2026-11-17'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '19:30'
+  price: From £12
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=10601APSKMRRDLKDGKBKNPNLTDRGCSHLR start=2026-11-17T19:30:00 isOnSale=True prices 12..62 (API has no webEventId -> listing url)
+- title: EUROTRASH
+  date: '2026-11-18'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '19:30'
+  price: From £12
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=10601APSKMRRDLKDGKBKNPNLTDRGCSHLR start=2026-11-18T19:30:00 isOnSale=True prices 12..62 (API has no webEventId -> listing url)
+- title: EUROTRASH
+  date: '2026-11-20'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '19:30'
+  price: From £12
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=10601APSKMRRDLKDGKBKNPNLTDRGCSHLR start=2026-11-20T19:30:00 isOnSale=True prices 12..76 (API has no webEventId -> listing url)
+- title: GIRLS
+  date: '2026-11-16'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '20:00'
+  price: £29
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT start=2026-11-16T20:00:00 isOnSale=True prices 29..29 (API has no webEventId -> listing url)
+- title: GIRLS
+  date: '2026-11-17'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '20:00'
+  price: £29
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT start=2026-11-17T20:00:00 isOnSale=True prices 29..29 (API has no webEventId -> listing url)
+- title: GIRLS
+  date: '2026-11-18'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '15:00'
+  price: £29
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT start=2026-11-18T15:00:00 isOnSale=True prices 29..29 (API has no webEventId -> listing url)
+- title: GIRLS
+  date: '2026-11-18'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '20:00'
+  price: £29
+  url: https://www.youngvic.org/whats-on/
+  sessions_known: true
+  start_known: true
+  evidence: bulk instance event=11001ATRSBGDJMQQMCVKRJSQJPSBBHRPT start=2026-11-18T20:00:00 isOnSale=True prices 29..29 (API has no webEventId -> listing url)

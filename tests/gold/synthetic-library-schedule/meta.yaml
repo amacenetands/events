@@ -1,0 +1,14 @@
+name: Example Library
+url: https://library.example.org/whats-on/
+city: london
+extract: [jsonld, adapter, llm]
+source: jsonld
+today: 2026-11-15
+venue:
+  category_hint: kids
+notes: >-
+  SYNTHETIC page: no cached page in cache/memory.db carries a schema.org eventSchedule
+  (2026-11-15 scan matched only "EventScheduled"), so this page is hand-written in the
+  shape of the Schedule nodes the jsonld source supports. Covers eventSchedule byDay (URL list
+  and plain string + scheduleTimezone) +
+  startTime, price 0 = Free, offers list = price range.

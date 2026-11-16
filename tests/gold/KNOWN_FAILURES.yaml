@@ -1,0 +1,358 @@
+# Gold events the CURRENT pipeline gets wrong; tests/test_eval.py asserts the failure set
+# (venue, title, date, field, got) equals this file. A fix shows up as UNEXPECTED PASS (delete
+# the entry/field), a different wrong value as NEW: then refresh tests/gold/baseline.json with
+# `scripts/eval.py --update-baseline`. See tests/gold/README.md.
+# date: gold date (+ "T<time>" when gold has a time; pipeline date for "extra");
+# got: {field: pipeline value (normalised)}; field "missing" = gold event not produced,
+# "extra" = pipeline event not in gold.
+- venue: bach-to-baby-ealing
+  title: Christmastide / Bach to Baby Festive Family Concert
+  date: 2026-12-19T10:00
+  got:
+    missing: null
+  reason: jsonld wins with a partial JSON-LD (1 of 3 concerts); first-non-empty source order never lets llm see the HTML-only concerts
+- venue: bach-to-baby-ealing
+  title: Christmastide / Bach to Baby Festive Family Concert
+  date: 2026-12-19T11:30
+  got:
+    missing: null
+  reason: jsonld wins with a partial JSON-LD (1 of 3 concerts); first-non-empty source order never lets llm see the HTML-only concerts
+- venue: barbican
+  title: NAZA
+  date: '2026-10-16'
+  got:
+    missing: null
+  reason: 'follow_links: byline date range "Fri 16 Oct — Wed 18 Nov 2026" (film run) read as one screening = first upcoming <time> (the end, 18 Nov 18:15), not a run; gold run is missed and the screening
+    is extra'
+- venue: barbican
+  title: NAZA
+  date: 2026-11-18T18:15
+  got:
+    extra: '2026-11-18'
+  reason: 'follow_links: byline date range "Fri 16 Oct — Wed 18 Nov 2026" (film run) read as one screening = first upcoming <time> (the end, 18 Nov 18:15), not a run; gold run is missed and the screening
+    is extra'
+- venue: cafe-oto
+  title: 'Unpredictable presents: ✦ MEXICAN CONFLUENCES ✦ feat. Piña para la Niña'
+  date: 2026-11-15T19:30
+  got:
+    price: '15'
+  reason: 'multi-tier price "£15 | £12 Advance | £8 MEMBERS": parse_price_text takes the first amount, not the lowest general-admission one'
+- venue: cafe-oto
+  title: 'Infant Tree + KRAAK present: KRAAKLINGS w/ Horacio Pollard + Venediktos Tempelboom + Kiara Govaert'
+  date: 2026-11-16T19:30
+  got:
+    price: '14'
+  reason: 'multi-tier price "£15 | £12 Advance | £8 MEMBERS": parse_price_text takes the first amount, not the lowest general-admission one'
+- venue: cafe-oto
+  title: 'EFG London Jazz Festival: Robyn''s Rocket – w/ Laura Jurd & Robyn Rocket + Little Kali + ATMoss + Live Visuals by Rucksack cinema and Jade'
+  date: 2026-11-17T19:30
+  got:
+    price: '15'
+  reason: 'multi-tier price "£15 | £12 Advance | £8 MEMBERS": parse_price_text takes the first amount, not the lowest general-admission one'
+- venue: cafe-oto
+  title: JIMI TENOR BAND – Two-Day Residency
+  date: '2026-11-20'
+  got:
+    price: '19'
+  reason: LLM (recorded deepseek) copied the previous card's "£19 | £17 Advance" (Maxine Funke) onto a card with no price
+- venue: cafe-oto
+  title: 'Upset The Rhythm presents: Wendy Eisenberg + Jasper Llewellyn'
+  date: 2026-11-09T19:30
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: cafe-oto
+  title: Sam Eastmond’s Bagatelles Band
+  date: 2026-11-10T19:30
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: cafe-oto
+  title: 'SAGOME 029: LOVE SONGS + REGINA COLLAGE + STELLA Z (DJ)'
+  date: 2026-11-11T19:30
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: cafe-oto
+  title: 'SPACE 5: Michael Barthel / Luciano Maggiore + Seijiro Murayama / Silvan Schmid + Zara Joan-Miller / Ellis Berwick + Regan Bowering (solo piece)'
+  date: 2026-11-12T19:30
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: cafe-oto
+  title: Dudú Kouaté & Ernst Reijseger – solos and duo
+  date: 2026-11-13T19:30
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: cafe-oto
+  title: OFFSITE SHOW Zach Rowden + Lauren Tosswill + Rory Salter / Caius Williams / Regan Bowering + Vicky Sparrow
+  date: 2026-11-14T14:00
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: cafe-oto
+  title: Maxine Funke + Clayton Noone + Time Is Away (DJ)
+  date: 2026-11-14T19:30
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: camden-peoples-theatre
+  title: Sharp Edges
+  date: '2026-11-11'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: HUG PIECE
+  date: '2026-11-13'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: Trans People Are Awful Trans + Night
+  date: '2026-11-18'
+  got:
+    price: null
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'price "PWYC from 1" normalised to "Pay what you can"; the minimum amount is dropped; jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: Tripping Out (WIP)
+  date: '2026-11-20'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: Washed Ashore (WIP)
+  date: '2026-11-24'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: This Offers No Solutions (WIP)
+  date: '2026-11-24'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: Boys Beware (WIP)
+  date: '2026-11-25'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: White Gold
+  date: '2026-11-25'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: An Evening with Camden Youth Theatre
+  date: '2026-12-01'
+  got:
+    price: null
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'price "PWYC from 1" normalised to "Pay what you can"; the minimum amount is dropped; jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: VV Showdown
+  date: '2026-12-02'
+  got:
+    price: null
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'price "PWYC from 1" normalised to "Pay what you can"; the minimum amount is dropped; jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: Hot Gay Xmas Shit
+  date: '2026-12-03'
+  got:
+    price: null
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'price "PWYC from 1" normalised to "Pay what you can"; the minimum amount is dropped; jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: TwitchKitsch
+  date: '2026-12-04'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: 'Camden Meeple''s Theatre: Board Game Day'
+  date: '2026-12-05'
+  got:
+    price: null
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'price "PWYC from 1" normalised to "Pay what you can"; the minimum amount is dropped; jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: Self and Other Fictions An Anthology
+  date: '2026-12-08'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: camden-peoples-theatre
+  title: Vincent
+  date: '2027-01-14'
+  got:
+    url: https://cptheatre.co.uk/Whats-On
+  reason: 'jsonld: Event has no url, offers.url is the event page, but build falls back to the listing URL'
+- venue: jazz-esse
+  title: Джазовый бранч с Меланией Кова
+  date: 2026-09-13T15:00
+  got:
+    price: null
+  reason: RU price "от 750р" (р = ruble abbreviation) not recognised by parse_price_text ("вход свободный" works)
+- venue: jazz-esse
+  title: Armir Lee MB Electric
+  date: 2026-09-13T20:00
+  got:
+    price: null
+  reason: RU price "от 750р" (р = ruble abbreviation) not recognised by parse_price_text ("вход свободный" works)
+- venue: jazz-esse
+  title: N-CODE BAND & NADIA KUZNETSOVA
+  date: 2026-09-14T20:00
+  got:
+    price: null
+  reason: RU price "от 750р" (р = ruble abbreviation) not recognised by parse_price_text ("вход свободный" works)
+- venue: jazz-esse
+  title: 'Культограм: Наука и искусство. Трилогия - интеллектуальный стендап'
+  date: 2026-09-16T19:30
+  got:
+    price: null
+  reason: RU price "от 750р" (р = ruble abbreviation) not recognised by parse_price_text ("вход свободный" works)
+- venue: jazz-esse
+  title: 'Культограм: «Кутеж по-московски»'
+  date: 2026-09-17T19:30
+  got:
+    price: null
+  reason: RU price "от 750р" (р = ruble abbreviation) not recognised by parse_price_text ("вход свободный" works)
+- venue: jazz-esse
+  title: Квартет Андрея Красильникова
+  date: 2026-09-17T20:00
+  got:
+    price: null
+  reason: RU price "от 750р" (р = ruble abbreviation) not recognised by parse_price_text ("вход свободный" works)
+- venue: london-coliseum
+  title: Iphigénie en Tauride
+  date: 2026-11-09T19:30
+  got:
+    end_date: '2026-11-14'
+    kind: run
+    sessions_known: false
+  reason: coliseum adapter collapses explicit per-performance bookings into one range run (sessions_known False, first time only)
+- venue: london-coliseum
+  title: Iphigénie en Tauride
+  date: 2026-11-11T19:30
+  got:
+    missing: null
+  reason: coliseum adapter collapses explicit per-performance bookings into one range run (sessions_known False, first time only)
+- venue: london-coliseum
+  title: Iphigénie en Tauride
+  date: 2026-11-14T18:00
+  got:
+    missing: null
+  reason: coliseum adapter collapses explicit per-performance bookings into one range run (sessions_known False, first time only)
+- venue: sadlers-wells
+  title: Germán Cornejo’s Tango After Dark
+  date: '2026-11-09'
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: sadlers-wells
+  title: HUMANHOOD - Vortex
+  date: '2026-11-10'
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: sadlers-wells
+  title: My Fierce Ignorant Step - Christos Papadopoulos
+  date: '2026-11-13'
+  got:
+    missing: null
+  reason: 'LLM recall: the recorded reply was made when the reducer filtered with the wall clock (2026-11-15), so the 9-14 Nov cards never reached the model; not re-recorded'
+- venue: synthetic-library-schedule
+  title: Baby Rhyme Time
+  date: 2026-09-03T10:00
+  got:
+    kind: run
+  reason: jsonld eventSchedule (byDay list or plain string) is emitted as kind run; the step-4 series contract is recurring + byday
+- venue: synthetic-library-schedule
+  title: Lego Club
+  date: 2026-10-01T16:00
+  got:
+    kind: run
+  reason: jsonld eventSchedule (byDay list or plain string) is emitted as kind run; the step-4 series contract is recurring + byday
+- venue: vam
+  title: Freddie Mercury | Splendid Things
+  date: '2026-11-09'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: Cloak & Dagger Couture
+  date: '2026-11-09'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: 'Lunchtime Lectures: Gilded Age Fashion'
+  date: '2026-11-12'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: Meet the Makers with Sheffield Museums
+  date: '2026-11-13'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: In Celebration of Winifred Atwell
+  date: '2026-11-13'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: Antique to Early Christian (in-person)
+  date: '2026-11-09'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: 'British Theatre 2026: An Overview'
+  date: '2026-10-11'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: Gardens and Art
+  date: '2026-11-12'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: Metalworking Now (2026-27)
+  date: '2026-11-09'
+  got:
+    price: null
+  reason: 'cards adapter config has no price selector: card price ("Free", "£15.00 - £20.00") is dropped'
+- venue: vam
+  title: National Art Library and Archive talks Monday 11.30
+  date: 2026-11-09T11:30
+  got:
+    missing: null
+  reason: 'cards adapter: "Every Monday until 28th December 2026, excluding 8th June and 31st August" is not a Monday series from today: no byday/time ("Monday 11.30" in the title), dated by its end'
+- venue: vam
+  title: National Art Library and Archive talks Monday
+  date: '2026-12-28'
+  got:
+    extra: '2026-12-28'
+  reason: 'cards adapter: the series end and the "excluding 8th June and 31st August" dates are emitted as one-day events'
+- venue: vam
+  title: National Art Library and Archive talks Monday
+  date: '2027-06-08'
+  got:
+    extra: '2027-06-08'
+  reason: 'cards adapter: the series end and the "excluding 8th June and 31st August" dates are emitted as one-day events'
+- venue: vam
+  title: National Art Library and Archive talks Monday
+  date: '2027-08-31'
+  got:
+    extra: '2027-08-31'
+  reason: 'cards adapter: the series end and the "excluding 8th June and 31st August" dates are emitted as one-day events'

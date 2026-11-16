@@ -40,7 +40,7 @@ def site_data(cfg: VenueConfig, fr: FetchResult, ctx: SourceCtx) -> dict | None:
     site = cfg.to_legacy_dict()
     site["url"] = base_url(cfg, fr, ctx)
     html = fr.body if _HTML_TAG.search(fr.body or "") else ""
-    red = reduce_site(html, site, pre_text=None if html else fr.body)
+    red = reduce_site(html, site, pre_text=None if html else fr.body, today=ctx.today)
     if red.thin:
         return None
     return {

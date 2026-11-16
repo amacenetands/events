@@ -1,0 +1,11 @@
+- title: Sinatra The Musical
+  date: '2026-11-10'
+  end_date: '2027-04-10'
+  kind: run
+  byday: null
+  time: null
+  price: £35
+  url: https://secure.lovetheatre.com/book/1HU76-sinatra-the-musical/
+  sessions_known: false
+  start_known: true
+  evidence: JSON-LD top-level array TheaterEvent "Sinatra The Musical" startDate "10-11-2026" endDate "10-04-2027" (DD-MM-YYYY) offers.price "35.00" url secure.lovetheatre.com/book/1HU76-sinatra-the-musical/

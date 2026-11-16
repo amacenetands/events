@@ -1,0 +1,15 @@
+name: V&A
+url: https://www.vam.ac.uk/whatson
+city: london
+extract: [jsonld, adapter, llm]
+source: adapter
+today: 2026-11-09
+venue:
+  category_hint: exhibition
+  adapter: {kind: cards, card: li.b-event-teaser, title: .b-event-teaser__title, date: .b-icon-list__item-text, desc: .b-event-teaser__type}
+notes: >-
+  Page fetched 2026-11-09; the li.b-event-teaser list cut to 10 of 119 cards covering
+  "Closes …" / "On now until …" (start unknown), a year-less date, price ranges, Free, ranges
+  and an "Every Monday until …, excluding …" series. With the "Now open" / "On-demand" cards
+  cut, every card date parses, so the `cards` adapter wins (with them, the LLM does).
+  "On now until"/"Closes" gold: date = capture day, start_known false.

@@ -1,0 +1,13 @@
+name: Orange Tree Theatre
+url: https://orangetreetheatre.co.uk/whats-on/
+city: london
+extract: [jsonld, adapter, llm]
+source: adapter
+today: 2026-11-09
+venue:
+  category_hint: theatre
+  adapter: {kind: json, script: "script:-soup-contains('JupiterCalendar')", js_after: "new JupiterCalendar(", title: title, date: start, url: url}
+notes: >-
+  Page fetched 2026-11-09; page.html = tests/fixtures/sources/adapter_orange_tree.html (the
+  JupiterCalendar payload cut to its first 12 performances). Each performance is a separate
+  calendar entry with its own time; urls carry a #yyyymmdd fragment (dropped in gold).

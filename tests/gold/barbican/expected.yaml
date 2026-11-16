@@ -1,0 +1,22 @@
+- title: NAZA
+  date: '2026-10-16'
+  end_date: '2026-11-18'
+  kind: run
+  byday: null
+  time: null
+  price: £15.50
+  url: https://www.barbican.org.uk/whats-on/2026/event/naza
+  sessions_known: false
+  start_known: true
+  evidence: NAZA | (15) | Fri 16 Oct | — | Wed 18 Nov 2026 | , | Cinemas ; <time datetime="2026-10-16T17:30:00Z"> — <time datetime="2026-11-18T18:15:00Z"> (film run, screening days not listed) ; Standard | £15.50
+- title: 'Ensemble Pygmalion: Mozart''s Great Mass in C minor'
+  date: '2026-11-09'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '20:00'
+  price: From £24
+  url: https://www.barbican.org.uk/whats-on/2026/event/ensemble-pygmalion-mozarts-great-mass-in-c-minor
+  sessions_known: true
+  start_known: true
+  evidence: 'Ensemble Pygmalion: Mozart''s Great Mass in C minor | Mon 9 Nov 2026, 20:00 | , | Hall ; Standard | From £24 (£20 + £4 transaction fee)'

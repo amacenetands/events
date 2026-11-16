@@ -679,7 +679,8 @@ class SpektrixSource:
             st = SpektrixStats()
             out = await fetch_events(sc, http=ctx.http, start=ctx.today,
                                      end=ctx.today + timedelta(days=ctx.window_days),
-                                     stats=st, **self.fetch_kw)
+                                     stats=st, **{"now": datetime.combine(ctx.today, datetime.min.time()),
+                                                  **self.fetch_kw})
             self._report(cfg, st, ctx)
             return _fill_urls(out, body, base_url(cfg, fr, ctx)) if body else out
         except Exception as e:                               # noqa: BLE001 — never break a crawl

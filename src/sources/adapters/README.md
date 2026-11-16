@@ -26,7 +26,7 @@ from ..base import Adapter, Rec, register
 @register("my_venue")
 class MyVenue(Adapter):
     direct = True                                   # records are trustworthy -> skip LLM
-    def records(self, html, site_cfg):
+    def records(self, html, site_cfg, today=None):   # today: crawl date (None = wall clock)
         return [Rec(title=t, date="2026-12-01", url="/x") for t in ...]
 ```
 then `adapter: {kind: my_venue}` in sites/<city>.yaml. Post-extraction fix-ups are not adapters: see `src/venues/` (hooks) and the `fix:` block. Modules in `venues/` auto-import.

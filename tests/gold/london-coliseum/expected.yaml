@@ -1,0 +1,44 @@
+- title: Iphigénie en Tauride
+  date: '2026-11-09'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '19:30'
+  price: null
+  url: https://londoncoliseum.org/events/iphigenie-en-tauride/
+  sessions_known: true
+  start_known: true
+  evidence: 'json-data bookings {"event_name": "Iphigénie en Tauride", "start": "2026-11-09", "title": "7.30pm"}'
+- title: Iphigénie en Tauride
+  date: '2026-11-11'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '19:30'
+  price: null
+  url: https://londoncoliseum.org/events/iphigenie-en-tauride/
+  sessions_known: true
+  start_known: true
+  evidence: 'bookings {"start": "2026-11-11", "title": "7.30pm"}'
+- title: Iphigénie en Tauride
+  date: '2026-11-14'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '18:00'
+  price: null
+  url: https://londoncoliseum.org/events/iphigenie-en-tauride/
+  sessions_known: true
+  start_known: true
+  evidence: 'bookings {"start": "2026-11-14", "title": "6.00pm"}'
+- title: 'Sessions at the London Coliseum: Black Country, New Road'
+  date: '2026-11-13'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '19:30'
+  price: null
+  url: https://londoncoliseum.org/events/sessions-at-the-london-coliseum-black-country-new-road/
+  sessions_known: true
+  start_known: true
+  evidence: 'bookings {"event_name": "Sessions at the London Coliseum: Black Country, New Road", "start": "2026-11-13", "title": "7.30pm"}'

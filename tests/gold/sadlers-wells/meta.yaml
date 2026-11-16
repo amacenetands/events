@@ -1,0 +1,17 @@
+name: Sadler's Wells
+url: https://www.sadlerswells.com/whats-on/
+city: london
+extract:
+- jsonld
+- adapter
+- llm
+source: llm
+today: 2026-11-09
+venue:
+  category_hint: theatre
+notes: >-
+  Page fetched 2026-11-09 (cache/memory.db scrapes), cut to main#main-content; scripts/styles
+  stripped. llm_reply.json = the real deepseek EXTRACT_VERSION 8 reply (extractions row of
+  2026-11-15), made when the reducer still filtered with the wall clock (2026-11-15), so the
+  cards dated 9-14 Nov never reached the model: with today = fetch date they are gold `missing`
+  (LLM recall). Not re-recorded; text_hash re-stamped for the current reducer output.

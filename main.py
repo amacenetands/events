@@ -6,6 +6,7 @@ London / Moscow events: crawl once, query many ways.
   python main.py query --city london --when today --audience family --kinds one_off,run [--time evening]
                        [--days weekday] [--category concert] [--new-only] [--rank|--no-rank]
                        [--preset NAME] [--send] [--mask] [--russian] [--max-age-days 7] [--auto-crawl]
+  python main.py eval [--only SLUG] [--baseline] [--update-baseline] [--json out.json]   (gold set, offline)
 
 Legacy flags still work (crawl cached sites, then query with the matching preset
 from pipelines.yaml; they SEND email unless --dry-run):
@@ -432,6 +433,9 @@ def main() -> None:
         cmd_query(argv[1:])
     elif argv and argv[0] == "crawl":
         cmd_crawl(argv[1:])
+    elif argv and argv[0] == "eval":
+        from src.eval.cli import main as eval_main
+        sys.exit(eval_main(argv[1:]))
     else:
         legacy(argv)
 

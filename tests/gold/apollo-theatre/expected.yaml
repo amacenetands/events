@@ -1,0 +1,33 @@
+- title: 'Derren Brown: Only Human'
+  date: '2026-10-10'
+  end_date: '2027-01-30'
+  kind: run
+  byday: null
+  time: null
+  price: £20
+  url: https://theapollotheatre.co.uk/tickets/derren-brown-only-human/
+  sessions_known: false
+  start_known: true
+  evidence: 'Derren Brown: Only Human | Saturday 10 October 2026 - Saturday 30 January 2027 ; JSON-LD offers.price "20"'
+- title: Nerdy Prudes Must Die
+  date: '2027-02-06'
+  end_date: '2027-03-07'
+  kind: run
+  byday: null
+  time: null
+  price: £28.75
+  url: https://theapollotheatre.co.uk/tickets/nerdy-prudes-must-die/
+  sessions_known: false
+  start_known: true
+  evidence: Nerdy Prudes Must Die | Saturday 6 February 2027 - Sunday 7 March 2027 ; JSON-LD offers.price "28.75"
+- title: Potted Panto
+  date: '2026-12-06'
+  end_date: '2027-01-03'
+  kind: run
+  byday: null
+  time: null
+  price: £25
+  url: https://theapollotheatre.co.uk/tickets/potted-panto/
+  sessions_known: false
+  start_known: true
+  evidence: Potted Panto | Sunday 6 December 2026 - Sunday 3 January 2027 ; JSON-LD offers.price "25"

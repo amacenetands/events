@@ -1,0 +1,13 @@
+name: Aldwych Theatre
+url: https://www.atgtickets.com/venues/aldwych-theatre/
+city: london
+extract:
+- jsonld
+- adapter
+- llm
+source: jsonld
+today: '2026-11-09'
+venue:
+  category_hint: theatre
+notes: >-
+  Page fetched 2026-11-09 (ATG); scripts/styles stripped. Data is a top-level JSON-LD array with DD-MM-YYYY dates; the body is only nav.

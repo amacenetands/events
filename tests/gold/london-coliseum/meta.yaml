@@ -1,0 +1,13 @@
+name: London Coliseum
+url: https://londoncoliseum.org/whats-on/
+city: london
+extract: [jsonld, adapter, llm]
+source: adapter
+today: 2026-11-09
+venue:
+  category_hint: theatre
+  adapter: {kind: coliseum}
+notes: >-
+  Page fetched 2026-11-09; page.html = tests/fixtures/sources/adapter_coliseum.html
+  (<script id="json-data"> with 4 productions). Every performance date and time is listed,
+  so the sessions are known.

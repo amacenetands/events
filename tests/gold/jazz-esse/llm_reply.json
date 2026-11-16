@@ -1,0 +1,78 @@
+{
+ "text_hash": "f8279dbe4dfc5aae",
+ "records": [
+  {
+   "title": "Джазовый бранч с Меланией Кова",
+   "date_text": "13 Сент",
+   "time_text": "15:00",
+   "price_text": "от 750р",
+   "url": "/event/index/3761/9157"
+  },
+  {
+   "title": "Armir Lee MB Electric",
+   "date_text": "13 Сент",
+   "time_text": "20:00",
+   "price_text": "от 1500р",
+   "url": "/event/index/3366/9184",
+   "desc": "Джаз / RnB / Соул / Фанк"
+  },
+  {
+   "title": "N-CODE BAND & NADIA KUZNETSOVA",
+   "date_text": "14 Сент",
+   "time_text": "20:00",
+   "price_text": "от 1300р",
+   "url": "/event/index/3560/8248",
+   "desc": "Классический джаз в авторском видении"
+  },
+  {
+   "title": "«Яков Окунь представляет»",
+   "date_text": "15 Сент",
+   "time_text": "20:00",
+   "price_text": "вход свободный",
+   "url": "/event/index/2127/6920",
+   "desc": "Еженедельный концерт-джем сейшн"
+  },
+  {
+   "title": "Джазовые стандарты с Сергеем Васильевым",
+   "date_text": "15 Сент",
+   "time_text": "20:30",
+   "price_text": "вход свободный",
+   "url": "/event/index/3784/9190",
+   "desc": "Джазовые стандарты",
+   "category_text": "Jazz Lab"
+  },
+  {
+   "title": "Культограм: Наука и искусство. Трилогия - интеллектуальный стендап",
+   "date_text": "16 Сент",
+   "time_text": "19:30",
+   "price_text": "от 3500р",
+   "url": "/event/index/3781/9181",
+   "category_text": "Jazz Lab"
+  },
+  {
+   "title": "Открытие 33-го концертного сезона - «Гнесин Джаз Квинтет»",
+   "date_text": "16 Сент",
+   "time_text": "20:00",
+   "price_text": "вход свободный",
+   "url": "/event/index/3621/8502",
+   "desc": "Александр Эйдельман представляет \"Джаз-арт клуб\""
+  },
+  {
+   "title": "Культограм: «Кутеж по-московски»",
+   "date_text": "17 Сент",
+   "time_text": "19:30",
+   "price_text": "от 3500р",
+   "url": "/event/index/3747/9123",
+   "desc": "Атмосферный ужин с лекцией",
+   "category_text": "Jazz Lab"
+  },
+  {
+   "title": "Квартет Андрея Красильникова",
+   "date_text": "17 Сент",
+   "time_text": "20:00",
+   "price_text": "от 1300р",
+   "url": "/event/index/2863/8942",
+   "desc": "Современный джаз"
+  }
+ ]
+}

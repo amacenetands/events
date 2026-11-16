@@ -1,0 +1,111 @@
+- title: Freddie Mercury | Splendid Things
+  date: '2026-11-09'
+  end_date: '2027-01-17'
+  kind: run
+  byday: null
+  time: null
+  price: Free
+  url: https://www.vam.ac.uk/exhibitions/freddie-mercury-splendid-things
+  sessions_known: false
+  start_known: false
+  evidence: Display | Freddie Mercury | Splendid Things | Closes Sunday, 17 January 2027 | V&A South Kensington | Free
+- title: Cloak & Dagger Couture
+  date: '2026-11-09'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: £15.00 - £20.00
+  url: https://www.vam.ac.uk/event/MOaJ9LDeDzA/cloak-dagger-couture
+  sessions_known: true
+  start_known: true
+  evidence: Sold out | Talk | Cloak & Dagger Couture | Monday 9 November | V&A South Kensington | £15.00 - £20.00
+- title: 'Lunchtime Lectures: Gilded Age Fashion'
+  date: '2026-11-12'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: Free
+  url: https://www.vam.ac.uk/event/1WX9VJx2pgN/lunchtime-lecture-12-november-2026
+  sessions_known: true
+  start_known: true
+  evidence: 'V&A Academy talk | Lunchtime Lectures: Gilded Age Fashion | Thursday, 12 November 2026 | V&A South Kensington | Free'
+- title: Meet the Makers with Sheffield Museums
+  date: '2026-11-13'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: Free
+  url: https://www.vam.ac.uk/event/Re1149A5aE/upstart-at-sheffield-museums-meet-the-makers-nov-2026
+  sessions_known: true
+  start_known: true
+  evidence: Book soon | Talk | Meet the Makers with Sheffield Museums | Friday, 13 November 2026 | Online | Free
+- title: In Celebration of Winifred Atwell
+  date: '2026-11-13'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: null
+  price: £12.00 - £18.00
+  url: https://www.vam.ac.uk/event/ReDq1m7PrZ/in-celebration-of-winifred-atwell
+  sessions_known: true
+  start_known: true
+  evidence: Talk | In Celebration of Winifred Atwell | Friday, 13 November 2026 | V&A South Kensington | £12.00 - £18.00
+- title: Antique to Early Christian (in-person)
+  date: '2026-11-09'
+  end_date: '2026-12-01'
+  kind: run
+  byday: null
+  time: null
+  price: £645.00
+  url: https://www.vam.ac.uk/event/B5yXw45ZR65/p26043-antique-to-early-christian-in-person
+  sessions_known: false
+  start_known: false
+  evidence: Book soon | V&A Academy year course | Antique to Early Christian (in-person) | On now until Tuesday, 1 December 2026 | V&A South Kensington | £645.00
+- title: 'British Theatre 2026: An Overview'
+  date: '2026-10-11'
+  end_date: '2026-11-29'
+  kind: run
+  byday: null
+  time: null
+  price: £320.00
+  url: https://www.vam.ac.uk/event/Yw8jWJbOMK/p26041-british-theatre-2026
+  sessions_known: false
+  start_known: true
+  evidence: 'Sold out | V&A Academy short course | British Theatre 2026: An Overview | Sunday, 11 October 2026 – Sunday, 29 November 2026 | V&A South Kensington | £320.00'
+- title: Gardens and Art
+  date: '2026-11-12'
+  end_date: '2026-12-10'
+  kind: run
+  byday: null
+  time: null
+  price: £125.00
+  url: https://www.vam.ac.uk/event/OX2W0z49dz/o26029-gardens-and-art
+  sessions_known: false
+  start_known: true
+  evidence: New | V&A Academy online course | Gardens and Art | Thursday, 12 November 2026 – Thursday, 10 December 2026 | Online | £125.00
+- title: National Art Library and Archive talks Monday 11.30
+  date: '2026-11-09'
+  end_date: '2026-12-28'
+  kind: recurring
+  byday:
+  - Mon
+  time: '11:30'
+  price: Free
+  url: https://www.vam.ac.uk/event/RNow3aba9V/national-art-library-and-archive-talks-11-30-2026
+  sessions_known: true
+  start_known: false
+  evidence: Display | National Art Library and Archive talks Monday 11.30 | Every Monday until 28th December 2026, excluding 8th June and 31st August | V&A South Kensington | Free
+- title: Metalworking Now (2026-27)
+  date: '2026-11-09'
+  end_date: '2027-03-11'
+  kind: run
+  byday: null
+  time: null
+  price: Free
+  url: https://www.vam.ac.uk/event/4YRzJDmbavr/metalworking-now-2026-27
+  sessions_known: false
+  start_known: false
+  evidence: Display | Metalworking Now (2026-27) | On now until Thursday, 11 March 2027 | V&A South Kensington | Free

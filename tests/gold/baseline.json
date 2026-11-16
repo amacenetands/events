@@ -1,0 +1,1240 @@
+{
+ "by_source": {
+  "adapter": {
+   "byday": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 22,
+    "tp": 0
+   },
+   "date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 22
+   },
+   "end_date": {
+    "f1": 0.9091,
+    "fn": 0,
+    "fp": 1,
+    "p": 0.8333,
+    "r": 1.0,
+    "tn": 16,
+    "tp": 5
+   },
+   "kind": {
+    "f1": 0.9545,
+    "fn": 1,
+    "fp": 1,
+    "p": 0.9545,
+    "r": 0.9545,
+    "tn": 0,
+    "tp": 21
+   },
+   "price": {
+    "f1": 0.0,
+    "fn": 9,
+    "fp": 0,
+    "p": 1.0,
+    "r": 0.0,
+    "tn": 13,
+    "tp": 0
+   },
+   "sessions_known": {
+    "f1": 0.9545,
+    "fn": 1,
+    "fp": 1,
+    "p": 0.9545,
+    "r": 0.9545,
+    "tn": 0,
+    "tp": 21
+   },
+   "start_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 22
+   },
+   "time": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 9,
+    "tp": 13
+   },
+   "title": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 22
+   },
+   "url": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 22
+   }
+  },
+  "follow_links": {
+   "byday": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 1,
+    "tp": 0
+   },
+   "date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   },
+   "end_date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 1,
+    "tp": 0
+   },
+   "kind": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   },
+   "price": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   },
+   "sessions_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   },
+   "start_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   },
+   "time": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   },
+   "title": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   },
+   "url": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 1
+   }
+  },
+  "jsonld": {
+   "byday": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 29,
+    "tp": 2
+   },
+   "date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 31
+   },
+   "end_date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 20,
+    "tp": 11
+   },
+   "kind": {
+    "f1": 0.9355,
+    "fn": 2,
+    "fp": 2,
+    "p": 0.9355,
+    "r": 0.9355,
+    "tn": 0,
+    "tp": 29
+   },
+   "price": {
+    "f1": 0.8718,
+    "fn": 5,
+    "fp": 0,
+    "p": 1.0,
+    "r": 0.7727,
+    "tn": 9,
+    "tp": 17
+   },
+   "sessions_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 31
+   },
+   "start_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 31
+   },
+   "time": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 19,
+    "tp": 12
+   },
+   "title": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 31
+   },
+   "url": {
+    "f1": 0.5161,
+    "fn": 15,
+    "fp": 15,
+    "p": 0.5161,
+    "r": 0.5161,
+    "tn": 0,
+    "tp": 16
+   }
+  },
+  "llm": {
+   "byday": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 25,
+    "tp": 0
+   },
+   "date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 25
+   },
+   "end_date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 14,
+    "tp": 11
+   },
+   "kind": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 25
+   },
+   "price": {
+    "f1": 0.3158,
+    "fn": 9,
+    "fp": 4,
+    "p": 0.4286,
+    "r": 0.25,
+    "tn": 12,
+    "tp": 3
+   },
+   "sessions_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 25
+   },
+   "start_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 25
+   },
+   "time": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 13,
+    "tp": 12
+   },
+   "title": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 25
+   },
+   "url": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 25
+   }
+  },
+  "spektrix": {
+   "byday": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 8,
+    "tp": 0
+   },
+   "date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   },
+   "end_date": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 8,
+    "tp": 0
+   },
+   "kind": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   },
+   "price": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   },
+   "sessions_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   },
+   "start_known": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   },
+   "time": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   },
+   "title": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   },
+   "url": {
+    "f1": 1.0,
+    "fn": 0,
+    "fp": 0,
+    "p": 1.0,
+    "r": 1.0,
+    "tn": 0,
+    "tp": 8
+   }
+  }
+ },
+ "coverage": {
+  "expected": 103,
+  "extra": 4,
+  "found": 87,
+  "found_wrong_date": 0,
+  "missed": 16
+ },
+ "events": {
+  "aldwych-theatre|Sinatra The Musical|2026-11-10": {
+   "found": true,
+   "wrong": []
+  },
+  "apollo-theatre|Derren Brown: Only Human|2026-10-10": {
+   "found": true,
+   "wrong": []
+  },
+  "apollo-theatre|Nerdy Prudes Must Die|2027-02-06": {
+   "found": true,
+   "wrong": []
+  },
+  "apollo-theatre|Potted Panto|2026-12-06": {
+   "found": true,
+   "wrong": []
+  },
+  "bach-to-baby-ealing|Christmastide / Bach to Baby Festive Family Concert|2026-12-19T10:00": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "bach-to-baby-ealing|Christmastide / Bach to Baby Festive Family Concert|2026-12-19T11:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "bach-to-baby-ealing|Twas the Night Before Christmas / Bach to Baby Festive Family Concert|2026-11-21T11:00": {
+   "found": true,
+   "wrong": []
+  },
+  "barbican|Ensemble Pygmalion: Mozart's Great Mass in C minor|2026-11-09T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "barbican|NAZA|2026-10-16": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|Dudú Kouaté & Ernst Reijseger – solos and duo|2026-11-13T19:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|EFG London Jazz Festival: Robyn's Rocket – w/ Laura Jurd & Robyn Rocket + Little Kali + ATMoss + Live Visuals by Rucksack cinema and Jade|2026-11-17T19:30": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "cafe-oto|Infant Tree + KRAAK present: KRAAKLINGS w/ Horacio Pollard + Venediktos Tempelboom + Kiara Govaert|2026-11-16T19:30": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "cafe-oto|JIMI TENOR BAND – Two-Day Residency|2026-11-20": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "cafe-oto|Maxine Funke + Clayton Noone + Time Is Away (DJ)|2026-11-14T19:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|OFFSITE SHOW Zach Rowden + Lauren Tosswill + Rory Salter / Caius Williams / Regan Bowering + Vicky Sparrow|2026-11-14T14:00": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|SAGOME 029: LOVE SONGS + REGINA COLLAGE + STELLA Z (DJ)|2026-11-11T19:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|SPACE 5: Michael Barthel / Luciano Maggiore + Seijiro Murayama / Silvan Schmid + Zara Joan-Miller / Ellis Berwick + Regan Bowering (solo piece)|2026-11-12T19:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|Sam Eastmond’s Bagatelles Band|2026-11-10T19:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|Unpredictable presents: ✦ MEXICAN CONFLUENCES ✦ feat. Piña para la Niña|2026-11-15T19:30": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "cafe-oto|Upset The Rhythm presents: Wendy Eisenberg + Jasper Llewellyn|2026-11-09T19:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "cafe-oto|Upset the Rhythm: Grouper – Two-Day Residency|2026-11-18": {
+   "found": true,
+   "wrong": []
+  },
+  "camden-peoples-theatre|An Evening with Camden Youth Theatre|2026-12-01": {
+   "found": true,
+   "wrong": [
+    "price",
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Boys Beware (WIP)|2026-11-25": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Camden Meeple's Theatre: Board Game Day|2026-12-05": {
+   "found": true,
+   "wrong": [
+    "price",
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|HUG PIECE|2026-11-13": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Hot Gay Xmas Shit|2026-12-03": {
+   "found": true,
+   "wrong": [
+    "price",
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Self and Other Fictions An Anthology|2026-12-08": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Sharp Edges|2026-11-11": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|This Offers No Solutions (WIP)|2026-11-24": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Trans People Are Awful Trans + Night|2026-11-18": {
+   "found": true,
+   "wrong": [
+    "price",
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Tripping Out (WIP)|2026-11-20": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|TwitchKitsch|2026-12-04": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|VV Showdown|2026-12-02": {
+   "found": true,
+   "wrong": [
+    "price",
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Vincent|2027-01-14": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|Washed Ashore (WIP)|2026-11-24": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "camden-peoples-theatre|White Gold|2026-11-25": {
+   "found": true,
+   "wrong": [
+    "url"
+   ]
+  },
+  "conway-hall|Edward Lloyd|2026-11-18T13:10": {
+   "found": true,
+   "wrong": []
+  },
+  "conway-hall|Raphael Wallfisch & Simon Callaghan|2026-11-15T18:30": {
+   "found": true,
+   "wrong": []
+  },
+  "conway-hall|Ruth Rogers & Martin Cousin|2026-11-29T18:30": {
+   "found": true,
+   "wrong": []
+  },
+  "conway-hall|Ryelandt Trio|2026-12-13T18:30": {
+   "found": true,
+   "wrong": []
+  },
+  "conway-hall|The Golden Fountain|2026-12-05T19:30": {
+   "found": true,
+   "wrong": []
+  },
+  "conway-hall|Tippett Quartet|2026-12-06T18:30": {
+   "found": true,
+   "wrong": []
+  },
+  "conway-hall|Winter Carols by Candlelight|2026-12-10T19:00": {
+   "found": true,
+   "wrong": []
+  },
+  "conway-hall|Woolf Quartet|2026-11-22T18:30": {
+   "found": true,
+   "wrong": []
+  },
+  "jazz-esse|Armir Lee MB Electric|2026-09-13T20:00": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "jazz-esse|N-CODE BAND & NADIA KUZNETSOVA|2026-09-14T20:00": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "jazz-esse|«Яков Окунь представляет»|2026-09-15T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "jazz-esse|Джазовые стандарты с Сергеем Васильевым|2026-09-15T20:30": {
+   "found": true,
+   "wrong": []
+  },
+  "jazz-esse|Джазовый бранч с Меланией Кова|2026-09-13T15:00": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "jazz-esse|Квартет Андрея Красильникова|2026-09-17T20:00": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "jazz-esse|Культограм: «Кутеж по-московски»|2026-09-17T19:30": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "jazz-esse|Культограм: Наука и искусство. Трилогия - интеллектуальный стендап|2026-09-16T19:30": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "jazz-esse|Открытие 33-го концертного сезона - «Гнесин Джаз Квинтет»|2026-09-16T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "london-coliseum|Iphigénie en Tauride|2026-11-09T19:30": {
+   "found": true,
+   "wrong": [
+    "end_date",
+    "kind",
+    "sessions_known"
+   ]
+  },
+  "london-coliseum|Iphigénie en Tauride|2026-11-11T19:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "london-coliseum|Iphigénie en Tauride|2026-11-14T18:00": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "london-coliseum|Sessions at the London Coliseum: Black Country, New Road|2026-11-13T19:30": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Constanze at St Mary Magdalene Church|2026-11-27T19:30": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-09T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-10T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-11T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-12T16:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-12T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-13T19:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-14T16:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-14T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-16T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "orange-tree-theatre|Cranford|2026-11-17T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Aditi Mangaldas Dance Company - WITHIN|2026-11-27": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|BalletBoyz - Six Lethargies|2026-11-18": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Culture Club|2026-11-13": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Ebony Scrooge - ZooNation|2026-11-24": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Family Freestyle at Sadler's Wells East|2026-11-12": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Georgia Tegou - In the Quiet of Us|2026-11-19": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Germán Cornejo’s Tango After Dark|2026-11-09": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "sadlers-wells|HUMANHOOD - Vortex|2026-11-10": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "sadlers-wells|Martha Graham Dance Company - Inner Landscape - Programme A|2027-01-20": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|My Fierce Ignorant Step - Christos Papadopoulos|2026-11-13": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "sadlers-wells|Rhythms of the Divine: Mevlevi Sema Ceremony and Turkish Sufi Music Concert|2026-11-23": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Take a Bow Productions – Let’s Take a Bow|2026-11-22": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|The Snowman|2026-11-21": {
+   "found": true,
+   "wrong": []
+  },
+  "sadlers-wells|Wang Yeu-Kwn / Shimmering Production - Islands|2027-02-02": {
+   "found": true,
+   "wrong": []
+  },
+  "synthetic-library-schedule|Baby Rhyme Time|2026-09-03T10:00": {
+   "found": true,
+   "wrong": [
+    "kind"
+   ]
+  },
+  "synthetic-library-schedule|Lego Club|2026-10-01T16:00": {
+   "found": true,
+   "wrong": [
+    "kind"
+   ]
+  },
+  "synthetic-library-schedule|Winter Book Fair|2026-12-12T11:00": {
+   "found": true,
+   "wrong": []
+  },
+  "vam|Antique to Early Christian (in-person)|2026-11-09": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|British Theatre 2026: An Overview|2026-10-11": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|Cloak & Dagger Couture|2026-11-09": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|Freddie Mercury | Splendid Things|2026-11-09": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|Gardens and Art|2026-11-12": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|In Celebration of Winifred Atwell|2026-11-13": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|Lunchtime Lectures: Gilded Age Fashion|2026-11-12": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|Meet the Makers with Sheffield Museums|2026-11-13": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|Metalworking Now (2026-27)|2026-11-09": {
+   "found": true,
+   "wrong": [
+    "price"
+   ]
+  },
+  "vam|National Art Library and Archive talks Monday 11.30|2026-11-09T11:30": {
+   "found": false,
+   "wrong": [
+    "title",
+    "date",
+    "end_date",
+    "kind",
+    "byday",
+    "time",
+    "price",
+    "url",
+    "sessions_known",
+    "start_known"
+   ]
+  },
+  "young-vic|EUROTRASH|2026-11-16T19:30": {
+   "found": true,
+   "wrong": []
+  },
+  "young-vic|EUROTRASH|2026-11-17T19:30": {
+   "found": true,
+   "wrong": []
+  },
+  "young-vic|EUROTRASH|2026-11-18T19:30": {
+   "found": true,
+   "wrong": []
+  },
+  "young-vic|EUROTRASH|2026-11-20T19:30": {
+   "found": true,
+   "wrong": []
+  },
+  "young-vic|GIRLS|2026-11-16T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "young-vic|GIRLS|2026-11-17T20:00": {
+   "found": true,
+   "wrong": []
+  },
+  "young-vic|GIRLS|2026-11-18T15:00": {
+   "found": true,
+   "wrong": []
+  },
+  "young-vic|GIRLS|2026-11-18T20:00": {
+   "found": true,
+   "wrong": []
+  }
+ },
+ "extras": [
+  "barbican|NAZA|2026-11-18T18:15",
+  "vam|National Art Library and Archive talks Monday|2026-12-28",
+  "vam|National Art Library and Archive talks Monday|2027-06-08",
+  "vam|National Art Library and Archive talks Monday|2027-08-31"
+ ],
+ "fields": {
+  "byday": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
+   "tn": 85,
+   "tp": 2
+  },
+  "date": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
+   "tn": 0,
+   "tp": 87
+  },
+  "end_date": {
+   "f1": 0.9818,
+   "fn": 0,
+   "fp": 1,
+   "p": 0.9643,
+   "r": 1.0,
+   "tn": 59,
+   "tp": 27
+  },
+  "kind": {
+   "f1": 0.9655,
+   "fn": 3,
+   "fp": 3,
+   "p": 0.9655,
+   "r": 0.9655,
+   "tn": 0,
+   "tp": 84
+  },
+  "price": {
+   "f1": 0.6824,
+   "fn": 23,
+   "fp": 4,
+   "p": 0.8788,
+   "r": 0.5577,
+   "tn": 34,
+   "tp": 29
+  },
+  "sessions_known": {
+   "f1": 0.9885,
+   "fn": 1,
+   "fp": 1,
+   "p": 0.9885,
+   "r": 0.9885,
+   "tn": 0,
+   "tp": 86
+  },
+  "start_known": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
+   "tn": 0,
+   "tp": 87
+  },
+  "time": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
+   "tn": 41,
+   "tp": 46
+  },
+  "title": {
+   "f1": 1.0,
+   "fn": 0,
+   "fp": 0,
+   "p": 1.0,
+   "r": 1.0,
+   "tn": 0,
+   "tp": 87
+  },
+  "url": {
+   "f1": 0.8276,
+   "fn": 15,
+   "fp": 15,
+   "p": 0.8276,
+   "r": 0.8276,
+   "tn": 0,
+   "tp": 72
+  }
+ }
+}

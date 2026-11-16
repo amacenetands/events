@@ -17,7 +17,7 @@ def _t(el, sel: str | None) -> str:
 class CardListAdapter(Adapter):
     direct = True
 
-    def records(self, html: str, site_cfg: dict) -> list[Rec]:
+    def records(self, html: str, site_cfg: dict, today=None) -> list[Rec]:
         c = site_cfg.get("adapter") or {}
         soup = BeautifulSoup(html, "html.parser")
         out: list[Rec] = []

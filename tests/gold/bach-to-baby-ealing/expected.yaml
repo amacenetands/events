@@ -1,0 +1,33 @@
+- title: Twas the Night Before Christmas / Bach to Baby Festive Family Concert
+  date: '2026-11-21'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '11:00'
+  price: £18
+  url: https://www.bachtobaby.com/ealing-music-concerts-for-baby-and-family
+  sessions_known: true
+  start_known: true
+  evidence: Saturday | 21 | November | 11.00am | Twas the Night Before Christmas ; JSON-LD startDate 2026-11-21T11:00:00 offers.price "18" offers.url = listing
+- title: Christmastide / Bach to Baby Festive Family Concert
+  date: '2026-12-19'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '10:00'
+  price: null
+  url: https://www.bachtobaby.com/ealing-music-concerts-for-baby-and-family
+  sessions_known: true
+  start_known: true
+  evidence: Saturday | 19 | December | 10.00am | Christmastide | Bach to Baby Festive Family Concert (no JSON-LD node; no per-event price/link)
+- title: Christmastide / Bach to Baby Festive Family Concert
+  date: '2026-12-19'
+  end_date: null
+  kind: one_off
+  byday: null
+  time: '11:30'
+  price: null
+  url: https://www.bachtobaby.com/ealing-music-concerts-for-baby-and-family
+  sessions_known: true
+  start_known: true
+  evidence: Saturday | 19 | December | 11.30am | Christmastide | Bach to Baby Festive Family Concert

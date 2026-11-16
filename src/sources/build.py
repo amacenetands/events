@@ -15,6 +15,7 @@ __all__ = ["build_events", "build_event", "GENERIC_TITLE_RE", "MAX_INSTANCES", "
 
 MAX_INSTANCES = 60      # dated instances expanded per RawEvent
 RAW_DATE_MAX = 120
+SHORT_RUN_DAYS = 2      # inclusive length up to which a bare range's sessions are known (each day)
 
 # Placeholder titles ("Concert - Sat 5 ...") a source or model sometimes emits.
 GENERIC_TITLE_RE = re.compile(
@@ -117,6 +118,9 @@ def _series(spec: DateSpec, cfg: VenueConfig, today: date) -> dict[str, Any]:
     (no end) start today or at their first session after it."""
     byday = sorted(spec.byday) if spec.byday else None
     sessions_known = spec.sessions_known      # fix.range_means_weekly: venues.fixes
+    if (not sessions_known and spec.kind == "run" and spec.start and spec.end
+            and (spec.end - spec.start).days <= SHORT_RUN_DAYS - 1):
+        sessions_known = True                 # a 1–2 day range is every day of it
     if spec.end and spec.start and spec.end <= spec.start:
         return dict(date=spec.start, kind="one_off", start_known=spec.start_known)
     if spec.kind == "recurring" and not byday:      # repeat rule without weekdays: no occurrences -> TBC

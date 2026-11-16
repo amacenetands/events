@@ -1,0 +1,14 @@
+name: Young Vic
+url: https://www.youngvic.org/whats-on/
+city: london
+extract: [spektrix]
+source: spektrix
+today: 2026-11-15
+venue:
+  category_hint: theatre
+  adapter: {kind: spektrix, client: youngvic}
+spektrix_fixtures: tests/fixtures/spektrix
+notes: >-
+  Spektrix API recorded 2026-11-15 (tests/fixtures/spektrix/youngvic_*.json, window
+  2026-11-15..2027-02-13). No listing page: the client comes from `adapter`. Gold from
+  youngvic_events.json (name, webEventId) + youngvic_bulk.json (instance starts, prices).

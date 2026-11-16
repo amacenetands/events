@@ -1,0 +1,13 @@
+name: Apollo Theatre
+url: https://theapollotheatre.co.uk/whats-on/
+city: london
+extract:
+- jsonld
+- adapter
+- llm
+source: jsonld
+today: 2026-11-09
+venue:
+  category_hint: theatre
+notes: >-
+  Page fetched 2026-11-09 (Nimax); body cards repeat the JSON-LD ranges ("Saturday 10 October 2026 - Saturday 30 January 2027"). JSON-LD offers.price is the from-price.

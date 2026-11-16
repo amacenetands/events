@@ -185,7 +185,7 @@ def flat_lines(soup) -> list[str]:
     return lines
 
 
-def date_context_lines(lines: list[str], ctx: int = 2) -> list[str]:
+def date_context_lines(lines: list[str], ctx: int = 2, today=None) -> list[str]:
     """Dedupe repeated short non-date lines, keep date/time lines + `ctx` lines before."""
     seen: set[str] = set()
     out: list[str] = []
@@ -199,27 +199,27 @@ def date_context_lines(lines: list[str], ctx: int = 2) -> list[str]:
     for i, l in enumerate(out):
         if MONTH_HDR.match(l):
             keep.add(i)     # "November 2026" section header: bare day numbers follow
-        elif (DATE_RE.search(l) or TIME.search(l)) and not past_only(l):
+        elif (DATE_RE.search(l) or TIME.search(l)) and not past_only(l, today):
             keep.update(range(max(0, i - ctx), i + 1))
     return [out[i] for i in sorted(keep)]
 
 
-def text_records(text: str) -> list[Rec]:
+def text_records(text: str, today=None) -> list[Rec]:
     """Reducer for already-flattened text (browser-markdown fallback)."""
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
     lines = [squash(l) for l in text.splitlines() if l.strip()]
-    return [Rec(raw=l) for l in dict.fromkeys(date_context_lines(lines))]
+    return [Rec(raw=l) for l in dict.fromkeys(date_context_lines(lines, today=today))]
 
 
 @register("auto")
 class AutoAdapter(Adapter):
-    def records(self, html: str, site_cfg: dict) -> list[Rec]:
+    def records(self, html: str, site_cfg: dict, today=None) -> list[Rec]:
         soup = BeautifulSoup(html, "html.parser")
         recs: list[Rec] = []
         grp: dict = {}
         for r in json_records(soup.find_all("script")):
-            if past_only(r["date"]):
+            if past_only(r["date"], today):
                 continue
             url = re.sub(r"#.*$", "", strip_host(r["url"].replace("\\/", "/")))
             title = re.sub(r"\s+\d{1,2}[:.]\d\d$", "", r["title"])
@@ -244,7 +244,7 @@ class AutoAdapter(Adapter):
                 if len(_txt(c)) > 1500:
                     continue
                 line = card_line(c)
-                if not past_only(line):
+                if not past_only(line, today):
                     recs.append(Rec(raw="[C] " + line))
         # Flat date lines: sole source when <MIN_RECORDS structured records were found;
         # otherwise only the date lines NOT already covered by a record (cards often
@@ -253,7 +253,7 @@ class AutoAdapter(Adapter):
         # else every flat line "Sunday, 7:30 pm GMT ..." looks uncovered and is re-emitted
         # as an orphan title-less line (duplicates + confuses the LLM).
         covered = squash(re.sub(r"\s*\|\s*", " ", "\n".join(r.raw for r in recs)))
-        extra = [l for l in date_context_lines(flat_lines(soup))
+        extra = [l for l in date_context_lines(flat_lines(soup), today=today)
                  if len(recs) < MIN_RECORDS or squash(l) not in covered]
         recs += [Rec(raw=l) for l in extra]
         return self.dedupe(recs)

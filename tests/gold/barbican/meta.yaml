@@ -1,0 +1,16 @@
+name: Barbican
+url: https://www.barbican.org.uk/whats-on
+city: london
+extract: [follow_links]
+source: follow_links
+today: 2026-11-09
+venue:
+  category_hint: concert
+  follow: {link_pattern: '/whats-on/\d{4}/event/'}
+details:
+  /whats-on/2026/event/naza: details/naza.html
+  /whats-on/2026/event/ensemble-pygmalion-mozarts-great-mass-in-c-minor: details/ensemble-pygmalion-mozarts-great-mass-in-c-minor.html
+notes: >-
+  Listing = tests/fixtures/sources/follow_barbican_listing.html cut to the two event links whose
+  detail pages are recorded in details/ (cache/memory.db: NAZA fetched 2026-11-15, Ensemble
+  Pygmalion 2026-11-09). NAZA is a film run (byline date range), not a single screening.

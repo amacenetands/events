@@ -1,0 +1,14 @@
+name: Джаз-клуб «Эссе»
+url: https://www.jazzesse.ru/
+city: moscow
+extract: [jsonld, adapter, llm]
+source: llm
+today: 2026-09-13
+venue:
+  category_hint: concert
+notes: >-
+  RU page fetched 2026-09-13 (cache/memory.db), cut to the first 9 article.afishaItem cards of
+  section.timetable (`eval --capture jazz-esse --keep section.timetable --items article.afishaItem
+  --limit 9`). Year-less "13 Сент" dates, 24h times, "от 750р" prices, "вход свободный" = free.
+  llm_reply.json recorded once 2026-11-15 with `eval --record-llm jazz-esse` (deepseek key not
+  visible to the recorder, so the engine fell back to haiku).

@@ -10,7 +10,7 @@ _AMT = re.compile(
     r"|(?<![\d.,])(?P<a2>\d{1,3}(?:[  ]\d{3})+|\d+)(?:[.,](?P<c2>\d{2}))?\s?(?P<post>₽|руб(?:л(?:ей|я|ь))?\.?|р\.)",
     re.I,
 )
-_FREE = re.compile(r"(?<![\w-])(?:free|бесплатно|вход\s+(?:свободный|бесплатный))(?![\w-])", re.I)
+_FREE = re.compile(r"(?<![\w-])(?:free|бесплатно|вход\s+(?:свободный|бесплатный)|(?:свободный|бесплатный)\s+вход)(?![\w-])", re.I)
 _FREE_ADDON = re.compile(
     r"\+\s*(?:a\s+)?free\b|\bfree\s+(?:essential|wi-?fi|cloakroom|parking|drinks?|programme|gift|tote|cancellation|delivery|exchange|access)"
     r"|\bfree\s+(?:for|to)\s+(?:members|friends|patrons|subscribers|supporters)|\bfree\s+with\s+(?:(?:a|your|valid|museum|gallery)\s+)*(?:membership|admission|entry|tickets?)"
@@ -31,7 +31,7 @@ _LINK = re.compile(r"\s*->\s*\S+\s*$")
 _STRICT_FREE = re.compile(
     r"^\s*(?:price|tickets?|entry|admission|cost)?\s*:?\s*free\b[^a-z]{0,3}(?:entry|admission|event|to\s+attend|for\s+all|,|!|\.|–|-|$)"
     r"|\b(?:free\s+(?:entry|admission|event|to\s+attend|tickets?|but\s+book)|admission\s+(?:is\s+)?free|entry\s+(?:is\s+)?free|tickets?\s*:?\s*free)\b"
-    r"|^\s*free\s*$|бесплатно|вход\s+свободный", re.I)
+    r"|^\s*free\s*$|бесплатно|вход\s+свободный|свободный\s+вход", re.I)
 
 
 def _num(a: str, c: str | None) -> tuple[float, str]:

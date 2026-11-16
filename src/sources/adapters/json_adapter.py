@@ -11,7 +11,7 @@ from .base import Adapter, Rec, register
 class JsonAdapter(Adapter):
     direct = True
 
-    def records(self, html: str, site_cfg: dict) -> list[Rec]:
+    def records(self, html: str, site_cfg: dict, today=None) -> list[Rec]:
         c = site_cfg.get("adapter") or {}
         soup = BeautifulSoup(html, "html.parser")
         sc = soup.select_one(c["script"])
