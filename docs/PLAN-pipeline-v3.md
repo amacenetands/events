@@ -289,13 +289,13 @@ Branch `rewrite/pipeline-v3`. Each step: Opus builder → Opus reviewer → test
 | 1a | `src/normalize/` dates/times/prices/urls + tests | committed 26e6389 (561 tests) |
 | 1b | `Event` fields, `RawEvent`, `FetchResult`, `VenueConfig`, `cities.yaml`, `load_venues` | committed 1450e11 |
 | 2a-i | `src/sources/base.py` (Source protocol, SourceCtx, registry), `build.py` (RawEvent→Event via normalize), sources `jsonld`, `adapter`, `follow_links` + tests | done (review: 4 HIGH fixed — open-ended series kept live, no date pre-filter in sources, build fully exception-safe, `_PARTIAL_AFTER` regex; RawEvent +category/audience/age_text; SourceCtx.force; safe_records; CityConfig.currency; jsonld 37→111 events on cache vs legacy, 0 lost) |
-| 2a-ii | `llm` source with raw-string prompt (title/date_text/time_text/price_text/url/desc/category/audience); `parse_sites` rewritten over `cfg.extract`; delete `fetch_html_sites`; `--test-site` as filter; EXTRACT_VERSION 8 | builder running (interrupted by rate limit, resumed) |
+| 2a-ii | `llm` source with raw-string prompt; `crawl_sites` = fetch_all once → `parse_venue` over `cfg.extract`; legacy fetch/ladder deleted; `--test-site` as filter; EXTRACT_VERSION 8 | done 6589ea1 (review: spektrix auto-promotion gated behind `extract`; slot collapse in spektrix source — Barbican 3,196→251; shared title→anchor matcher; offline `--parse-only`; BLOCKED fallback body parsed + stale; 824 tests) |
 | 2b | Spektrix source (43 London clients verified) + platform fingerprint | done f6a08ca (bulk `/instances`, startTo exclusive→end+1, `sold_out`, scored fingerprint, add-on rules; Barbican 201 ev/3,244 sessions in 32 s — timed-entry slots must collapse downstream in step 4) |
-| 3 | `src/fetch/` http (conditional, block detection) + Patchright browser; scrape status | built (57 tests; stealth does NOT pass Southbank 403 — feeds/APIs only); review: 2 HIGH (loop-bound locks, browser never closed) + epoch leak, stale fetched_at on fallback; fixes being applied; wiring into parse_sites after 2a-ii |
+| 3 | `src/fetch/` http (conditional, block detection) + Patchright browser; scrape status | done b24478d, wired in 6589ea1 (per-loop browser state, per-call throttle, cached-body fallback ≤4×TTL, `FetchCfg.gap`; stealth does NOT pass Southbank 403 — feeds/APIs only) |
 | 4 | query/rank/digest honour `byday` / `sessions_known`; prune expired | done ddb3d5f (series contract: recurring+byday = series, instance = recurring+byday None; event_days via occurrences; schedule_label EN/RU; prune_past keeps open series/TBC; A3 baseline: 156 range-only runs in cache) |
-| 5 | venue hooks + `fix:` block; `notes` migration; `sites/<city>.yaml`; city config everywhere | |
+| 5 | venue hooks + `fix:` block; `notes` migration; `sites/<city>.yaml`; city config everywhere | built; review: delete `sites.yaml` (two sources of truth), safe `range_means_weekly` rule, hook return-type guard, both sample hooks ruled config/hint not hooks, about/hint split too eager (120 hints); fixes being applied |
 | 6 | enrich pass (detail pages) | |
-| 7 | fixtures + gold + `main.py eval` | |
+| 7 | fixtures + gold + `main.py eval` | built: 14 venues / 92 gold events, offline harness, drift, KNOWN_FAILURES (45); first-run F1 date .98 time .98 price .67 url .83 byday .40; review running |
 | 8 | `/new-city` skill; Moscow migrated | |
 | 9 | full crawl; before/after metrics | |
 
