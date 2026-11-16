@@ -246,6 +246,18 @@ def _days_ok(e: Event, days, start: date, end: date, today: date | None = None) 
     return any(d.weekday() in wd for d in event_days(e, start, end, today=today))
 
 
+def first_match_day(e: Event, f: "Filter", today: date | None = None) -> date | None:
+    """First day inside the filter's window (and --days weekdays) the event actually happens on;
+    None when it has none (callers fall back to e.date). One-offs: their own date."""
+    if e.kind == "one_off":
+        return e.date
+    today = today or city_today(f)
+    start, end = resolve_when(f.when, today)
+    wd = parse_days(f.days)
+    ds = [d for d in event_days(e, start, end, today=today) if wd is None or d.weekday() in wd]
+    return min(ds) if ds else None
+
+
 def _audience_ok(e: Event, f: Filter) -> bool:
     a = f.audience
     if a == "any":

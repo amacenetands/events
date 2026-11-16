@@ -37,7 +37,7 @@ from src.digest import generate_digest_v2, coverage_summary, health_footer, save
 from src.translate import translate_descriptions
 from src.email_sender import send_digest
 from src.models import Event
-from src.query import (is_banned_url, Filter, query, describe, filter_from_dict, load_presets, preset_filter, parse_time_arg,
+from src.query import (first_match_day, is_banned_url, Filter, query, describe, filter_from_dict, load_presets, preset_filter, parse_time_arg,
                        resolve_when, city_today, city_now)
 from src import events_db, timing as _timing
 
@@ -313,7 +313,8 @@ async def run_query(
         print(f"Ranked: {len(picks)} top picks of {len(scores)} candidates"
               f"{' (LLM rerank)' if res.llm_used else ''}; all {len(events)} events kept")
         for i, e in enumerate(picks, 1):
-            print(f"  {i:2}. {e.title[:60]} | {e.venue} | {e.date:%a %d %b}{' ' + e.time if e.time else ''}"
+            d0 = first_match_day(e, f, today) or e.date
+            print(f"  {i:2}. {e.title[:60]} | {e.venue} | {d0:%a %d %b}{' ' + e.time if e.time else ''}"
                   f" | {e.category} | {reasons.get(e.fingerprint(), '')}")
 
     if russian:

@@ -28,6 +28,7 @@ from datetime import timedelta
 from ..config import VenueConfig
 from ..models import Event
 from ..normalize import series_kind, weekday_of
+from ..normalize.urls import is_map_url
 
 __all__ = ["apply_fixes", "apply_fixes_stored"]
 
@@ -125,9 +126,24 @@ def _one(e: Event, cfg: VenueConfig, listing: str, ctx) -> Event | None:
     return e
 
 
+def unmap_urls(cfg: VenueConfig, events: list[Event], ctx) -> list[Event]:
+    """Generic, every venue: a map/directions link is never an event URL; falls back to the listing URL."""
+    if not any(is_map_url(e.url) for e in events):
+        return events
+    listing = cfg.resolved_url(ctx.today.year)
+    out = []
+    for e in events:
+        if is_map_url(e.url):
+            e = e.model_copy(update={"url": listing})
+            _bump(ctx, "fix.map_url")
+        out.append(e)
+    return out
+
+
 def apply_fixes(cfg: VenueConfig, events: list[Event], ctx) -> list[Event]:
     """Events with the venue's `fix:` block applied (dropped ones removed). Never raises:
     a failing fix leaves that event as built and logs one error line per venue."""
+    events = unmap_urls(cfg, events, ctx)
     fx = cfg.fix
     if not (fx.drop_title_re or fx.url_pattern or fx.time_default or fx.weekly or fx.byday
             or fx.range_means_weekly):
@@ -163,8 +179,10 @@ def apply_fixes_stored(events: list[Event], venues, today, crawl_ids: list[str] 
         cfg = by_name.get(e.source)
         fresh = (crawl_ids is not None and latest_crawl is not None and crawl_ids[i] == latest_crawl
                  and cfg is not None and not cfg.disabled)
-        if cfg is None or fresh:
+        if cfg is None:
             out.append(e)
+        elif fresh:
+            out.extend(unmap_urls(cfg, [e], ctx))
         else:
             out.extend(apply_fixes(cfg, [e], ctx))
     return out

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
 
-__all__ = ["pick_event_url", "is_listing_url", "url_host", "anchor_lines", "match_title_url"]
+__all__ = ["pick_event_url", "is_map_url", "is_listing_url", "url_host", "anchor_lines", "match_title_url"]
 
 _ARROW = re.compile(r"->\s*(\S+)")
 _MD_LINK = re.compile(r"\]\((\S+?)\)")
@@ -15,6 +15,9 @@ _GENERIC_PATH = re.compile(
     r"^/(?:|index\.html?|home|contact(?:-us)?|about(?:-us)?|basket|cart|checkout|login|log-?in|sign-?in|account"
     r"|my-account|search|privacy(?:-policy)?|cookies?(?:-policy)?|terms.*|faqs?|donate|support-us|membership"
     r"|newsletter|visit|access(?:ibility)?)/?$", re.I)
+_MAP_HOSTS = re.compile(r"(?:^|\.)(?:maps\.app\.goo\.gl|maps\.apple\.com|what3words\.com|w3w\.co|citymapper\.com"
+                        r"|waze\.com|openstreetmap\.org|mapquest\.com)$")
+_MAP_PATH_HOSTS = re.compile(r"(?:^|\.)(?:google\.[a-z.]+|goo\.gl|g\.co|bing\.com|yandex\.[a-z]+|2gis\.[a-z]+)$")
 _LISTING_QUERY_KEYS = {"page", "paged", "p", "category", "cat", "type", "filter", "date", "month", "view",
                        "sort", "s", "q", "genre", "tag", "offset", "start"}
 
@@ -49,9 +52,22 @@ def _absolute(href: str, listing_url: str) -> str | None:
         return None
     u = urljoin(listing_url, href)
     s = urlsplit(u)
-    if s.scheme not in ("http", "https") or not s.netloc:
+    if s.scheme not in ("http", "https") or not s.netloc or is_map_url(u):
         return None
     return urlunsplit((s.scheme, s.netloc, s.path, s.query, ""))
+
+
+def is_map_url(u: str) -> bool:
+    """Directions/map link: Google/Apple/Bing/Yandex/2GIS maps, goo.gl/maps, what3words, citymapper, Waze, OSM."""
+    try:
+        s = urlsplit(u or "")
+    except ValueError:
+        return False
+    host = s.netloc.lower().removeprefix("www.")
+    path = s.path.lower()
+    if _MAP_HOSTS.search(host) or host.startswith("maps."):
+        return True
+    return bool(_MAP_PATH_HOSTS.search(host)) and (path.startswith("/maps") or "/maps/" in path)
 
 
 def _is_listing(u: str, listing_url: str) -> bool:

@@ -51,6 +51,21 @@ def _t(lang: str, key: str) -> str:
     return _STR.get(lang, _STR["en"])[key]
 
 
+_PRICE_RU = (("Free", "Бесплатно"), ("From ", "от "), ("Pay what you can", "Цена по желанию"),
+             ("Donation", "Пожертвование"))
+
+
+def price_label(price: str | None, lang: str = "en") -> str:
+    """Normalised price label (prices.py) in the digest language: 'Free' -> 'Бесплатно', 'From ₽500' -> 'от ₽500'."""
+    p = (price or "").strip()
+    if lang != "ru":
+        return p
+    for en, ru in _PRICE_RU:
+        if p.startswith(en):
+            return ru + p[len(en):]
+    return p
+
+
 def _dfmt(d: date, lang: str = "en", fmt: str = "short") -> str:
     """short: 'Sat 14 Nov' | long: 'Saturday 14 Nov' | day: '14 Nov' | full: '8 November 2026'."""
     if lang == "ru":
@@ -181,7 +196,7 @@ def schedule_label(e: Event, today: date, lang: str = "en") -> str:
 
 
 def _one_off_line(e: Event, new: bool, lang: str = "en") -> str:
-    bits = [_esc(e.venue)] + ([time_label(e, lang)] if e.time else []) + ([_esc(e.price)] if e.price else [])
+    bits = [_esc(e.venue)] + ([time_label(e, lang)] if e.time else []) + ([_esc(price_label(e.price, lang))] if e.price else [])
     new_tag = f" **{_t(lang, 'new')}**" if new else ""
     return f"- {_link(e)}{_badge(e, lang)}{new_tag} — {' · '.join(bits)}{_desc(e)}"
 
@@ -191,7 +206,7 @@ def _recurring_line(group: list[Event], new: bool, lang: str = "en", today: date
     e = group[0]
     if len(group) == 1 and e.byday and e.end_date is None and today is not None:   # open weekly series
         new_tag = f" **{_t(lang, 'new')}**" if new else ""
-        price = f" · {_esc(e.price)}" if e.price else ""
+        price = f" · {_esc(price_label(e.price, lang))}" if e.price else ""
         lab = schedule_label(e, today, lang)
         return (f"- {_link(e)}{_badge(e, lang)}{new_tag} — {_esc(e.venue)}{f' · {_esc(lab)}' if lab else ''}"
                 f"{price}{_closing(e, today, lang)}{_desc(e)}")
@@ -230,7 +245,7 @@ def _run_line(e: Event, today: date, new: bool, lang: str = "en") -> str:
     when = f" · {_esc(lab)}" if lab else ""
     soon = _closing(e, today, lang)
     new_tag = f" **{_t(lang, 'new')}**" if new else ""
-    price = f" · {_esc(e.price)}" if e.price else ""
+    price = f" · {_esc(price_label(e.price, lang))}" if e.price else ""
     return f"- {_link(e)}{_badge(e, lang)}{new_tag} — {_esc(e.venue)}{when}{price}{soon}{_desc(e)}"
 
 
@@ -277,7 +292,7 @@ def generate_digest_v2(
     scores: dict[str, float] | None = None,  # fingerprint -> score; orders events within a day
     lang: str | None = None,                 # 'en' | 'ru' (default: f.lang)
 ) -> str:
-    from .query import describe, city_today
+    from .query import describe, city_today, first_match_day
     lang = lang or getattr(f, "lang", "en") or "en"
     today = today or city_today(f)
     new_fps = new_fps or set()
@@ -322,6 +337,9 @@ def generate_digest_v2(
         for e in picks:
             ln = _one_off_line(e, is_new(e), lang) if e.kind == "one_off" else _run_line(e, today, is_new(e), lang)
             when = (_dfmt(e.date, lang) + (f" {e.time}" if e.time else "")) if e.kind == "one_off" else None
+            if when is None and getattr(f, "days", "any") not in ("any", "", None):     # next day that fits --days
+                d0 = first_match_day(e, f, today)
+                when = _dfmt(d0, lang) if d0 else None
             why = reasons.get(e.fingerprint())
             lines.append(f"- ★ {ln[2:]}" + (f" · _{when}_" if when else "") + (f" · _{_esc(why)}_" if why else ""))
         lines.append("")
