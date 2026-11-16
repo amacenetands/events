@@ -402,7 +402,7 @@ def test_crawl_sites_closes_browser(cache, monkeypatch):
         closed.append(1)
     monkeypatch.setattr(B, "close_browser", close)
     cfg = _cfg(fetch={"mode": "browser"})
-    monkeypatch.setattr(HS, "_venues", lambda p, t: (get_city("london"), [cfg]))
+    monkeypatch.setattr(HS, "_venues", lambda p, t, c=None: (get_city("london"), [cfg]))
     frs = {cfg.name: FetchResult(FetchStatus.OK, body="<html></html>", url=LISTING)}
     asyncio.run(HS.crawl_sites(frs=frs))
     assert closed == [1]

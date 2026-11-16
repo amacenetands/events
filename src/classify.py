@@ -126,7 +126,8 @@ def _min_age(text: str) -> int | None:
 
 
 def _norm_title(t: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()
+    """Letters/digits in any script, casefolded ("Круглый стол «А»" keeps its Cyrillic)."""
+    return re.sub(r"[\W_]+", " ", t.casefold()).strip()
 
 
 _T_EXPR = r"(\d{1,2}(?:[.:][0-5]\d)?\s?(?:am|pm)|\d{1,2}[:.][0-5]\d)(?![\d.]*\d)"
@@ -245,7 +246,7 @@ def classify(events: list[Event]) -> list[Event]:
     for e in out:
         if e.kind == "one_off":
             groups[(_norm_title(e.title), (e.venue or "").lower())].add(e.date)
-    multi = {k for k, ds in groups.items() if len(ds) >= 3}
+    multi = {k for k, ds in groups.items() if k[0] and len(ds) >= 3}   # "" title never groups
     if multi:
         out = [
             e.model_copy(update={"kind": "recurring", "recurrence": e.recurrence or "multiple dates"})

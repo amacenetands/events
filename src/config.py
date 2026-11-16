@@ -57,6 +57,15 @@ class CityConfig(BaseModel):
     songkick_metro: Optional[int] = None
     geo: Optional[tuple[float, float]] = None  # (lat, lon) centre for radius-based APIs (Skiddle)
 
+    @field_validator("lang")
+    @classmethod
+    def _lang(cls, v: str) -> str:
+        langs = supported_langs()
+        if v not in langs:
+            raise ValueError(f"lang {v!r}: src/normalize/dates.py has no month/weekday table for {v!r} "
+                             f"(supported: {', '.join(langs)})")
+        return v
+
     @field_validator("geo")
     @classmethod
     def _geo(cls, v: Optional[tuple[float, float]]) -> Optional[tuple[float, float]]:
@@ -68,6 +77,13 @@ class CityConfig(BaseModel):
     def sites_path(self) -> Path:
         p = Path(self.sites)
         return p if p.is_absolute() else CITIES_YAML.parent / p
+
+
+def supported_langs() -> tuple[str, ...]:
+    """Languages the date grammar (src/normalize/dates.py `Lang`) has month/weekday tables for."""
+    from typing import get_args
+    from .normalize.dates import Lang
+    return get_args(Lang)
 
 
 @lru_cache(maxsize=None)
@@ -484,10 +500,25 @@ def _check_hooks(venues: list[VenueConfig], partial: bool) -> int:
     return errors
 
 
-def _check(city: str | None) -> int:
-    """Validate every city's sites file, venue/city agreement, duplicate urls and hooks."""
-    cities = [get_city(city)] if city else list(load_cities().values())
+def _check_api_sources(cities: list[CityConfig]) -> int:
+    from .sources import API_SOURCE_REGISTRY
     errors = 0
+    for c in cities:
+        for n in c.api_sources:
+            if n not in API_SOURCE_REGISTRY:
+                errors += 1
+                print(f"ERROR city {c.name!r}: api_sources {n!r} unknown; known: {sorted(API_SOURCE_REGISTRY)}")
+    return errors
+
+
+def _check(city: str | None) -> int:
+    """Validate cities.yaml, every city's sites file, venue/city agreement, duplicate urls and hooks."""
+    try:
+        cities = [get_city(city)] if city else list(load_cities().values())
+    except ValidationError as e:
+        print(f"ERROR {CITIES_YAML.name}: {e}")
+        return 1
+    errors = _check_api_sources(cities)
     loaded: list[VenueConfig] = []
     for c in cities:
         vs, e = _validate_file(c.sites_path, c)

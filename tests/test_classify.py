@@ -171,3 +171,25 @@ def test_is_elsewhere_uses_the_city_with_word_boundaries():
     assert not is_elsewhere(E("Bath, Rugby, London"))
     assert is_elsewhere(E("Bath, Londonderry, Rugby"))                          # word boundary
     assert is_elsewhere(E("Bath, Rugby, London"), "moscow")                    # current city only
+
+
+def test_recurring_rule_cyrillic_titles():
+    # distinct Cyrillic titles (same prefix, «…» differs) on 3 dates: still one-offs
+    titles = ["Круглый стол «Автономные поселения»", "Круглый стол «Нейроархитектура»", "Круглый стол «Город»"]
+    evs = classify([ev(t, f"2026-12-1{i}") for i, t in enumerate(titles)])
+    assert [e.kind for e in evs] == ["one_off"] * 3
+    # the same Cyrillic title on 3 dates is a series
+    evs = classify([ev("Экскурсия «Дом»", f"2026-12-1{i}") for i in range(3)])
+    assert all(e.kind == "recurring" and e.recurrence == "multiple dates" for e in evs)
+
+
+def test_recurring_rule_ignores_empty_normalised_title():
+    evs = classify([ev("«»", f"2026-12-1{i}") for i in range(3)])
+    assert [e.kind for e in evs] == ["one_off"] * 3
+
+
+def test_recurring_rule_english_unchanged():
+    evs = classify([ev("Jazz Night!", f"2026-12-1{i}") for i in range(2)] + [ev("jazz night", "2026-12-13")])
+    assert all(e.kind == "recurring" for e in evs)
+    evs = classify([ev(f"Talk {n}", f"2026-12-1{i}") for i, n in enumerate("ABC")])
+    assert all(e.kind == "one_off" for e in evs)

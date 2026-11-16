@@ -22,3 +22,16 @@ moscow:
   crawl_tags: [moscow]
   api_sources: []
   geo: [55.7558, 37.6173]
+# New city (/new-city <name>, .claude/skills/new-city/SKILL.md) — copy and fill:
+# <name>:
+#   label: "<Name> Events"          # digest title
+#   display_name: <Name>             # local spelling, used in headings and map links
+#   tz: Europe/<Zone>                # IANA
+#   lang: en                         # must have a month/weekday table in src/normalize/dates.py (Lang):
+#                                    #   en, ru today; another language needs that table first
+#   currency: "€"                    # for prices given without a symbol
+#   pricey: 100                      # rank: above this (in currency) is expensive
+#   sites: sites/<name>.yaml         # a venue belongs to the city whose file lists it; no city tag needed
+#   # optional: require_tags (tags that route --tag to this city), parked_tags (only with an explicit --tag)
+#   api_sources: []                  # skiddle needs geo (UK-centric); songkick needs songkick_metro
+#   geo: [<lat>, <lon>]              # centre: seed_venues.py and radius APIs

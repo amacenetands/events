@@ -161,7 +161,7 @@ def test_parse_sites_end_to_end(fakes, monkeypatch):
     fakes("jsonld", exc=ValueError("bad"))
     venues = [VenueConfig(name="Alpha", url="https://a.org/"), VenueConfig(name="Beta", url="https://b.org/"),
               VenueConfig(name="Gamma", url="https://c.org/")]
-    monkeypatch.setattr(html_sites, "_venues", lambda p, t: (get_city("london"),
+    monkeypatch.setattr(html_sites, "_venues", lambda p, t, c=None: (get_city("london"),
                         [v for v in venues if not t or v.name.lower() == t.lower()]))
     monkeypatch.setattr(html_sites.timing, "log_runtime", lambda **k: None)
     frs = {"Alpha": _ok(PLAIN_PAGE), "Beta": FetchResult(FetchStatus.EMPTY, note="none")}   # Gamma missing

@@ -32,7 +32,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 import yaml
 
-from ..config import VenueConfig, all_venues, get_city
+from ..config import DEFAULT_CITY, VenueConfig, all_venues, get_city
 from ..fetch.types import FetchResult, FetchStatus
 from ..models import Event
 from ..sources.base import SourceCtx, load_builtin_sources
@@ -316,12 +316,16 @@ def meta_divergence(g: GoldVenue) -> list[str]:
     return sorted(k for k in g.overrides() if have.get(k) != want.get(k))
 
 
-def load_gold(gold_dir: Path | None = None, only: str | None = None) -> list[GoldVenue]:
+def load_gold(gold_dir: Path | None = None, only: str | None = None,
+              city: str | None = None) -> list[GoldVenue]:
+    """Gold venues, optionally one (`only`: slug or name) and/or one city (meta `city`, default london)."""
     gold_dir = gold_dir or GOLD_DIR
     out = []
     for d in sorted(p for p in gold_dir.iterdir() if (p / "meta.yaml").exists()):
         meta = yaml.safe_load((d / "meta.yaml").read_text())
         if only and only.casefold() not in (d.name.casefold(), meta["name"].casefold()):
+            continue
+        if city and (meta.get("city") or DEFAULT_CITY).casefold() != city.casefold():
             continue
         exp = yaml.safe_load((d / "expected.yaml").read_text()) or []
         out.append(GoldVenue(d.name, d, meta, exp))
@@ -542,12 +546,12 @@ def score_venue(rep: EvalReport, g: GoldVenue, got: list[Event], won: list[str],
 
 
 def run_gold(today: date | None = None, only: str | None = None, llm: str = "recorded",
-             gold_dir: Path | None = None) -> EvalReport:
+             gold_dir: Path | None = None, city: str | None = None) -> EvalReport:
     """Score the pipeline on the gold set. `today` overrides every venue's capture date (default:
     each meta's `today`); `llm` = "recorded" (offline replay) | "live" (real backend) | "skip".
     Raises StaleReply when a recorded reply's text_hash no longer matches its page."""
     load_builtin_sources()
-    gold = load_gold(gold_dir, only)
+    gold = load_gold(gold_dir, only, city)
     replies = None
     if llm == "recorded":
         replies = {g.name: r for g in gold if (r := g.llm_reply()) is not None}

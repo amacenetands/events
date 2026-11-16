@@ -2,12 +2,14 @@
 with a baseline, record LLM replies, capture new gold pages.
 
   eval                                  per-field table + mismatches
+  eval --city moscow                    only gold venues whose meta.yaml says city: moscow
   eval --only "Conway Hall" --show      also print every built event
   eval --json out.json                  full report
   eval --baseline tests/gold/baseline.json [--update-baseline]
   eval --record-llm sadlers-wells [--force]   one live LLM call on the gold page -> llm_reply.json
   eval --restamp-llm sadlers-wells      refresh a reply's text_hash (records unchanged)
-  eval --capture slug --url URL [--keep CSS --items CSS --limit N --json-scripts RX] [--force]
+  eval --capture slug --url URL [--city C] [--keep CSS --items CSS --limit N --json-scripts RX] [--force]
+        (page from cache/memory.db; also writes a meta.yaml stub when none exists)
 """
 from __future__ import annotations
 
@@ -88,8 +90,22 @@ def restamp_llm(slug: str) -> Path:
     return out
 
 
+def meta_stub(url: str, city: str | None, today: date) -> dict:
+    """meta.yaml skeleton for a new gold page: the sites entry whose url is `url` (in `city`'s
+    file; every city when None) gives name/city/extract. `source` + `notes` are for a human."""
+    from ..config import city_names, get_city, venues_from_file
+    key = url.rstrip("/")
+    hit = next(((c, v) for c in ([city.lower()] if city else city_names())
+                for v in venues_from_file(get_city(c).sites_path)
+                if v.resolved_url(today.year).rstrip("/") == key), None)
+    c, v = hit or (city, None)
+    return {"name": v.name if v else "TODO venue name (sites/<city>.yaml)", "url": url, "city": c,
+            "extract": list(v.extract) if v else ["llm"], "source": "TODO winning source kind",
+            "today": today, "notes": "TODO: where the page came from; what is tricky"}
+
+
 def capture(slug: str, url: str, keep: str | None, items: str | None, limit: int | None,
-            json_scripts: str | None = None, force: bool = False) -> Path:
+            json_scripts: str | None = None, force: bool = False, city: str | None = None) -> Path:
     from .capture import MAX_BYTES, cached_html, trim_html
     d = GOLD_DIR / slug
     page = d / "page.html"
@@ -98,6 +114,11 @@ def capture(slug: str, url: str, keep: str | None, items: str | None, limit: int
     d.mkdir(parents=True, exist_ok=True)
     text = trim_html(cached_html(url), keep=keep, items=items, limit=limit, json_scripts=json_scripts)
     page.write_text(text)
+    meta = d / "meta.yaml"
+    if not meta.exists():
+        import yaml
+        meta.write_text(yaml.safe_dump(meta_stub(url, city, date.today()), allow_unicode=True, sort_keys=False))
+        print(f"wrote {meta} (stub: fill source/notes, then expected.yaml)", file=sys.stderr)
     if len(text.encode()) > MAX_BYTES:
         print(f"warning: {len(text.encode())} bytes > {MAX_BYTES}; narrow --keep/--limit", file=sys.stderr)
     return page
@@ -114,6 +135,7 @@ def _show(rep: EvalReport) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="eval", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--only", help="gold slug or venue name")
+    ap.add_argument("--city", help="only gold venues of this city (meta.yaml city:, default london)")
     ap.add_argument("--today", type=date.fromisoformat, help="override every venue's capture date")
     ap.add_argument("--llm", choices=("recorded", "live", "skip"), default="recorded")
     ap.add_argument("--json", type=Path, help="write the full report here")
@@ -131,6 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--restamp-llm", metavar="SLUG", help="refresh a reply's text_hash, records unchanged")
     ap.add_argument("--force", action="store_true", help="allow --capture / --record-llm to overwrite")
     a = ap.parse_args(argv)
+    if a.city:
+        from ..config import city_names
+        if a.city.lower() not in city_names():
+            ap.error(f"unknown city {a.city!r}; known: {', '.join(city_names())}")
 
     if a.record_llm:
         print(record_llm(a.record_llm, force=a.force))
@@ -141,12 +167,16 @@ def main(argv: list[str] | None = None) -> int:
     if a.capture:
         if not a.url:
             ap.error("--capture needs --url")
-        print(capture(a.capture, a.url, a.keep, a.items, a.limit, a.json_scripts, a.force))
+        print(capture(a.capture, a.url, a.keep, a.items, a.limit, a.json_scripts, a.force, a.city))
         return 0
     if a.today and (a.baseline or a.update_baseline):
         ap.error("--today changes every venue's window; it cannot be compared with a baseline")
 
-    rep = run_gold(today=a.today, only=a.only, llm=a.llm)
+    rep = run_gold(today=a.today, only=a.only, llm=a.llm, city=a.city)
+    if not rep.venues:
+        print(f"WARNING: no gold venues{f' for city {a.city}' if a.city else ''}"
+              f"{f' matching {a.only!r}' if a.only else ''} (tests/gold/*/meta.yaml)")
+        return 1
     if a.show:
         _show(rep)
     if not a.quiet:
@@ -166,8 +196,8 @@ def main(argv: list[str] | None = None) -> int:
 
     path = a.baseline or (DEFAULT_BASELINE if a.update_baseline else None)
     if a.update_baseline:
-        if a.only:
-            ap.error("--update-baseline needs the full gold set (no --only)")
+        if a.only or a.city:
+            ap.error("--update-baseline needs the full gold set (no --only / --city)")
         path.write_text(json.dumps(baseline_dict(rep), ensure_ascii=False, indent=1, sort_keys=True) + "\n")
         print(f"baseline written: {path}")
         return 0
@@ -176,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"no baseline at {path}", file=sys.stderr)
             return 2
         drift = compare(rep, json.loads(path.read_text()))
-        if a.only:   # partial run: only this subset's events are comparable
+        if a.only or a.city:   # partial run: only this subset's events are comparable
             drift = [d for d in drift if not d.startswith("F1 ")]
         if drift:
             print(f"\nDRIFT vs {path} ({len(drift)}):\n  " + "\n  ".join(drift))

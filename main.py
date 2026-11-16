@@ -2,15 +2,18 @@
 """
 London / Moscow events: crawl once, query many ways.
 
-  python main.py crawl --city london [--force-download --force-parse --fetch-only --parse-only --test-site NAME]
+  python main.py crawl --city london [--tag T] [--force-download --force-parse --fetch-only --parse-only --test-site NAME]
   python main.py query --city london --when today --audience family --kinds one_off,run [--time evening]
                        [--days weekday] [--category concert] [--new-only] [--rank|--no-rank]
                        [--preset NAME] [--send] [--mask] [--russian] [--max-age-days 7] [--auto-crawl]
-  python main.py eval [--only SLUG] [--baseline] [--update-baseline] [--json out.json]   (gold set, offline)
+  python main.py eval [--city NAME] [--only SLUG] [--baseline] [--update-baseline] [--json out.json]   (gold set, offline)
+
+--city NAME picks a cities.yaml city; --tag T (a venue tag) implies its city via city_for_tag
+(moscow-theatre → moscow) and, for crawl, selects the venues carrying it (parked tags included).
 
 Legacy flags still work (crawl cached sites, then query with the matching preset
 from pipelines.yaml; they SEND email unless --dry-run):
-  python main.py [--family|--evening|--daytime|--museums-only|--theatres|--tag moscow]
+  python main.py [--family|--evening|--daytime|--museums-only|--theatres|--tag moscow|--city NAME]
                  [--today] [--date-window N] [--dry-run] [--no-rank] [--no-dedup] [--mask]
                  [--fetch-only|--parse-only|--force-download|--force-parse|--test-site NAME]
 """
@@ -41,9 +44,28 @@ from src import events_db, timing as _timing
 from src import config as _config
 
 
-def _city_tag(city: str) -> str | None:
-    """Legacy pipeline tag for a city's crawl (cities.yaml: None for London, "moscow")."""
-    return _config.legacy_pipeline_tag(city)
+def resolve_city(city: str | None, tag: str | None = None) -> str:
+    """--city wins; else the city a --tag routes to (city_for_tag); else the default city.
+    --city with a tag that routes elsewhere is an error."""
+    names = _config.city_names()
+    if city is not None and city.lower() not in names:
+        raise SystemExit(f"unknown city {city!r}; known: {', '.join(names)}")
+    by_tag = _config.city_for_tag(tag) if tag else None
+    if city and tag and tag in _routing_tags() and by_tag != city.lower():
+        raise SystemExit(f"--tag {tag!r} belongs to {by_tag!r}, not --city {city!r}")
+    return (city or by_tag or _config.DEFAULT_CITY).lower()
+
+
+def _routing_tags() -> set[str]:
+    return {t for c in _config.load_cities().values() for t in c.require_tags}
+
+
+def crawl_tag(city: str, tag: str | None) -> str | None:
+    """The tag that narrows a city crawl: a parked tag or a plain venue tag (family) narrows;
+    a tag that only routes to the city (moscow) selects the whole city, so it is dropped."""
+    if tag and tag in _routing_tags() and tag not in _config.get_city(city).parked_tags:
+        return None
+    return tag
 
 
 def _tags_by_source() -> dict[str, list[str]]:
@@ -89,15 +111,16 @@ async def crawl(
     fetch_only: bool = False,
     parse_only: bool = False,
     test_site: str | None = None,
+    tag: str | None = None,
 ) -> int:
     """Fetch (stale pages only, unless forced) + parse + classify venues for city; persist
-    to the events table. test_site: only that venue, events printed, nothing persisted."""
+    to the events table. test_site: only that venue, events printed, nothing persisted.
+    tag: only venues carrying it (a parked tag such as moscow-theatre included)."""
     t0 = _timing.now()
-    tag = _city_tag(city)
-    print(f"Crawl: {city}\n" + "=" * 40)
+    print(f"Crawl: {city}{f' (tag {tag})' if tag else ''}\n" + "=" * 40)
 
     errors: list[str] = []
-    sites = crawl_sites(pipeline=tag, test_site=test_site, force_download=force_download,
+    sites = crawl_sites(pipeline=tag, city=city, test_site=test_site, force_download=force_download,
                         force_parse=force_parse, fetch_only=fetch_only, parse_only=parse_only, errors=errors)
     if fetch_only:
         await sites
@@ -199,7 +222,7 @@ async def run_query(
 ) -> list[Event]:
     loaded = events_db.load_events(f.city)
     today, now = city_today(f), city_now(f)
-    loaded.events = tidy(classify(loaded.events), today, {n.lower() for n in configured_site_names(_city_tag(f.city), include_disabled=True)})   # re-apply deterministic rules so new classifier flags need no recrawl
+    loaded.events = tidy(classify(loaded.events), today, {n.lower() for n in configured_site_names(city=f.city, include_disabled=True)})   # re-apply deterministic rules so new classifier flags need no recrawl
     age = events_db.age_days(loaded.crawled_at)
     if age is None:
         print(f"WARNING: no crawl for {f.city}. Run: venv/bin/python main.py crawl --city {f.city}")
@@ -250,7 +273,7 @@ async def run_query(
         counts: dict[str, int] = {}
         for e in base:
             counts[e.source] = counts.get(e.source, 0) + 1
-        footer = coverage_summary(counts, configured_site_names(_city_tag(f.city)))
+        footer = coverage_summary(counts, configured_site_names(city=f.city))
 
     digest = generate_digest_v2(events, f, picks=picks, new_fps=new_fps, title=f.label, footer=footer,
                                reasons=reasons, scores=scores, today=today, lang=f.lang)
@@ -323,6 +346,8 @@ def build_filter(args) -> Filter:
                          f"known: {', '.join(_config.city_names())}") from None
     if _lang != "en" and "lang" not in base:
         ov["lang"] = _lang         # e.g. Moscow digests default to RU headings (cities.yaml lang)
+    if "label" not in base:
+        ov["label"] = _config.get_city(_cname).label
     f = filter_from_dict(base, **ov)
     resolve_when(f.when)   # validate early
     return f
@@ -332,6 +357,7 @@ def cmd_query(argv):
     p = argparse.ArgumentParser(prog="main.py query")
     p.add_argument("--preset")
     p.add_argument("--city", choices=_config.city_names())
+    p.add_argument("--tag", help="venue tag: implies its city (city_for_tag) and filters to venues carrying it")
     p.add_argument("--when", help="today|tomorrow|weekend|next:N (N days incl. today)|range:YYYY-MM-DD..YYYY-MM-DD")
     p.add_argument("--audience", choices=["any", "family", "kids", "adult"])
     p.add_argument("--kinds", help="comma list of one_off,run,recurring")
@@ -361,6 +387,10 @@ def cmd_query(argv):
     p.add_argument("--parse-only", action="store_true", help="with --auto-crawl: parse cached html only")
     p.add_argument("--quiet", action="store_true", help="don't print the digest body")
     a = p.parse_args(argv)
+    if a.tag:
+        if a.city or not a.preset or a.tag in _routing_tags():
+            a.city = resolve_city(a.city, a.tag)
+        a.venue_tag = ",".join(filter(None, [a.venue_tag, a.tag]))
     f = build_filter(a)
     asyncio.run(run_query(
         f, preset=a.preset, send=a.send and not a.dry_run, mask=a.mask, do_rank=a.rank, llm_rank=a.llm_rank or bool(a.rank_backend), rank_backend=a.rank_backend, top_n=a.top, russian=a.russian,
@@ -371,11 +401,14 @@ def cmd_query(argv):
 
 def cmd_crawl(argv):
     p = argparse.ArgumentParser(prog="main.py crawl")
-    p.add_argument("--city", choices=_config.city_names(), default="london")
+    p.add_argument("--city", choices=_config.city_names(), help="default: --tag's city, else london")
+    p.add_argument("--tag", help="only venues carrying this tag (parked tags too); implies its city")
     _add_crawl_flags(p)
     a = p.parse_args(argv)
-    asyncio.run(crawl(a.city, force_download=a.force_download, force_parse=a.force_parse,
-                      fetch_only=a.fetch_only, parse_only=a.parse_only, test_site=a.test_site))
+    city = resolve_city(a.city, a.tag)
+    asyncio.run(crawl(city, force_download=a.force_download, force_parse=a.force_parse,
+                      fetch_only=a.fetch_only, parse_only=a.parse_only, test_site=a.test_site,
+                      tag=crawl_tag(city, a.tag)))
 
 
 def legacy(argv):
@@ -395,12 +428,22 @@ def legacy(argv):
     p.add_argument("--no-dedup", action="store_true")
     p.add_argument("--date-window", type=int, metavar="N")
     p.add_argument("--russian", action="store_true")
-    p.add_argument("--tag", metavar="NAME", help="named preset (e.g. moscow)")
+    p.add_argument("--tag", metavar="NAME", help="named preset (e.g. moscow) or a city-routing venue tag "
+                                                 "(e.g. moscow-theatre)")
+    p.add_argument("--city", choices=_config.city_names(), help="that city's preset (or defaults)")
     _add_crawl_flags(p)
     a = p.parse_args(argv)
+    presets = load_presets()
+    if a.tag and a.tag not in presets and a.tag not in _routing_tags():
+        raise SystemExit(f"Unknown --tag {a.tag!r}. Presets: {sorted(presets)}; "
+                         f"city tags: {sorted(_routing_tags())}")
+    city = resolve_city(a.city, a.tag) if (a.city or (a.tag and a.tag not in presets)) else None
+    ctag = a.tag if a.tag in _routing_tags() else None
 
-    name = a.tag or next((n for n, on in [("family", a.family), ("daytime", a.daytime), ("evening", a.evening),
-                                          ("theatres", a.theatres), ("museums", a.museums_only)] if on), "standard")
+    flag = next((n for n, on in [("family", a.family), ("daytime", a.daytime), ("evening", a.evening),
+                                 ("theatres", a.theatres), ("museums", a.museums_only)] if on), None)
+    # a flag preset wins over the city's own preset; --city then only re-targets it
+    name = (a.tag if a.tag in presets else None) or flag or (city if city in presets else None) or "standard"
     ov: dict = {}
     if a.today:
         ov["when"] = "today"
@@ -412,9 +455,19 @@ def legacy(argv):
         ov["public_only"] = False
     if a.include_online:
         ov["include_online"] = True
+    pcity = presets[name].get("city", _config.DEFAULT_CITY)
+    if city and pcity != city:                 # preset of another city: keep its filter, retarget it
+        c, pc = _config.get_city(city), _config.get_city(pcity)
+        label = presets[name].get("label") or c.label
+        label = label.replace(pc.display_name, c.display_name) if pc.display_name in label \
+            else f"{c.display_name} {label}"
+        ov.update(city=city, label=label, lang=c.lang, tz=c.tz)
+    ctag = ctag and crawl_tag(city or pcity, ctag)
+    if ctag:
+        ov["venue_tags"] = [ctag]             # e.g. --tag moscow-theatre: only those venues' rows
     f = preset_filter(name, **ov)
     ck = dict(force_download=a.force_download, force_parse=a.force_parse, fetch_only=a.fetch_only,
-              parse_only=a.parse_only, test_site=a.test_site)
+              parse_only=a.parse_only, test_site=a.test_site, tag=ctag)
 
     async def go():
         n = await crawl(f.city, **ck)

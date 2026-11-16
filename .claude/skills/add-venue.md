@@ -2,6 +2,7 @@
 name: add-venue
 description: |
   Add a new venue to sites/<city>.yaml with auto-generated remove_selectors.
+  For a whole new city use the new-city skill.
   Trigger: "add venue", "add [venue name] to pipeline", "/add-venue".
 ---
 
@@ -25,10 +26,12 @@ Then `venv/bin/python -m src.config --check`.
 ## 2. Validate URL reachable
 
 ```bash
-python scripts/validate_venues.py --venue "Venue Name"
+venv/bin/python scripts/validate_venues.py --city <city> --venue "Venue Name" --probe
 ```
 
-If 403: likely JS-rendered or Cloudflare-blocked — set `fetch: {mode: browser}`.
+`--probe` also prints the ticketing platform, JSON-LD event count, feeds and a fetch/extract
+suggestion (`--url URL` probes a page before it has an entry). If 403 / bot wall: look for a
+feed or platform API first; `fetch: {mode: browser}` only helps JS-rendered pages, not walls.
 
 ## 3. Generate remove_selectors
 
@@ -54,8 +57,10 @@ For JS sites (browser fetch), generate selectors manually:
 ## 4. Test extraction
 
 ```bash
-python main.py --test-site "Venue Name"
+venv/bin/python main.py crawl --city <city> --test-site "Venue Name"
 ```
+Thin page / 0 events → test a cards adapter on the stored page before writing it:
+`venv/bin/python scripts/validate_venues.py --city <city> --adapter-check "Venue Name" --adapter '{kind: cards, card: …, title: …, date: …}'`.
 
 Each extracted event MUST have all five fields populated:
 - **title** — event name
@@ -67,9 +72,8 @@ Each extracted event MUST have all five fields populated:
 If any of these are missing for most events, the page structure needs investigation — the LLM extraction prompt may need a `hint:` in sites/<city>.yaml explaining where dates/times appear on this site.
 
 If 0 results:
-- Check if site needs `js_required: true`
-- Inspect fetched markdown: add `print(text[:2000])` in extract_events_from_text
-- Check date range: events > 14 days out won't appear (use `--family` for 30-day window)
+- Check if the site needs `fetch: {mode: browser}`
+- Re-parse the stored page without fetching: add `--parse-only`
 
 ## 5. Regenerate all selectors (after bulk venue additions)
 
@@ -80,13 +84,13 @@ python scripts/gen_selectors.py             # apply
 
 ## Required event fields
 
-Every extracted event must have all five fields. If a venue's page omits any, add a `notes:` hint:
+Every extracted event must have all five fields. If a venue's page omits any, add a `hint:`:
 
 ```yaml
-  notes: "Dates shown as 'Sat 12 Jul' in .event-date span. Times in .event-time. Each card links to /events/{slug}"
+  hint: "Dates shown as 'Sat 12 Jul' in .event-date span. Times in .event-time. Each card links to /events/{slug}"
 ```
 
-The extraction LLM reads `notes` before parsing — a specific hint about where dates/times/links appear
+The extraction LLM reads `hint` before parsing (`about` is never sent) — a specific hint about where dates/times/links appear
 on that venue's page dramatically improves extraction accuracy.
 
 ## LLM prompt for manual selector identification
@@ -103,7 +107,7 @@ Each event must have: title, date, time, direct URL to the event page, and descr
 Please:
 1. Suggest CSS selectors for non-event elements (nav, cookie banners, hero images, 
    newsletter forms) to add to `remove_selectors`.
-2. Note where on the page dates, times, and per-event links appear — this goes in `notes:`.
+2. Note where on the page dates, times, and per-event links appear — this goes in `hint:`.
 
-Return JSON: {"remove_selectors": [...], "notes": "..."}
+Return JSON: {"remove_selectors": [...], "hint": "..."}
 ```

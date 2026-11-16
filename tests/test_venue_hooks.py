@@ -128,7 +128,7 @@ def test_crawl_sites_runs_pre_fetch_and_pre_source(registry, monkeypatch):
     """crawl_sites maps cfgs through pre_fetch before fetching and fr through pre_source before sources."""
     from src.sources import html_sites
     cfg = _cfg(hook="dummy_hall", extract=["llm"])
-    monkeypatch.setattr(html_sites, "_venues", lambda p, t: (get_city("london"), [cfg]))
+    monkeypatch.setattr(html_sites, "_venues", lambda p, t, c=None: (get_city("london"), [cfg]))
     seen: dict = {}
 
     async def fake_fetch_all(vs, **kw):

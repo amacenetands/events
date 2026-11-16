@@ -37,16 +37,24 @@ def city_today(city) -> date:
     return datetime.now(ZoneInfo(city.tz)).date()
 
 
-def _load_sites(pipeline: str | None = None, include_disabled: bool = False) -> list[dict]:
-    """Legacy-shaped site dicts for one pipeline tag, via config.load_venues.
-    pipeline=None → London default (Moscow-tagged venues excluded); a Moscow tag
-    (moscow / moscow-theatre) → that city's venues carrying it; any other tag →
-    London venues carrying it. {YEAR} in urls is resolved to the current year."""
+def _select(pipeline: str | None, city: str | None, include_disabled: bool = False):
+    """(CityConfig, venues). `city` given: that city's file (membership), `pipeline` only
+    narrows to venues carrying the tag (a parked tag must be named to be included).
+    No city: the city is the one `pipeline` routes to (city_for_tag; None → default)."""
     from .. import config
-    city = config.city_for_tag(pipeline)
-    year = city_today(config.get_city(city)).year
-    venues = config.load_venues(city, include_disabled=include_disabled,
-                                tags=[pipeline] if pipeline else None)
+    c = config.get_city(city if city else config.city_for_tag(pipeline))
+    return c, config.load_venues(c.name, include_disabled=include_disabled,
+                                 tags=[pipeline] if pipeline else None)
+
+
+def _load_sites(pipeline: str | None = None, include_disabled: bool = False,
+                city: str | None = None) -> list[dict]:
+    """Legacy-shaped site dicts via _select: `city`'s venues (optionally only those tagged
+    `pipeline`), or without a city the tag rule: None → London default, a routing tag
+    (moscow / moscow-theatre) → that city's venues carrying it, any other tag → London venues
+    carrying it. {YEAR} in urls is resolved to the current year."""
+    c, venues = _select(pipeline, city, include_disabled)
+    year = city_today(c).year
     out = []
     for v in venues:
         d = v.to_legacy_dict()
@@ -55,19 +63,18 @@ def _load_sites(pipeline: str | None = None, include_disabled: bool = False) -> 
     return out
 
 
-def configured_site_names(pipeline: str | None = None, include_disabled: bool = False) -> list[str]:
-    """Names of all non-skipped sites for a pipeline. include_disabled keeps
-    fetch-disabled (bot-blocked) venues so their cached rows still surface."""
-    return [s["name"] for s in _load_sites(pipeline=pipeline, include_disabled=include_disabled)]
+def configured_site_names(pipeline: str | None = None, include_disabled: bool = False,
+                          city: str | None = None) -> list[str]:
+    """Names of all non-skipped sites for a city and/or pipeline tag (see _select).
+    include_disabled keeps fetch-disabled (bot-blocked) venues so their cached rows still surface."""
+    return [s["name"] for s in _load_sites(pipeline=pipeline, include_disabled=include_disabled, city=city)]
 
 
-def _venues(pipeline: str | None, test_site: str | None):
-    from .. import config
-    city = config.city_for_tag(pipeline)
-    venues = config.load_venues(city, tags=[pipeline] if pipeline else None)
+def _venues(pipeline: str | None, test_site: str | None, city: str | None = None):
+    c, venues = _select(pipeline, city)
     if test_site:
         venues = [v for v in venues if v.name.lower() == test_site.lower()]
-    return config.get_city(city), venues
+    return c, venues
 
 
 def _spektrix_client(cfg, fr: FetchResult):
@@ -156,13 +163,15 @@ async def crawl_sites(
     errors: list[str] | None = None,
     summary: dict | None = None,
     frs: dict[str, FetchResult] | None = None,
+    city: str | None = None,
 ) -> SitesResult:
     """Fetch (src/fetch; stored pages only with parse_only, then sources are offline) and
     parse every venue; classified Events + the FetchResults. `errors` gets one
     "<venue>: <why>" per venue with any ctx error (save_crawl merges those); `summary`
-    gets {venue: stats}. `frs` (tests) replaces fetching."""
+    gets {venue: stats}. `frs` (tests) replaces fetching. `city`: that city's venues
+    (`pipeline` then only narrows by tag); None: the city `pipeline` routes to."""
     _t0 = timing.now()
-    city, venues = _venues(pipeline, test_site)
+    city, venues = _venues(pipeline, test_site, city)
     if test_site and not venues:
         print(f"  [crawl] Site '{test_site}' not found in {city.sites}")
         return SitesResult()
@@ -235,7 +244,7 @@ async def crawl_sites(
 
 async def parse_sites(pipeline: str | None = None, test_site: str | None = None, force_parse: bool = False,
                       errors: list[str] | None = None, summary: dict | None = None,
-                      frs: dict[str, FetchResult] | None = None) -> list[Event]:
+                      frs: dict[str, FetchResult] | None = None, city: str | None = None) -> list[Event]:
     """Offline parse of the stored pages (no listing fetches, no API calls); Events only."""
     return (await crawl_sites(pipeline, test_site, force_parse=force_parse, parse_only=True,
-                              errors=errors, summary=summary, frs=frs)).events
+                              errors=errors, summary=summary, frs=frs, city=city)).events

@@ -6,7 +6,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Moscow+Philharmonic+%28Full+Afisha%29+London
+  map: https://maps.google.com/?q=Moscow+Philharmonic+%28Full+Afisha%29+Moscow
   category_hint: concert
   about: All-halls calendar of Moscow State Philharmonic. RU. Server-rendered. Covers Tchaikovsky/Chamber/Rachmaninov
     halls.
@@ -15,7 +15,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Moscow+Conservatory+London
+  map: https://maps.google.com/?q=Moscow+Conservatory+Moscow
   category_hint: concert
   about: Conservatory halls (Great/Small/Rachmaninov), Bolshaya Nikitskaya. RU. Dates + hall filters.
 - name: Московский международный Дом музыки (ММДМ)
@@ -23,7 +23,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Moscow+Int%27l+House+of+Music+%28MMDM%29+London
+  map: https://maps.google.com/?q=Moscow+Int%27l+House+of+Music+%28MMDM%29+Moscow
   category_hint: concert
   about: Largest concert complex (Svetlanov/Chamber/Theater halls), Paveletskaya. RU. Classical + jazz.
 - name: Концертный зал «Зарядье»
@@ -31,7 +31,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Zaryadye+Concert+Hall+London
+  map: https://maps.google.com/?q=Zaryadye+Concert+Hall+Moscow
   category_hint: concert
   about: Modern hall near Kremlin, Varvarka St. RU. Jazz sub-filter /events/?genre=jazz.
 - name: Дом союзов (Колонный зал)
@@ -39,7 +39,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=House+of+Unions+%28Column+Hall%29+London
+  map: https://maps.google.com/?q=House+of+Unions+%28Column+Hall%29+Moscow
   category_hint: concert
   about: Historic Column Hall, Bolshaya Dmitrovka. RU. Classical/choral/vocal.
 - name: РАМ имени Гнесиных
@@ -47,7 +47,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Gnessin+Academy+of+Music+London
+  map: https://maps.google.com/?q=Gnessin+Academy+of+Music+Moscow
   category_hint: concert
   about: Academy concert hall, Arbat. RU. Recitals + public concerts.
 - name: «Московские виртуозы»
@@ -55,7 +55,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Moscow+Virtuosi+Orchestra+London
+  map: https://maps.google.com/?q=Moscow+Virtuosi+Orchestra+Moscow
   category_hint: concert
   about: Spivakov chamber orchestra; plays MMDM/Tchaikovsky/Zaryadye. EN/RU.
 - name: Джаз-клуб «Эссе»
@@ -63,7 +63,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Esse+Jazz+Club+London
+  map: https://maps.google.com/?q=Esse+Jazz+Club+Moscow
   category_hint: concert
   about: 'Jazz club, Pyatnitskaya St, Zamoskvorechye. RU. Schedule on homepage #afisha anchor.'
 - name: Джазовый клуб Игоря Бутмана
@@ -71,7 +71,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Igor+Butman+Jazz+Club+London
+  map: https://maps.google.com/?q=Igor+Butman+Jazz+Club+Moscow
   category_hint: concert
   about: Butman's jazz club, central Moscow. RU. Homepage = concert listing, event cards w/ dates.
 - name: Клуб Козлова
@@ -79,7 +79,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Kozlov+Club+London
+  map: https://maps.google.com/?q=Kozlov+Club+Moscow
   category_hint: concert
   fetch:
     mode: browser
@@ -89,7 +89,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=Jazz+Club+Soyuz+Kompozitorov+London
+  map: https://maps.google.com/?q=Jazz+Club+Soyuz+Kompozitorov+Moscow
   category_hint: concert
   about: Jazz club, Bryusov Lane near Tverskaya. RU. Schedule w/ dates+prices.
 - name: JAM Club
@@ -97,7 +97,7 @@ venues:
   tags:
   - moscow
   type: concert-hall
-  map: https://maps.google.com/?q=JAM+Club+London
+  map: https://maps.google.com/?q=JAM+Club+Moscow
   category_hint: concert
   fetch:
     mode: browser
@@ -107,7 +107,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=State+Tretyakov+Gallery+London
+  map: https://maps.google.com/?q=State+Tretyakov+Gallery+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -117,7 +117,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Pushkin+State+Museum+of+Fine+Arts+London
+  map: https://maps.google.com/?q=Pushkin+State+Museum+of+Fine+Arts+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -127,7 +127,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=State+Historical+Museum+London
+  map: https://maps.google.com/?q=State+Historical+Museum+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -138,7 +138,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=State+Darwin+Museum+London
+  map: https://maps.google.com/?q=State+Darwin+Museum+Moscow
   category_hint: exhibition
   about: Natural history/evolution, Vavilova St. RU (?eng= for EN). Titles+dates in HTML. http not https.
 - name: Мемориальный музей космонавтики
@@ -146,7 +146,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Memorial+Museum+of+Cosmonautics+London
+  map: https://maps.google.com/?q=Memorial+Museum+of+Cosmonautics+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -156,7 +156,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Multimedia+Art+Museum+%28MAMM%29+London
+  map: https://maps.google.com/?q=Multimedia+Art+Museum+%28MAMM%29+Moscow
   category_hint: exhibition
   about: Photography/media art, Ostozhenka. EN. Titles+dates server-rendered. Also runs lectures.
 - name: Еврейский музей и центр толерантности
@@ -164,7 +164,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Jewish+Museum+and+Tolerance+Center+London
+  map: https://maps.google.com/?q=Jewish+Museum+and+Tolerance+Center+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -174,23 +174,25 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Museum+of+Russian+Impressionism+London
+  map: https://maps.google.com/?q=Museum+of+Russian+Impressionism+Moscow
   category_hint: exhibition
   about: Private museum, Leningradsky pr. EN. Titles+dates in HTML.
 - name: Музей Булгакова
-  url: https://bulgakovmuseum.ru/en/category/exhibitions/
+  url: https://bulgakovmuseum.ru/category/exhibitions/
+  fetch:
+    mode: browser
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Bulgakov+Museum+London
+  map: https://maps.google.com/?q=Bulgakov+Museum+Moscow
   category_hint: exhibition
-  about: Literary/memorial 'Bad Apartment 50', Bolshaya Sadovaya. EN. WordPress, real HTML.
+  about: Literary/memorial 'Bad Apartment 50', Bolshaya Sadovaya. RU. The /en/ listing 404s; the RU listing is JS-rendered.
 - name: Музей Маяковского
   url: https://muzeimayakovskogo.ru/events/exhibitions/
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Mayakovsky+Museum+London
+  map: https://maps.google.com/?q=Mayakovsky+Museum+Moscow
   category_hint: exhibition
   about: Futurist poet museum (temp at Malaya Dmitrovka). RU. Titles+dates in HTML.
 - name: Музей Льва Толстого
@@ -198,7 +200,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Leo+Tolstoy+Museum+London
+  map: https://maps.google.com/?q=Leo+Tolstoy+Museum+Moscow
   category_hint: exhibition
   about: Literary museum, Prechistenka, Khamovniki. RU. Titles+dates server-rendered.
 - name: Музей-панорама «Бородинская битва»
@@ -206,7 +208,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Museum-Panorama+Battle+of+Borodino+London
+  map: https://maps.google.com/?q=Museum-Panorama+Battle+of+Borodino+Moscow
   category_hint: exhibition
   about: 1812 war museum, Kutuzovsky pr. EN. Titles+dates in HTML. Closed Fri.
 - name: Музей Москвы
@@ -214,7 +216,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Museum+of+Moscow+London
+  map: https://maps.google.com/?q=Museum+of+Moscow+Moscow
   category_hint: exhibition
   about: City history museum, Zubovsky Blvd. RU/EN. Exhibitions+lectures+tours, branch filters.
 - name: Музей-заповедник «Царицыно»
@@ -222,7 +224,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Tsaritsyno+Museum-Reserve+London
+  map: https://maps.google.com/?q=Tsaritsyno+Museum-Reserve+Moscow
   category_hint: exhibition
   about: Catherine II palace estate, South Moscow. RU. Titles+dates in HTML.
 - name: Музей-заповедник «Коломенское» (МГОМЗ)
@@ -230,7 +232,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Kolomenskoye+Museum-Reserve+%28MGOMZ%29+London
+  map: https://maps.google.com/?q=Kolomenskoye+Museum-Reserve+%28MGOMZ%29+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -241,7 +243,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Moscow+Museum+of+Modern+Art+%28MMOMA%29+London
+  map: https://maps.google.com/?q=Moscow+Museum+of+Modern+Art+%28MMOMA%29+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -251,7 +253,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=Winzavod+Centre+for+Contemporary+Art+London
+  map: https://maps.google.com/?q=Winzavod+Centre+for+Contemporary+Art+Moscow
   category_hint: exhibition
   about: Major contemporary-art cluster, Basmanny. RU (EN at /eng/). Exhibitions w/ dates+prices.
 - name: Дизайн-завод ARTPLAY
@@ -259,7 +261,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=ARTPLAY+Design+Centre+London
+  map: https://maps.google.com/?q=ARTPLAY+Design+Centre+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -269,7 +271,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=GES-2+House+of+Culture+London
+  map: https://maps.google.com/?q=GES-2+House+of+Culture+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -280,7 +282,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Cube.Moscow+London
+  map: https://maps.google.com/?q=Cube.Moscow+Moscow
   category_hint: gallery
   about: Multi-gallery art platform (~10 galleries), Patriarch's Ponds. RU/EN. Events w/ dates+tickets.
 - name: Центр творческих индустрий «Фабрика»
@@ -288,7 +290,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=Fabrika+Centre+%28CCI+Fabrika%29+London
+  map: https://maps.google.com/?q=Fabrika+Centre+%28CCI+Fabrika%29+Moscow
   category_hint: exhibition
   about: Oldest creative cluster (2005), former paper factory, Baumansky. RU. Dated listings.
 - name: Хлебозавод №9
@@ -296,7 +298,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=Hlebozavod+No.+9+London
+  map: https://maps.google.com/?q=Hlebozavod+No.+9+Moscow
   category_hint: exhibition
   about: Creative cluster, former bread factory, Butyrsky. RU. Titles+dates in HTML.
 - name: Дизайн-завод «Флакон»
@@ -304,7 +306,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=Flacon+Design+Factory+London
+  map: https://maps.google.com/?q=Flacon+Design+Factory+Moscow
   category_hint: exhibition
   about: Creative cluster on former crystal factory, Dmitrovskaya. RU. Afisha w/ dated events.
 - name: Галерея pop/off/art
@@ -312,7 +314,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=pop%2Foff%2Fart+Gallery+London
+  map: https://maps.google.com/?q=pop%2Foff%2Fart+Gallery+Moscow
   category_hint: gallery
   about: Contemporary gallery at Winzavod. EN/RU. Dated solo shows.
 - name: Галерея XL
@@ -320,7 +322,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=XL+Gallery+London
+  map: https://maps.google.com/?q=XL+Gallery+Moscow
   category_hint: gallery
   about: 'Founded 1993, contemporary gallery at Winzavod. EN. Verify js — ECONNREFUSED on fetch. DEAD: SSL/conn
     error.'
@@ -330,7 +332,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=Triumph+Gallery+London
+  map: https://maps.google.com/?q=Triumph+Gallery+Moscow
   category_hint: gallery
   about: Founded 2006, contemporary gallery, central Moscow. RU/EN. Subcats thin — use root/homepage.
 - name: Центр современного искусства М'АРС
@@ -338,7 +340,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=M%27ARS+Centre+for+Contemporary+Art+London
+  map: https://maps.google.com/?q=M%27ARS+Centre+for+Contemporary+Art+Moscow
   category_hint: exhibition
   about: Media/digital/VR art centre, Pushkarev Lane (Trubnaya). RU. Dated immersive shows.
 - name: Галерея «Электрозавод»
@@ -346,7 +348,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Galereya+Elektrozavod+London
+  map: https://maps.google.com/?q=Galereya+Elektrozavod+Moscow
   category_hint: gallery
   fetch:
     mode: browser
@@ -356,7 +358,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Shchusev+Museum+of+Architecture+%28MUAR%29+%E2%80%94+Exhibitions+London
+  map: https://maps.google.com/?q=Shchusev+Museum+of+Architecture+%28MUAR%29+%E2%80%94+Exhibitions+Moscow
   category_hint: exhibition
   about: State architecture museum, Vozdvizhenka. RU. Exhibitions w/ dates, static HTML.
 - name: Музей архитектуры им. Щусева — Мероприятия
@@ -364,7 +366,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Shchusev+Museum+of+Architecture+%28MUAR%29+%E2%80%94+Events+London
+  map: https://maps.google.com/?q=Shchusev+Museum+of+Architecture+%28MUAR%29+%E2%80%94+Events+Moscow
   category_hint: lecture
   about: MUAR lectures/screenings/workshops. RU. Static HTML w/ dates.
 - name: Центр «Зотов»
@@ -372,7 +374,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=Zotov+Centre+London
+  map: https://maps.google.com/?q=Zotov+Centre+Moscow
   category_hint: exhibition
   about: Constructivism centre, 1931 Bread Factory No.5, Presnya. RU/EN. Events w/ dates.
 - name: Музей «Гараж»
@@ -380,7 +382,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Garage+Museum+of+Contemporary+Art+London
+  map: https://maps.google.com/?q=Garage+Museum+of+Contemporary+Art+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -390,7 +392,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=VDNKh+%E2%80%94+Events+London
+  map: https://maps.google.com/?q=VDNKh+%E2%80%94+Events+Moscow
   category_hint: festival
   fetch:
     mode: browser
@@ -400,7 +402,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=VDNKh+%E2%80%94+Cosmonautics+%26+Aviation+Centre+London
+  map: https://maps.google.com/?q=VDNKh+%E2%80%94+Cosmonautics+%26+Aviation+Centre+Moscow
   category_hint: exhibition
   fetch:
     mode: browser
@@ -410,7 +412,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Narkomfin+Building+London
+  map: https://maps.google.com/?q=Narkomfin+Building+Moscow
   category_hint: lecture
   fetch:
     mode: browser
@@ -420,7 +422,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Open+City+Festival+London
+  map: https://maps.google.com/?q=Open+City+Festival+Moscow
   category_hint: festival
   about: Architecture-education festival by Moskomarkhitektura, Jun–Nov. RU. Tilda static. Lectures+tours+workshops.
 - name: Политехнический музей
@@ -428,7 +430,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Polytechnic+Museum+London
+  map: https://maps.google.com/?q=Polytechnic+Museum+Moscow
   category_hint: lecture
   fetch:
     mode: browser
@@ -438,7 +440,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=MARCH+Architecture+School+London
+  map: https://maps.google.com/?q=MARCH+Architecture+School+Moscow
   category_hint: lecture
   about: Independent architecture school, Basmanny. EN/RU. Static HTML; last events 2023 — verify still active.
 - name: Высшая школа урбанистики НИУ ВШЭ
@@ -446,15 +448,17 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=HSE+Graduate+School+of+Urbanism+London
+  map: https://maps.google.com/?q=HSE+Graduate+School+of+Urbanism+Moscow
   category_hint: lecture
   about: HSE urbanism school. EN/RU. News/events server-rendered w/ dates; active 2025–26.
 - name: ГУП НИиПИ Генплана Москвы — Конференции
   url: https://conf.genplanmos.ru/
+  disabled: true
+  disabled_reason: TCP timeout from the crawl host (DNS resolves; likely geo-blocked); never fetched, 0 events
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Genplan+Institute+of+Moscow+%E2%80%94+Conferences+London
+  map: https://maps.google.com/?q=Genplan+Institute+of+Moscow+%E2%80%94+Conferences+Moscow
   category_hint: lecture
   about: City-planning institute public lectures/conferences. RU. Verify js — timed out on fetch.
 - name: Лекторий «Прямая речь»
@@ -462,7 +466,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Pryamaya+Rech+Lectorium+London
+  map: https://maps.google.com/?q=Pryamaya+Rech+Lectorium+Moscow
   category_hint: lecture
   about: Leading intellectual lecture hall — literature/science/psychology/history. RU. Schedule in HTML.
 - name: Культурно-просветительский центр «Архэ»
@@ -470,7 +474,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Arche+Cultural-Educational+Center+London
+  map: https://maps.google.com/?q=Arche+Cultural-Educational+Center+Moscow
   category_hint: lecture
   about: Science-pop lectorium at MPGU — paleontology/history/philosophy. RU. Homepage = events feed.
 - name: Лекторий Level One
@@ -478,7 +482,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Level+One+Lectorium+London
+  map: https://maps.google.com/?q=Level+One+Lectorium+Moscow
   category_hint: lecture
   fetch:
     mode: browser
@@ -488,7 +492,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Synchronize+London
+  map: https://maps.google.com/?q=Synchronize+Moscow
   category_hint: lecture
   fetch:
     mode: browser
@@ -498,7 +502,7 @@ venues:
   tags:
   - moscow
   type: gallery
-  map: https://maps.google.com/?q=Tretyakov+Gallery+Lectorium+London
+  map: https://maps.google.com/?q=Tretyakov+Gallery+Lectorium+Moscow
   category_hint: lecture
   fetch:
     mode: browser
@@ -508,7 +512,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Kurilka+Gutenberga+London
+  map: https://maps.google.com/?q=Kurilka+Gutenberga+Moscow
   category_hint: lecture
   about: Free science-pop lectures by researchers. Timepad organizer page, titles+dates in HTML.
 - name: Москва глазами инженера
@@ -516,7 +520,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Moscow+Through+an+Engineer%27s+Eyes+London
+  map: https://maps.google.com/?q=Moscow+Through+an+Engineer%27s+Eyes+Moscow
   category_hint: lecture
   about: Architecture/engineering walks + lectures. RU. Calendar w/ dates+titles.
 - name: Библиотека Некрасова
@@ -524,7 +528,7 @@ venues:
   tags:
   - moscow
   type: library
-  map: https://maps.google.com/?q=Nekrasovka+Library+London
+  map: https://maps.google.com/?q=Nekrasovka+Library+Moscow
   category_hint: lecture
   about: Largest public library; lectures on history/literature/music. RU. Afisha w/ dates+rooms.
 - name: Библиотека №19 им. Достоевского
@@ -532,7 +536,7 @@ venues:
   tags:
   - moscow
   type: library
-  map: https://maps.google.com/?q=Dostoevsky+Library+No.19+London
+  map: https://maps.google.com/?q=Dostoevsky+Library+No.19+Moscow
   category_hint: lecture
   about: Library on Chistoprudny Blvd; lectures/meetings. Timepad page (own site TLS issues).
 - name: ДК «Рассвет»
@@ -540,7 +544,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=DK+Rassvet+London
+  map: https://maps.google.com/?q=DK+Rassvet+Moscow
   category_hint: lecture
   fetch:
     mode: browser
@@ -551,7 +555,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Moscow+Planetarium+London
+  map: https://maps.google.com/?q=Moscow+Planetarium+Moscow
   category_hint: lecture
   about: Astronomy lectures + sky shows, Sadovaya-Kudrinskaya. RU. Afisha w/ program titles.
 - name: Beat Film Festival
@@ -559,7 +563,7 @@ venues:
   tags:
   - moscow
   type: cinema
-  map: https://maps.google.com/?q=Beat+Film+Festival+London
+  map: https://maps.google.com/?q=Beat+Film+Festival+Moscow
   category_hint: festival
   about: Documentary/music/culture film fest, runs June. RU/EN. Schedule HTML w/ titles+dates+times.
 - name: Московский международный кинофестиваль (ММКФ)
@@ -567,15 +571,15 @@ venues:
   tags:
   - moscow
   type: cinema
-  map: https://maps.google.com/?q=Moscow+Int%27l+Film+Festival+%28MMKF%29+London
+  map: https://maps.google.com/?q=Moscow+Int%27l+Film+Festival+%28MMKF%29+Moscow
   category_hint: festival
   about: Major film fest, runs April. RU. Schedule HTML. URL slug miff48 increments yearly.
 - name: Фестиваль «Зодчество»
-  url: https://zodchestvo.com/festival/schedule/
+  url: https://zodchestvo.com/about/schedule/
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Zodchestvo+Architecture+Festival+London
+  map: https://maps.google.com/?q=Zodchestvo+Architecture+Festival+Moscow
   category_hint: festival
   about: Architecture fest at Gostiny Dvor, runs November. RU/EN. Multi-track schedule; mixes archived+live.
 - name: Книжный фестиваль «Красная площадь»
@@ -583,7 +587,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Krasnaya+Ploshchad+Book+Festival+London
+  map: https://maps.google.com/?q=Krasnaya+Ploshchad+Book+Festival+Moscow
   category_hint: festival
   about: Book fest on Red Square, runs early June. RU. 800+ events w/ DD.MM.YYYY timestamps. Year in URL.
 - name: Фестиваль «Интермузей»
@@ -591,7 +595,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Intermuseum+Festival+London
+  map: https://maps.google.com/?q=Intermuseum+Festival+Moscow
   category_hint: festival
   about: Museum-sector fest, runs May. RU Tilda on culture.ru. 60+ free events across major museums. Verify js.
 - name: Московский джазовый фестиваль
@@ -599,7 +603,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Moscow+Jazz+Festival+London
+  map: https://maps.google.com/?q=Moscow+Jazz+Festival+Moscow
   category_hint: festival
   about: Large jazz fest, runs June. RU. Schedule HTML w/ performers+venues. Free outdoor concerts.
 - name: Чеховский международный театральный фестиваль
@@ -607,7 +611,7 @@ venues:
   tags:
   - moscow
   type: theatre
-  map: https://maps.google.com/?q=Chekhov+Int%27l+Theatre+Festival+London
+  map: https://maps.google.com/?q=Chekhov+Int%27l+Theatre+Festival+Moscow
   category_hint: festival
   about: Biennial theatre fest (odd years; next 2027). RU/EN. /event listing hub.
 - name: Фестиваль «Круг света»
@@ -615,7 +619,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Circle+of+Light+Festival+London
+  map: https://maps.google.com/?q=Circle+of+Light+Festival+Moscow
   category_hint: festival
   about: Light/projection fest at landmarks, runs late Sep–Oct. RU. No program subpage off-season — verify js.
 - name: Ночь музеев в Москве
@@ -623,7 +627,7 @@ venues:
   tags:
   - moscow
   type: museum
-  map: https://maps.google.com/?q=Museum+Night+Moscow+London
+  map: https://maps.google.com/?q=Museum+Night+Moscow+Moscow
   category_hint: festival
   fetch:
     mode: browser_stealth
@@ -635,7 +639,7 @@ venues:
   tags:
   - moscow
   type: venue
-  map: https://maps.google.com/?q=Night+of+Arts+Moscow+London
+  map: https://maps.google.com/?q=Night+of+Arts+Moscow+Moscow
   category_hint: festival
   fetch:
     mode: browser_stealth
@@ -647,7 +651,7 @@ venues:
   tags:
   - moscow
   type: cinema
-  map: https://maps.google.com/?q=Moscow+Jewish+Film+Festival+London
+  map: https://maps.google.com/?q=Moscow+Jewish+Film+Festival+Moscow
   category_hint: festival
   fetch:
     mode: browser
@@ -696,6 +700,9 @@ venues:
   about: Lenkom Theatre, Malaya Dmitrovka 6, Pushkinskaya/Chekhovskaya. RU server-rendered afisha with full cast.
 - name: МХАТ им. М. Горького
   url: https://art-theatre.ru/afisha/
+  disabled: true
+  disabled_reason: art-theatre.ru now serves an unrelated casino site (afisha 404); find the theatre's current
+    official site before re-enabling
   tags:
   - moscow-theatre
   type: theatre
