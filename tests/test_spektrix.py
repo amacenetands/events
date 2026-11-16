@@ -483,6 +483,39 @@ def test_star_prefixed_and_hire_addons():
     assert not S.is_addon({"name": "Starstruck"}) and not S.is_addon({"name": "Hire Me: a play"})
 
 
+def test_preorder_merch_programme_addons():
+    for n in ("Ice Cream Pre-Order - Antarctica", "Donation", "Booking Fee", "Souvenir Programme",
+              "RPO: Programme 2026/27", "Concert programme (Choral)", "Merchandise", "Gift Aid"):
+        assert S.is_addon({"name": n}), n
+
+
+def test_panto_family_and_courses_adult():
+    assert S.classify_event(_ev("Jack and the Beanstalk", description="Panto 2026"))[1] == "family"
+    assert S.classify_event(_ev("Producer Bootcamp"))[1] == "adult"
+    assert S.classify_event(_ev("Creating Theatre for Early Years with Page One Theatre"))[1] == "adult"
+    assert S.classify_event(_ev("Baby Explorers", description="A CPD day"))[1] == "adult"
+    assert S.classify_event(_ev("Peter Pan", description="Her career was long."))[1] == ""
+
+
+def test_title_variants_and_fill_urls():
+    assert S._title_variants("The Big Bash: Peter Pan (2026)")[:3] == [
+        "The Big Bash: Peter Pan (2026)", "The Big Bash: Peter Pan", "The Big Bash"]
+    html = '<a href="/event/the-big-bash/">The Big Bash</a><a href="/event/antarctica/">Antarctica</a>'
+    raws = [S.RawEvent(title="The Big Bash: Antarctica", url=""), S.RawEvent(title="Zzz Unknown", url="")]
+    out = S._fill_urls(raws, html, "https://v.example/whats-on")
+    assert out[0].url == "https://v.example/event/the-big-bash/" and not out[1].url
+
+
+def test_fill_urls_by_slug_when_link_text_is_generic():
+    html = ('<a href="/events/ilford-boy#dates">Book now</a><a href="/events/ilford-boy">More info</a>'
+            '<a href="/events/the-kings-ransom">Details</a><a href="/events/wind-2">Details</a>'
+            '<a href="/a/dup">x</a><a href="/b/dup">y</a><a href="https://other.example/events/zed">z</a>')
+    titles = ["ILFORD BOY", "THE KING'S RANSOM", "Wind", "Dup", "Zed"]
+    out = S._fill_urls([S.RawEvent(title=t, url="") for t in titles], html, "https://v.example/whats-on")
+    assert [r.url for r in out] == ["https://v.example/events/ilford-boy", "https://v.example/events/the-kings-ransom",
+                                    "https://v.example/events/wind-2", "", ""]
+
+
 # ── audience / url mapping ───────────────────────────────────────────────────
 
 def _ev(name="Show", **kw):
@@ -531,3 +564,10 @@ def test_event_url_template_only_when_web_url_empty():
     assert S._url(ev) == ""
     assert S._url(ev, "https://v/{bogus}") == ""
     assert S.event_to_raw(ev, tpl).url.endswith("/E1")
+
+
+def test_window_days_override():
+    ctx = SourceCtx(http=None, today=date(2026, 1, 1), window_days=90, city=get_city("london"))
+    assert S._window_days(_venue(adapter={"kind": "spektrix", "client": "x", "window_days": 365}), ctx) == 365
+    assert S._window_days(_venue(adapter={"kind": "spektrix", "client": "x", "window_days": 30}), ctx) == 90
+    assert S._window_days(_venue(adapter={"kind": "spektrix", "client": "x"}), ctx) == 90

@@ -123,7 +123,7 @@ venues:
     - .skip-link
   about: Chamber music, lieder. Frequent morning and lunchtime concerts.
 - name: St Martin-in-the-Fields
-  adapter: {kind: spektrix, client: stmartininthefields, domain: tickets.stmartin-in-the-fields.org}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
+  adapter: {kind: spektrix, client: stmartininthefields, domain: tickets.stmartin-in-the-fields.org, window_days: 365}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.stmartin-in-the-fields.org/calendar/
   tags:
   - family
@@ -255,7 +255,7 @@ venues:
     - .c-page-spinner
   about: Theatre and family shows, outdoor Globe season, workshops for kids and families
 - name: Hackney Empire
-  adapter: {kind: spektrix, client: hackneyempire, domain: tickets.hackneyempire.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
+  adapter: {kind: spektrix, client: hackneyempire, domain: tickets.hackneyempire.co.uk, window_days: 365}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.hackneyempire.co.uk/whats-on
   tags:
   - theatres
@@ -1606,7 +1606,7 @@ venues:
   about: Central London church — regular concerts, annual New Year family concert, talks, cultural programme with
     creche
 - name: Lyric Hammersmith
-  adapter: {kind: spektrix, client: lyrichammersmith, domain: tickets.lyric.co.uk}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
+  adapter: {kind: spektrix, client: lyrichammersmith, domain: tickets.lyric.co.uk, window_days: 365}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://lyric.co.uk/whats-on/
   tags:
   - theatres
@@ -1615,7 +1615,7 @@ venues:
   about: West London family theatre — Little Lyric Saturday shows for under-11s, Young Lyric £5 tickets, half-term
     residencies
 - name: Donmar Warehouse
-  adapter: {kind: spektrix, client: donmarwarehouse, domain: tickets.donmarwarehouse.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
+  adapter: {kind: spektrix, client: donmarwarehouse, domain: tickets.donmarwarehouse.com, window_days: 365}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://www.donmarwarehouse.com/whats-on/
   tags:
   - theatres
@@ -2908,7 +2908,7 @@ venues:
   disabled: true
   disabled_reason: Cloudflare JS challenge blocks automated clients
 - name: Royal Court Theatre
-  adapter: {kind: spektrix, client: royalcourt, domain: tickets.royalcourttheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
+  adapter: {kind: spektrix, client: royalcourt, domain: tickets.royalcourttheatre.com, window_days: 365}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://royalcourttheatre.com/whats-on/
   tags:
   - theatres
@@ -3359,7 +3359,7 @@ venues:
   category_hint: kids
   about: Wimbledon children's theatre
 - name: Unicorn Theatre
-  adapter: {kind: spektrix, client: unicorntheatre, domain: tickets.unicorntheatre.com}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
+  adapter: {kind: spektrix, client: unicorntheatre, domain: tickets.unicorntheatre.com, window_days: 365}   # v3: Spektrix API replaces llm (was spektrix.detected_unlisted)
   url: https://unicorntheatre.com/whats-on
   tags:
   - family

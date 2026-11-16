@@ -31,7 +31,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Iterable
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urldefrag, urlsplit
 
 import httpx
 
@@ -181,7 +181,9 @@ def fingerprint(html: str | None, url: str = "") -> str | None:
 _ADDON_GENERIC = re.compile(
     r"\b(headsets?|listening device|vouchers?|gift (?:cards?|vouchers?|memberships?)|"
     r"packages?|secure my booking|test event|blue badge|car park(?:ing)?|parking (?:space|permit|pass|ticket|voucher)s?|"
-    r"(?:cushion|seat|locker|coat|blanket) hire|name[- ]a[- ]seat|for testing only|do not use)\b|^\W*parking\W*$|^\s*\*", re.I)
+    r"(?:cushion|seat|locker|coat|blanket) hire|name[- ]a[- ]seat|for testing only|do not use|"
+    r"pre[- ]?orders?|ice[- ]?creams?|merch(?:andise)?|donations?|booking fees?|gift aid|souvenirs?|(?:concert|souvenir) programmes?)\b|"
+    r":\s*programmes?(?:\s*\d{4}.*)?$|^\W*programmes?\W*$|\b(?:bar|food|drinks?) menu\b|^\W*test for\b|^\W*parking\W*$|^\s*\*", re.I)
 # Add-on only when the rest of the name is a sibling show's title ("<Show> Programme").
 _ADDON_SUFFIX = re.compile(
     r"^\W*(?:(?:and|&|\+|with)\W+)?(?:programmes?|programs?|playtexts?|play ?texts?|scripts?|"
@@ -374,6 +376,11 @@ def _url(ev: dict[str, Any], tpl: str | None = None) -> str:
 
 # Audience words stated (mapped to 'kids' / 'family', the words build.py reads) in the event's own attributes or name. No bare "junior(s)" in a
 # name ("Junior Doctors"), no "relaxed" (an access label, not an audience).
+# Training for practitioners, not an audience of kids even at a children's venue.
+_ADULT_COURSE = re.compile(r"\b(bootcamp|masterclass(?:es)?|cpd|professional development|training|practitioners?|"
+                           r"foundation course|creating theatre for|surgeries|career)\b", re.I)
+_ADULT_DESC = re.compile(r"\b(bootcamp|cpd|professional development)\b", re.I)
+_PANTO = re.compile(r"\bpanto(?:mime)?\b", re.I)
 _AUD_ATTR = re.compile(r"\b(kids?|child(?:ren)?(?:'s)?|babies|baby|toddlers?|juniors?|famil(?:y|ies)|under[- ]?5s?|youth)\b", re.I)
 _AUD_NAME = re.compile(r"\b(kids?|child(?:ren)?(?:'s)?|babies|baby|toddlers?|famil(?:y|ies)|under[- ]?5s?)\b", re.I)
 # Audience claims in prose: only unambiguous phrasing ("a family drama" does not count).
@@ -423,6 +430,11 @@ def classify_event(ev: dict[str, Any]) -> tuple[str, str, str]:
     desc = " ".join(t for t in (clean_text(ev.get("description")) if isinstance(ev.get("description"), str) else "",
                                 clean_text(ev.get("htmlDescription")) if isinstance(ev.get("htmlDescription"), str) else "") if t)
     add(_AUD_DESC.finditer(desc))
+    desc_head = first_sentence(desc, 400) or ""
+    if any(_PANTO.search(t) for t in (_name(ev) or "", desc_head, *(v for _, v in attrs))):
+        add(re.finditer(r"(famil)y", "family"))
+    if _ADULT_COURSE.search(_name(ev) or "") or _ADULT_DESC.search(desc_head):
+        return cat, "adult", ""
     age = next((v for k, v in attrs if _AGE_ATTR.search(k) and re.search(r"\d", v)), "")
     if not age:
         # Prose ages only count when they speak to the audience: "Age guidance: 7+" on an
@@ -733,16 +745,50 @@ def _safe_map(fn, events: list[dict[str, Any]], stats: SpektrixStats) -> list[Ra
 
 # ── Source registry entry ────────────────────────────────────────────────────
 
+def _title_variants(title: str) -> list[str]:
+    """Names a listing page may use for a box-office title, most specific first: the title,
+    without '(2026)' / '[Autumn 26]' tags, then each side of 'A: B' / 'A - B'."""
+    out = [title]
+    bare = re.sub(r"\s*[\(\[][^)\]]*[\)\]]", "", title).strip()
+    parts = re.split(r"\s*(?::|\s[-–—]\s|\|)\s*", bare)
+    for v in [bare, *parts]:
+        if v and v not in out:
+            out.append(v)
+    return out
+
+
+def _slug_index(lines: list[str], base: str) -> dict[str, str | None]:
+    """last path segment (trailing '-2' dropped) -> same-site URL; None when two URLs share it.
+    For cards whose link text is 'Details' / 'More info' but whose URL is the event's slug."""
+    host = urlsplit(base).hostname or ""
+    idx: dict[str, str | None] = {}
+    for ln in lines:
+        href = ln.rsplit(" -> ", 1)[-1].strip()
+        u = urldefrag(urljoin(base, href))[0].split("?")[0].rstrip("/")
+        sp = urlsplit(u)
+        seg = sp.path.rsplit("/", 1)[-1]
+        if (sp.hostname or "").removeprefix("www.") != host.removeprefix("www.") or sp.path.count("/") < 2 or not seg:
+            continue
+        key = re.sub(r"-\d+$", "", seg.lower())
+        idx[key] = u if idx.get(key, u) == u else None
+    return idx
+
+
 def _fill_urls(raws: list[RawEvent], html: str, base: str) -> list[RawEvent]:
-    """Empty webUrl: the listing page's unique anchor for the title, else '' (build -> listing)."""
+    """Empty webUrl: the listing page's unique anchor for the title (or a variant of it, see
+    `_title_variants`), else the one same-site link whose last path segment is the title's
+    slug, else '' (build -> listing)."""
     if all(r.url for r in raws):
         return raws
     lines, memo = anchor_lines(html), {}
+    slugs = _slug_index(lines, base)
     out = []
     for r in raws:
         if not r.url:
             if r.title not in memo:
-                memo[r.title] = match_title_url(r.title, lines, base)
+                vs = _title_variants(r.title)
+                memo[r.title] = (next((u for v in vs if (u := match_title_url(v, lines, base))), None)
+                                 or next((u for v in vs if (u := slugs.get(slugify(v)))), None))
             if memo[r.title]:
                 r = r.model_copy(update={"url": memo[r.title]})
         out.append(r)
@@ -755,6 +801,12 @@ def client_for_venue(cfg: VenueConfig, html: str | None) -> SpektrixClient | Non
     if a.get("kind") == "spektrix" and a.get("client"):
         return SpektrixClient(str(a["client"]).lower(), _clean_domain(a.get("domain")))
     return detect(html, cfg.url)
+
+
+def _window_days(cfg: VenueConfig, ctx: SourceCtx) -> int:
+    """`adapter.window_days` (venues that announce a season far ahead) else the crawl window."""
+    w = (cfg.adapter or {}).get("window_days")
+    return max(ctx.window_days, w) if isinstance(w, int) and not isinstance(w, bool) else ctx.window_days
 
 
 class SpektrixSource:
@@ -776,7 +828,7 @@ class SpektrixSource:
             st = SpektrixStats()
             tpl = (cfg.adapter or {}).get("event_url")
             out = await fetch_events(sc, http=ctx.http, event_url=tpl if isinstance(tpl, str) else None, start=ctx.today,
-                                     end=ctx.today + timedelta(days=ctx.window_days),
+                                     end=ctx.today + timedelta(days=_window_days(cfg, ctx)),
                                      stats=st, **{"now": datetime.combine(ctx.today, datetime.min.time()),
                                                   **self.fetch_kw})
             self._report(cfg, st, ctx)
