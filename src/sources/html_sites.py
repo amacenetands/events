@@ -4,7 +4,7 @@ ordered `extract` sources (pipeline v3 §1.2).
 
     crawl_sites(...)  — fetch_all (or the stored scrapes with --parse-only) -> per venue:
                         sources (jsonld, adapter, follow_links, spektrix, llm, ...) ->
-                        build_events -> classify
+                        build_events -> enrich (detail pages) -> classify
     parse_sites(...)  — the same over stored pages only (offline), events only
 """
 import asyncio
@@ -101,7 +101,8 @@ def source_plan(cfg, fr: FetchResult, ctx: SourceCtx | None = None) -> list[str]
 
 async def parse_venue(cfg, fr: FetchResult, ctx: SourceCtx) -> tuple[list[Event], dict]:
     """(events, stats) for one venue: ordered sources, first non-empty wins (all with
-    `merge: true`), then build_events. `ctx` is this venue's own context."""
+    `merge: true`), then build_events, the enrich pass (`cfg.enrich`) and the post_enrich
+    hook. `ctx` is this venue's own context."""
     raws, won = [], []
     if fr.body and not fr.ok:
         ctx.errors.append(f"{cfg.name}: stale page ({fr.note or fr.status.value})")
@@ -118,11 +119,24 @@ async def parse_venue(cfg, fr: FetchResult, ctx: SourceCtx) -> tuple[list[Event]
             if not cfg.merge:
                 break
     events = build_events(raws, cfg, ctx)
+    if cfg.enrich and cfg.enrich.fields and events:
+        from .enrich import enrich_events
+        events = await enrich_events(events, cfg, ctx, listing_url=fr.url)
+    events = run_hook("post_enrich", cfg, events, ctx)
     stats = {"events": len(events), "source": "+".join(won) or None, "raws": len(raws),
              "fetch": fr.status.value, "build.failed": ctx.stats.get("build.failed", 0),
              "dropped_past": ctx.stats.get("build.dropped_past", 0),
              "stats": dict(ctx.stats), "errors": list(ctx.errors)}
     return events, stats
+
+
+def _enrich_flag(stats: dict) -> str:
+    """' enrich=pages/filled(t,p,s)[ failed=N]' for the [parse] line; '' without enrich."""
+    if not stats.get("enrich.pages"):
+        return ""
+    f = [stats.get(f"enrich.filled.{k}", 0) for k in ("time", "price", "sessions")]
+    out = f" enrich={stats['enrich.pages']}/{sum(f)}({f[0]},{f[1]},{f[2]})"
+    return out + (f" failed={stats['enrich.failed']}" if stats.get("enrich.failed") else "")
 
 
 @dataclass
@@ -189,7 +203,13 @@ async def crawl_sites(
                                 "build.failed": 0, "dropped_past": 0, "stats": {"parse.raised": 1},
                                 "errors": [f"{cfg.name}: parse raised {type(ex).__name__}: {str(ex)[:80]}"]}
 
-        results = await asyncio.gather(*(one(v) for v in venues))
+        try:
+            results = await asyncio.gather(*(one(v) for v in venues))
+        finally:
+            if not offline and any(v.enrich and v.enrich.fields and v.fetch.mode in ("browser", "browser_stealth")
+                                   for v in venues):
+                from ..fetch.browser import close_browser      # enrich rendered detail pages
+                await close_browser()
 
     for cfg, (evs, st) in zip(venues, results):
         res.events.extend(evs)
@@ -197,6 +217,7 @@ async def crawl_sites(
             summary[cfg.name] = st
         extra = "".join(f" {k}={st[k]}" for k in ("build.failed", "dropped_past") if st[k])
         flags = "".join(f" {k}" for k in st["stats"] if k.endswith(("thin", "detected_unlisted", "offline")))
+        flags += _enrich_flag(st["stats"])
         print(f"  [parse] {cfg.name}: {st['events']} events [{st['source'] or '-'}] raws={st['raws']} "
               f"fetch={st['fetch']}{extra}{flags}", flush=True)
         for er in st["errors"][:3]:

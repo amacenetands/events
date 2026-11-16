@@ -413,8 +413,20 @@ def offline(replies: dict[str, dict] | None, stale: list[str] | None = None) -> 
     async def no_network(*a, **k):
         raise RuntimeError("eval: live LLM call attempted in recorded mode")
 
+    from .. import fetch as fetch_pkg
+    from ..fetch import browser as fetch_browser_mod
+
+    async def no_render(url, **k):        # enrich on a browser-mode venue: never a live render
+        return FetchResult(FetchStatus.ERROR, url=url, note="eval: no browser")
+
+    class NoThrottle:                     # enrich's per-host gap: no sleeping in eval
+        async def wait(self, url, gap):
+            return None
+
     with contextlib.ExitStack() as st:
         st.enter_context(_patched(FL, _cache_get=lambda url, force: None, _cache_put=lambda *a, **k: None))
+        st.enter_context(_patched(fetch_browser_mod, fetch_browser=no_render))
+        st.enter_context(_patched(fetch_pkg, HostThrottle=NoThrottle))
         if replies is not None:
             st.enter_context(_patched(ex, cached_records=recorded, extract_raw_batch_async=no_network))
         yield

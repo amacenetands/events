@@ -22,7 +22,8 @@ Pick the first that works:
 - `src/venues/<slug>.py` (≤40 lines, docstring says WHY with the evidence), subclass `VenueHook`,
   decorate with `@venue_hook("<slug>")`, override only the stages you need:
   `pre_fetch(cfg)`, `pre_source(cfg, fr)` (crawl_sites), `post_raw(cfg, raws, ctx)`,
-  `post_build(cfg, events, ctx)` (build_events, after `fix:`).
+  `post_build(cfg, events, ctx)` (build_events, after `fix:`), `post_enrich(cfg, events, ctx)`
+  (parse_venue, after the `enrich:` detail-page pass; runs without `enrich:` too).
 - Bind it explicitly: `hook: <slug>` on the venue (ASCII; no name-derived binding).
 - `python -m src.config --check` fails on an unknown `hook:` and on a hook no venue uses.
 - A hook that raises or returns the wrong type is reported (`hook.<stage>.raised`, one error

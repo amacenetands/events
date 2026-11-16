@@ -142,10 +142,12 @@ class FollowCfg(_Strict):
 
 
 class EnrichCfg(_Strict):
-    """Detail-page gap-fill pass for fields the listing lacks (step 6)."""
-    fields: list[str] = []
-    max: int = 20
-    link_pattern: Optional[str] = None
+    """Detail-page gap-fill pass for fields the listing lacks (src/sources/enrich.py)."""
+    fields: list[Literal["time", "price", "sessions"]] = []
+    max: int = Field(20, ge=0)                 # detail pages per venue per crawl
+    link_pattern: Optional[str] = None         # only event URLs matching (re.search) are fetched
+
+    _re = field_validator("link_pattern")(_check_regex)
 
 
 def _check_days(v: Optional[list[int]]) -> Optional[list[int]]:

@@ -7,11 +7,9 @@ from datetime import date, datetime
 from urllib.parse import urldefrag, urljoin
 from zoneinfo import ZoneInfo
 
-import httpx
-
 from ..config import LEGACY_MAX_LINKS, VenueConfig
-from ..fetch.headers import HEADERS
-from ..fetch.types import FetchResult, is_blocked_page
+from ..fetch.detail import cache_get, cache_put, fetch_detail
+from ..fetch.types import FetchResult
 from ..models import RawEvent
 from ..normalize import find_price, parse_date_specs
 from .base import SourceCtx, base_url, register_source
@@ -22,7 +20,6 @@ DEFAULT_PATTERN = r"/event/"
 MAX_CONCURRENT = 8
 MAX_TIME_TAGS = 8           # the event's own dates come before related-event widgets
 PRICE_LINES = 400           # page-text lines after the title searched for a price
-TIMEOUT = 20
 _HREF = re.compile(r'href=["\']([^"\']+)["\']')
 _TITLE_SPLIT = re.compile(r"\s+[|–—]\s+")
 _HAS_TIME = re.compile(r"\d{1,2}:\d{2}")
@@ -110,13 +107,11 @@ def raw_from_detail(html: str, url: str, ctx: SourceCtx, link_pattern: str = DEF
 
 
 def _cache_get(url: str, force: bool) -> str | None:
-    from ..dedup import get_cached_html          # lazy: opens the sqlite cache
-    return get_cached_html(url, force=force)
+    return cache_get(url, force)
 
 
 def _cache_put(url: str, html: str, site_name: str) -> None:
-    from ..dedup import save_html_cache
-    save_html_cache(url, html, site_name=site_name)
+    cache_put(url, html, site_name)
 
 
 def _bump(ctx: SourceCtx, key: str) -> None:
@@ -125,28 +120,10 @@ def _bump(ctx: SourceCtx, key: str) -> None:
 
 async def _detail_html(url: str, cfg: VenueConfig, ctx: SourceCtx,
                        sem: asyncio.Semaphore) -> tuple[str, str] | None:
-    """(html, final url) from cache, else fetched (and cached when it is a real page).
-    Failures are counted in stats only (`follow_links.http_404`, `.fetch_error`, `.blocked`)."""
-    cached = _cache_get(url, ctx.force and not ctx.offline)
-    if cached:
-        return cached, url
-    if ctx.offline:
-        _bump(ctx, "follow_links.offline_uncached")
-        return None
-    async with sem:
-        try:
-            r = await ctx.http.get(url, headers=HEADERS, follow_redirects=True, timeout=TIMEOUT)
-        except httpx.HTTPError:
-            _bump(ctx, "follow_links.fetch_error")
-            return None
-    if r.status_code >= 400:
-        _bump(ctx, f"follow_links.http_{r.status_code}")
-        return None
-    if is_blocked_page(r.text):
-        _bump(ctx, "follow_links.blocked")
-        return None
-    _cache_put(url, r.text, cfg.name)
-    return r.text, str(r.url)
+    """(html, final url) via fetch.detail; failures only in `follow_links.*` stats."""
+    # module-level lookups at call time so tests can stub _cache_get/_cache_put
+    return await fetch_detail(url, cfg, ctx, sem, prefix="follow_links",
+                              get=lambda u, f: _cache_get(u, f), put=lambda u, h, n: _cache_put(u, h, n))
 
 
 class FollowLinksSource:

@@ -1637,6 +1637,9 @@ venues:
     - .c-global-footer
     - .c-global-footer__signup
     - '#ot-sdk-btn'
+  enrich:
+    fields: [time, price, sessions]
+    max: 30
   about: Dance, ballet, physical theatre — Islington, multiple spaces including Peacock
 - name: Almeida Theatre
   url: https://almeida.co.uk/whats-on/
@@ -2482,6 +2485,9 @@ venues:
   fetch:
     mode: browser
   hint: Matinée and Evening cards on one date are separate events; copy the session label into time_text
+  enrich:
+    fields: [time, price, sessions]
+    max: 30
   about: 'Camden intimate folk/acoustic/roots venue (~120 cap) — daily gigs [test: yes]'
 - name: New Cross Inn
   url: https://newcrossinn.com/gigs/

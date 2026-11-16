@@ -9,6 +9,7 @@ Every stage defaults to identity:
     pre_source(cfg, fr) -> fr                     before the sources see the page (crawl_sites)
     post_raw(cfg, raws, ctx) -> raws              before RawEvent -> Event (build_events)
     post_build(cfg, events, ctx) -> events        after build + fixes.apply_fixes (build_events)
+    post_enrich(cfg, events, ctx) -> events       after the enrich pass (parse_venue; runs without enrich too)
 
 `run_hook()` is how callers invoke a stage. A hook that raises, or returns the wrong type,
 is reported (ctx.stats["hook.<stage>.raised"] + one ctx.errors line) and its input passes
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
 
 __all__ = ["VenueHook", "VENUE_HOOKS", "venue_hook", "load_venue_hooks", "hook_for", "run_hook", "STAGES"]
 
-STAGES = ("pre_fetch", "pre_source", "post_raw", "post_build")
+STAGES = ("pre_fetch", "pre_source", "post_raw", "post_build", "post_enrich")
 _NOT_HOOKS = frozenset({"fixes"})          # modules in this package that are not venue hooks
 
 
@@ -46,6 +47,9 @@ class VenueHook:
         return raws
 
     def post_build(self, cfg: "VenueConfig", events: "list[Event]", ctx: "SourceCtx") -> "list[Event]":
+        return events
+
+    def post_enrich(self, cfg: "VenueConfig", events: "list[Event]", ctx: "SourceCtx") -> "list[Event]":
         return events
 
 
@@ -98,7 +102,8 @@ def _check_type(stage: str, out: Any) -> None:
     ok = {"pre_fetch": lambda o: isinstance(o, VenueConfig),
           "pre_source": lambda o: o is None or isinstance(o, FetchResult),
           "post_raw": lambda o: isinstance(o, list) and all(isinstance(x, RawEvent) for x in o),
-          "post_build": lambda o: isinstance(o, list) and all(isinstance(x, Event) for x in o)}[stage]
+          "post_build": lambda o: isinstance(o, list) and all(isinstance(x, Event) for x in o),
+          "post_enrich": lambda o: isinstance(o, list) and all(isinstance(x, Event) for x in o)}[stage]
     if not ok(out):
         raise TypeError(f"returned {type(out).__name__}, not the {stage} type")
 

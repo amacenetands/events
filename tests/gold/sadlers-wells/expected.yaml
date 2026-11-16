@@ -78,25 +78,135 @@
 - title: Family Freestyle at Sadler's Wells East
   date: '2026-11-12'
   end_date: '2026-12-17'
-  kind: run
-  byday: null
-  time: null
-  price: null
+  kind: recurring
+  byday: [Thu]
+  time: '10:00'
+  price: 'Prices from: £0.00'
   url: https://www.sadlerswells.com/whats-on/family-freestyle-sadlers-wells-east-2027/
-  sessions_known: false
+  sessions_known: true
   start_known: true
-  evidence: '[C] Family Freestyle at Sadler''s Wells East | 12 November 2026 – 17 December 2026 | Sadler''s Wells East (no time/price on listing) (no weekday on the listing; both range ends are Thursdays)'
+  evidence: '[C] Family Freestyle at Sadler''s Wells East | 12 November 2026 – 17 December 2026 | Sadler''s Wells East; details/ (2026-11-16): Performances = every Thursday 19 Nov – 17 Dec at 10 am and 11 am, "Prices from: £0.00" (listing start 12 Nov is a Thursday, kept)'
 - title: Culture Club
-  date: '2026-11-13'
-  end_date: '2027-03-19'
-  kind: run
+  date: '2026-11-20'
+  end_date: null
+  kind: recurring
   byday: null
-  time: null
-  price: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
   url: https://www.sadlerswells.com/whats-on/culture-club-2026/
-  sessions_known: false
+  sessions_known: true
   start_known: true
-  evidence: '[C] Culture Club | 13 November – 19 March 2027 | Sadler''s Wells Theatre (no time/price on listing) (no weekday on the listing; both range ends are Fridays)'
+  evidence: 'details/ (2026-11-16) Performances: Friday 20 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2026-12-04'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 4 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-01-08'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 8 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-01-15'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 15 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-01-22'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 22 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-02-05'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 5 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-02-12'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 12 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-02-19'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 19 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-03-05'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 5 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-03-12'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 12 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
+- title: Culture Club
+  date: '2027-03-19'
+  end_date: null
+  kind: recurring
+  byday: null
+  time: '14:00'
+  price: 'Prices from: £0.00'
+  url: https://www.sadlerswells.com/whats-on/culture-club-2026/
+  sessions_known: true
+  start_known: true
+  evidence: 'details/ (2026-11-16) Performances: Friday 19 ... 2 pm, From: £0.00 (11 Fridays 20 Nov – 19 Mar, not every week: one dated instance each)'
 - title: BalletBoyz - Six Lethargies
   date: '2026-11-18'
   end_date: '2026-11-21'

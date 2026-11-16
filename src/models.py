@@ -96,6 +96,7 @@ class Event(BaseModel):
     sessions_known: bool = True         # False: multi-day range with no weekday/session info
     start_known: bool = True            # False: "on now until X"; `date` = earliest known/assumed day
     sold_out: bool = False              # every listed session sold out
+    times_vary: bool = False            # sessions start at several times; `time` = the earliest
     raw_date: Optional[str] = None      # date text as found on the page (debug/eval)
     date_inconsistent: bool = False     # written weekday disagrees with the date (eval only; not shown)
 

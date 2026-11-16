@@ -149,6 +149,13 @@ def days_label(byday, lang: str = "en") -> str:
     return ", ".join(names[d] for d in days[:-1]) + st["and"] + names[days[-1]]
 
 
+def time_label(e: Event, lang: str = "en") -> str:
+    """'19:30', or 'from 10:00' / 'с 10:00' when the sessions start at several times."""
+    if not e.time:
+        return ""
+    return f"{_SCHED['ru' if lang == 'ru' else 'en']['from']} {e.time}" if e.times_vary else e.time
+
+
 def schedule_label(e: Event, today: date, lang: str = "en") -> str:
     """Deterministic schedule text from byday/time/dates (never the raw recurrence string):
     'Fridays 19:30' · 'Sat & Sun until 4 Jan' · 'daily until 7 Dec' · 'from 21 Nov until 19 Dec · check days'.
@@ -156,8 +163,8 @@ def schedule_label(e: Event, today: date, lang: str = "en") -> str:
     lang = "ru" if lang == "ru" else "en"
     st = _SCHED[lang]
     if e.kind == "one_off":
-        return e.time or ""
-    head = " ".join(x for x in (days_label(e.byday, lang), e.time or "") if x)
+        return time_label(e, lang)
+    head = " ".join(x for x in (days_label(e.byday, lang), time_label(e, lang)) if x)
     bits = [head] if head else []
     if e.start_known and e.date > today and e.end_date != e.date:
         bits.append(f"{st['from']} {_dfmt(e.date, lang, 'full' if e.date.year != today.year else 'day')}")
@@ -171,7 +178,7 @@ def schedule_label(e: Event, today: date, lang: str = "en") -> str:
 
 
 def _one_off_line(e: Event, new: bool, lang: str = "en") -> str:
-    bits = [_esc(e.venue)] + ([e.time] if e.time else []) + ([_esc(e.price)] if e.price else [])
+    bits = [_esc(e.venue)] + ([time_label(e, lang)] if e.time else []) + ([_esc(e.price)] if e.price else [])
     new_tag = f" **{_t(lang, 'new')}**" if new else ""
     return f"- {_link(e)}{_badge(e, lang)}{new_tag} — {' · '.join(bits)}{_desc(e)}"
 
