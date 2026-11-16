@@ -19,7 +19,8 @@ _NON_EVENT = re.compile(
 
 
 def norm_title(t: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
+    """Lower-case letters/digits of any script (Cyrillic titles must not normalise to '')."""
+    return re.sub(r"[\W_]+", " ", (t or "").lower()).strip()
 
 
 def is_noise(e: Event) -> bool:
@@ -36,7 +37,8 @@ def _weekly(ds: list[date]) -> bool:
 
 
 def collapse_series(events: list[Event]) -> list[Event]:
-    """>=3 distinct dates of same (source, title) -> one run (min..max), unless strictly weekly."""
+    """>=3 distinct dates of same (source, title) -> one run (min..max), unless strictly weekly.
+    The run keeps the earliest session time; times_vary when the sessions start at several."""
     groups: dict[tuple, list[Event]] = defaultdict(list)
     for e in events:
         if e.kind in ("one_off", "recurring") and e.end_date is None and not e.date_undetermined:
@@ -50,9 +52,10 @@ def collapse_series(events: list[Event]) -> list[Event]:
         g.sort(key=lambda e: (e.date, e.time or ""))
         base = g[0]
         drop.update(id(e) for e in g)
+        times = sorted({e.time for e in g if e.time})      # keep the session time(s): "from 10:30"
         add.append(base.model_copy(update={
-            "kind": "run", "date": ds[0], "end_date": ds[-1], "time": None,
-            "recurrence": None}))
+            "kind": "run", "date": ds[0], "end_date": ds[-1], "time": times[0] if times else None,
+            "times_vary": len(times) > 1, "recurrence": None}))
     return [e for e in events if id(e) not in drop] + add
 
 

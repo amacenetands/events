@@ -298,6 +298,119 @@ Branch `rewrite/pipeline-v3`. Each step: Opus builder → Opus reviewer → test
 | 7 | fixtures + gold + `main.py eval` | done d1da798 (877 tests): 14 venues / 103 gold events, offline + socket-blocked, configs from sites/<city>.yaml, time-aware matching, extras in drift, KNOWN_FAILURES carry `got`, LLM replies hash-stamped; 87 found / 16 missed / 4 extra; F1 date 1.00 time 1.00 price .68 url .83 kind .97; §1.7 live fill-rate check not built; store.py lazy connect deferred |
 | 7b | KNOWN_FAILURES root causes | done 9276942 (1024 tests): gold 101/113 found, 0 extra, every field F1 1.00; jsonld offers.url, cards price selector + title time, RU/PWYC/multi-tier prices ("From £N", full-price label wins), exclusion dates → `Event.exdates`, one series rule `normalize.series_kind` (1–4 weekdays → recurring, 5+/daily → run) + `models.is_series` in query/rank/fixes/enrich, merge-mode dedupe, Coliseum per performance, follow_links byline range, llm price bleed check; 12 remaining = LLM recall misses (re-record needs paid backend) |
 | 8 | `/new-city` skill; Moscow migrated | done c621c3c (948 tests): skill with 7 steps + human-needed list; city routing by file membership (`crawl_sites(city=)`, `--city`), tag rule gone; `--check` validates lang (en/ru only until dates.py locale tables are table-driven — follow-up) and api_sources; validate_venues --city/--probe/--status/--adapter-check; seed_venues (OSM+Wikidata); eval --city; classify `_norm_title` Cyrillic fix; Moscow: 2 URLs fixed, 2 disabled; `_check_moscow.py` + staging yaml deleted (slipped into 950e2a1) |
-| 9 | full crawl; before/after metrics | |
+| 9 | full crawl; before/after metrics | done 2026-11-16 (1037 tests; not committed): §1.7 live check `src/eval/live.py` → `cache/eval.jsonl`, `eval --live`, digest "Data health" footer; crawls clean (London 8.4 min, Moscow 5.0 min); fixes: duplicate venue names (2 pages parsed as one), Spektrix on 6 venues incl. Kings Place, tidy Cyrillic `norm_title` (Moscow digest 484→1569 rows), collapse keeps session time, `fix:` re-applied to stored rows (WordPlay Fridays), api venues not stale — see §7 |
 
 Shared contract both 2a/2b use: `Source.records(cfg: VenueConfig, fr: FetchResult | None, ctx: SourceCtx) -> list[RawEvent]`; `SourceCtx(http, today, window_days, city, stats, errors, force)`; `register_source`/`SOURCES`/`safe_records` in `src/sources/base.py`; `HEADERS` in `src/fetch/headers.py`. RawEvent string fields: title, date_text, end_text, time_text, price_text, recurrence_text, url, desc, venue, source_kind, sold_out, category_text, audience_text, age_text.
+
+## 7. Step 9 results (2026-11-16)
+
+Before = `memory_pre_v3_crawl.db` (v2 crawl 2026-11-15, measured today); after = full v3 crawl + one re-crawl
+after the step-9 config fixes. Table rows (stored events, incl. rows kept for disabled/errored venues).
+
+### Accuracy, London
+
+| metric | before | after |
+|---|---|---|
+| rows | 3412 | 4579 |
+| time null | 1416 (41.5%) | 1844 (40.3%) |
+| price null | 2910 (85.3%) | 3517 (76.8%) |
+| url shared by ≥4 rows | 1171 (34.3%) | 1811 (39.6%) ¹ |
+| url == the venue's listing url | 886 (26.0%) | 1188 (25.9%) ¹ |
+| kind one_off / recurring / run | 1726 / 941 / 745 (51/28/22%) | 2212 / 1552 / 815 (48/34/18%) |
+| run > 20 d in workshop/talk/tour/concert | 122 (16% of runs) | 50 (6%) |
+| recurring with no byday | 941 (100%) | 1478 (95%) ² |
+| expired rows still in table | 251 (7.4%) | 13 (0.3%) ³ |
+| sessions_known=False (A3 baseline: 156 range-only runs) | 0 | 685; 37 are >7-day workshop/talk/tour/concert runs |
+| start_known=False ("on now until") | 0 | 135 |
+| times_vary / sold_out / exdates | 0 / 0 / 0 | 8 / 4 / 0 |
+| date_undetermined | 48 | 118 ⁴ |
+
+¹ Spektrix `webUrl` is empty for ICA 206, Jacksons Lane 77, Kings Place 77 → listing url (360 rows); without them ≥4-share 34.4%, == listing 19.6%.
+² By design since step 4: a dated instance is recurring+byday None; series rows carry byday.
+³ Rows of venues not rebuilt (disabled/blocked) that end before yesterday; pruned on the next save.
+⁴ Science Museum 32, Gunnersbury 15, Vortex 14 (LLM title/date misalignment), How To Academy 12, Etcetera 12.
+
+Live fill (`eval --live`, events produced by the crawl, event-weighted): London time 61% · price 24% ·
+url ≠ listing 78% · sessions_known 84%; Moscow 80% · 22% · 79% · 91%.
+
+### Coverage, London (300 entries in sites/london.yaml; buckets by scrapes status + stored rows)
+
+| bucket | before venues / weight | after venues / weight |
+|---|---|---|
+| OK | 210 / 239 | 224 / 255 |
+| zero events, page has text | 57 / 59 (plan: 27 + 30 JS) | 36 / 38 |
+| empty (fetch `empty`) | — | 4 / 4 |
+| blocked | — | 2 / 2 |
+| error | — | 2 / 2 |
+| disabled | 26 / 36 | 25 / 33 |
+| not scraped (+4 `skip`) | 3 / 5 | 3 / 5 |
+
+Fetch statuses (first crawl, 268 venues): ok 240 · not_modified 9 · empty 7 · blocked 3 · error 9.
+Top-10 venues 35% of events (unchanged); venues with 1–2 events 53 → 37.
+Gained: Aldwych, Dominion (ATG JSON-LD), ICA, Jacksons Lane, The Other Palace, Spitalfields Music, Kings Place
+(Spektrix), Half Moon, Electric Ballroom, London for Toddlers, Menier, Shaftesbury, St Giles, St Margaret's,
+Theatro Technis, Ealing Summer Festivals, Southwark Cathedral What's On, Westminster Abbey Events.
+Lost: Bush Hall (page now thin), Ealing Club (only event past).
+
+Zero-event venues after (fetch status; winning source `-` everywhere):
+- page has text, LLM returned 0 or page thin (`llm.thin`): Art Play London, Bank of England Museum, Bedford Park
+  Festival, British Museum (not_modified, disabled feed), Bush Hall, Charing Cross Theatre, Chiswick Festival,
+  Churchill War Rooms, Ealing Club, Gate Theatre (Spektrix: 0 events in the 90-day window), Horsenden Farm,
+  Lion and Unicorn Theatre, Mudchute, Museum of Brands, OSO Arts Centre, Old Red Lion, Old Vic, Paper Dress
+  Vintage, Queen Mary Events, Shacklewell Arms, Spitalfields City Farm, St Mary-le-Bow, St Stephen Walbrook,
+  The Bedford, The Fan Museum, Union Chapel, Vauxhall City Farm, Watermans Arts Centre
+- Delfont Mackintosh JS template (`llm.thin`): Gielgud, Novello, Noël Coward, Prince Edward, Prince of Wales,
+  Sondheim, Victoria Palace, Wyndham's
+- empty: All Hallows by the Tower, Hen and Chickens, The Lexington, The Vaults · blocked: Bread and Roses,
+  Guildhall School · error: Bethnal Green WMC (404), London Palladium (403)
+- stale cached body served (403/bot wall, rows kept): Imperial College, Upstairs at the Gatehouse, Camden
+  Comedy Club, Adelphi, Cambridge, Gillian Lynne, His Majesty's, Drury Lane, National Theatre, St Paul's
+
+### Per source, London (re-crawl)
+
+| winning source | venues | events |
+|---|---|---|
+| llm | 202 | 3171 |
+| adapter | 4 | 654 |
+| spektrix | 5 | 378 |
+| jsonld | 14 | 124 |
+| follow_links | 1 | 15 |
+| none | 45 | 0 |
+
+Spektrix fingerprint on 40 venues; 34 of them still run `llm` (`spektrix.detected_unlisted`).
+Enrich: 2 venues, 44 detail pages, 85 fields filled (time 55, price 22, sessions 8), 0 failed.
+
+| | London | Moscow |
+|---|---|---|
+| wall time | 506 s (fetch 198 s); re-crawl 113 s | 299 s (fetch 58 s) |
+| LLM calls (deepseek) | 136 | 68 |
+| prompt / completion tokens | 324k / 435k (55k cache hit) | 229k / 317k (31k) |
+| events saved | 3901 → 4329 after fixes | 1707 |
+| flagged by live check | 12 (Hampstead 100→8 = v2 per-performance junk; Southwark 35→2 = name clash) | 3 |
+
+### Moscow (75 active venues; 15 parked theatres excluded)
+
+| metric | before | after |
+|---|---|---|
+| rows | 138 | 1710 |
+| time null | 49.3% | 20.0% |
+| price null | 90.6% | 77.7% |
+| url shared by ≥4 rows | 71.7% | 49.2% |
+| one_off / recurring / run | 15 / 57 / 66 | 1272 / 262 / 176 |
+| expired rows | 34 | 1 |
+| sessions_known=False | 0 | 161 |
+| OK / zero (text) / empty / blocked / error / not scraped | 27 / 39 / 0 / 0 / 0 / 9 | 53 / 15 / 4 / 2 / 1 / 0 |
+
+Backend: `.env` LLM_BACKEND=deepseek (not the documented qwen-primary + haiku fallback); 0 haiku calls.
+
+### Digest sanity (`query --preset family|evening`, Moscow `--when next:7`)
+
+- WordPlay (Southbank, disabled, rows kept from v2): "Fridays until 18 Dec" after `fix:` re-applied at load.
+  Family Freestyle (Sadler's Wells): "Thursdays from 10:00, 19 Nov – 17 Dec".
+- Fixed: Moscow digest dropped 1126 of 1710 rows (tidy `norm_title` turned Cyrillic titles into "" = noise);
+  Spektrix sessions collapsed into time-less runs; Kings Place listed as stale.
+- Open: Spektrix rows carry no audience (Jacksons Lane Christmas shows missing from the family digest);
+  Spektrix urls = listing; LLM audience noise ("Friday Jazz" [kids], KazzumCon [kids], seminar on "Families"
+  [family]); cross-source dupes (Primary Times vs Blackheath Halls / St Martin's carols); cancelled event in a
+  Moscow top pick ("Мероприятие отменено"); RAH lists non-Moscow exhibitions; "Free"/"From" untranslated in RU;
+  Comedy Freaks: LLM omits repeated titles (27 records → 4 events); 27 venues in the stale footer (Kew 152 d).

@@ -29,7 +29,7 @@ from ..config import VenueConfig
 from ..models import Event
 from ..normalize import series_kind, weekday_of
 
-__all__ = ["apply_fixes"]
+__all__ = ["apply_fixes", "apply_fixes_stored"]
 
 _CUE = re.compile(r"\b(?:every|each|weekly)\b|(?:mon|tues|wednes|thurs|fri|satur|sun)days\b|еженедельн|кажд"
                   r"|(?:понедельник|вторник|сред|четверг|пятниц|суббот|воскресень)ам\b", re.I)
@@ -145,4 +145,20 @@ def apply_fixes(cfg: VenueConfig, events: list[Event], ctx) -> list[Event]:
             f = e
         if f is not None:
             out.append(f)
+    return out
+
+
+def apply_fixes_stored(events: list[Event], venues, today) -> list[Event]:
+    """Query-load pass: the `fix:` blocks over stored rows, so rows a crawl did not rebuild
+    (disabled / blocked venues keep old rows) follow the current config too. Idempotent."""
+    from types import SimpleNamespace
+    by_name = {v.name: v for v in venues}
+    ctx = SimpleNamespace(today=today, stats={}, errors=[])
+    groups: dict[str, list[Event]] = {}
+    for e in events:
+        groups.setdefault(e.source, []).append(e)
+    out: list[Event] = []
+    for src, evs in groups.items():
+        cfg = by_name.get(src)
+        out.extend(apply_fixes(cfg, evs, ctx) if cfg is not None else evs)
     return out

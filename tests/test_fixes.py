@@ -172,3 +172,21 @@ def test_fix_validation(bad):
 def test_byday_leaves_tbc_alone():
     [e] = _build(_cfg(byday=[2]), RawEvent(title="Something", date_text="dates tbc"))
     assert e.date_undetermined and e.byday is None
+
+
+def test_apply_fixes_stored_pins_kept_rows_and_is_idempotent():
+    """Rows of a venue not rebuilt this crawl (disabled) still get the current `fix:` block."""
+    from datetime import timedelta
+    from src.models import Event
+    from src.venues.fixes import apply_fixes_stored
+    today = date.today()
+    start = today + timedelta(days=(4 - today.weekday()) % 7 + 1)      # a Saturday, after today
+    cfg = VenueConfig(name="SB", url="https://sb.example/whats-on", fix={"weekly": {"^WordPlay": [4]}})
+    row = Event(title="WordPlay: Ages 0 – 2", venue="SB", source="SB", date=start, end_date=start + timedelta(days=34),
+                kind="run", url="https://sb.example/whats-on")
+    other = Event(title="X", venue="Y", source="Unknown", date=start, url="https://y.example/")
+    once = apply_fixes_stored([row, other], [cfg], today)
+    wp = next(e for e in once if e.source == "SB")
+    assert wp.byday == [4] and wp.kind == "recurring" and wp.date.weekday() == 4 and wp.date > start
+    assert next(e for e in once if e.source == "Unknown") is other
+    assert apply_fixes_stored(once, [cfg], today) == once

@@ -92,6 +92,9 @@ async def _run_claude_async(prompt: str, *, model: str | None = None, timeout: f
     return out
 
 
+USAGE = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cache_hit_tokens": 0}   # deepseek, per process
+
+
 async def _run_deepseek_async(
     prompt: str,
     *,
@@ -120,6 +123,11 @@ async def _run_deepseek_async(
         r = await client.post(f"{_DEEPSEEK_URL}/v1/chat/completions", json=payload, headers=headers)
         r.raise_for_status()
         data = r.json()
+    u = data.get("usage") or {}
+    USAGE["calls"] += 1
+    USAGE["prompt_tokens"] += u.get("prompt_tokens", 0)
+    USAGE["completion_tokens"] += u.get("completion_tokens", 0)
+    USAGE["cache_hit_tokens"] += u.get("prompt_cache_hit_tokens", 0)
     content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
     if not content:
         raise RuntimeError(f"DeepSeek returned empty content (finish_reason={data.get('choices', [{}])[0].get('finish_reason')})")

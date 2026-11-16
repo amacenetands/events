@@ -33,7 +33,7 @@ from src.dedup import filter_unseen, mark_seen
 from src import rank as rankmod
 from src.classify import classify
 from src.tidy import tidy
-from src.digest import generate_digest_v2, coverage_summary, save_digest_v2
+from src.digest import generate_digest_v2, coverage_summary, health_footer, save_digest_v2
 from src.translate import translate_descriptions
 from src.email_sender import send_digest
 from src.models import Event
@@ -120,8 +120,10 @@ async def crawl(
     print(f"Crawl: {city}{f' (tag {tag})' if tag else ''}\n" + "=" * 40)
 
     errors: list[str] = []
+    summary: dict[str, dict] = {}
     sites = crawl_sites(pipeline=tag, city=city, test_site=test_site, force_download=force_download,
-                        force_parse=force_parse, fetch_only=fetch_only, parse_only=parse_only, errors=errors)
+                        force_parse=force_parse, fetch_only=fetch_only, parse_only=parse_only, errors=errors,
+                        summary=summary)
     if fetch_only:
         await sites
         return 0
@@ -154,15 +156,37 @@ async def crawl(
     if not scraped:
         print("Crawl produced 0 current events — keeping previous events table.")
         return 0
+    prev_db = events_db.source_counts(city)
     cid = events_db.save_crawl(city, scraped, _tags_by_source(), errors=errors,
                               oldest_fetched_at=_oldest_fetched(frs, scraped))
     print(f"Saved {len(scraped)} events for {city} (crawl {cid}); {len(errors)} sites with errors")
     for n in errors[:15]:
         print(f"  ! {n}")
+    _live_eval(city, summary, scraped, prev_db)
+    from src import llm as _llm
+    if _llm.USAGE["calls"]:
+        print(f"LLM: {_llm.USAGE}")
+        _timing.log_runtime(stage="llm_usage", city=city, **_llm.USAGE)
     secs = round(_timing.now() - t0, 1)
     print(f"⏱ Total: {secs:.0f}s", flush=True)
     _timing.log_runtime(stage="crawl", city=city, events=len(scraped), secs=secs)
     return len(scraped)
+
+
+def _live_eval(city: str, summary: dict, events: list[Event], prev_db: dict[str, int]) -> None:
+    """§1.7: one cache/eval.jsonl line per venue; print the venues flagged (0 / -50%)."""
+    from src.eval import live
+    try:
+        year = date.today().year
+        urls = {v.name: v.resolved_url(year) for v in _config.all_venues()}
+        rows = live.venue_rows(city, summary, events, urls, live.load_prev(city), prev_db)
+        live.append(rows)
+    except Exception as ex:   # noqa: BLE001 — bookkeeping must not fail a saved crawl
+        print(f"  live eval skipped: {type(ex).__name__}: {ex}")
+        return
+    fl = live.flagged(rows)
+    print(f"Live eval: {len(rows)} venues → {live.EVAL_LOG.name}; {len(fl)} flagged"
+          + "".join(f"\n  ⚑ {r['venue']}: {r['flag']} [fetch={r['fetch']}]" for r in fl[:20]))
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +200,8 @@ def _stale_venues(events, max_age_days: float) -> list[tuple[str, float]]:
     try:
         from src import dedup
         year = date.today().year
-        urls = {v.name: v.resolved_url(year) for v in _config.all_venues()}
+        urls = {v.name: v.resolved_url(year) for v in _config.all_venues()
+                if v.fetch.mode != "api"}        # api venues (Spektrix) never refresh a page
         out = []
         for src in sorted({e.source for e in events if e.source in urls}):
             at = dedup.get_html_fetched_at(urls[src])
@@ -189,6 +214,15 @@ def _stale_venues(events, max_age_days: float) -> list[tuple[str, float]]:
             if a is not None and a > max_age_days:
                 out.append((src, a))
         return sorted(out, key=lambda x: -x[1])
+    except Exception:
+        return []
+
+
+def _live_flagged(city: str) -> list[tuple[str, str]]:
+    """(venue, why) flagged by the city's latest live eval (cache/eval.jsonl)."""
+    try:
+        from src.eval import live
+        return [(r["venue"], r["flag"]) for r in live.flagged(live.latest(city))]
     except Exception:
         return []
 
@@ -222,6 +256,8 @@ async def run_query(
 ) -> list[Event]:
     loaded = events_db.load_events(f.city)
     today, now = city_today(f), city_now(f)
+    from src.venues.fixes import apply_fixes_stored
+    loaded.events = apply_fixes_stored(loaded.events, _config.all_venues(), today)   # rows not rebuilt this crawl
     loaded.events = tidy(classify(loaded.events), today, {n.lower() for n in configured_site_names(city=f.city, include_disabled=True)})   # re-apply deterministic rules so new classifier flags need no recrawl
     age = events_db.age_days(loaded.crawled_at)
     if age is None:
@@ -274,6 +310,7 @@ async def run_query(
         for e in base:
             counts[e.source] = counts.get(e.source, 0) + 1
         footer = coverage_summary(counts, configured_site_names(city=f.city))
+    footer = health_footer([(n, _age_str(a)) for n, a in stale], _live_flagged(f.city), f.lang) + footer
 
     digest = generate_digest_v2(events, f, picks=picks, new_fps=new_fps, title=f.label, footer=footer,
                                reasons=reasons, scores=scores, today=today, lang=f.lang)

@@ -511,6 +511,18 @@ def _check_api_sources(cities: list[CityConfig]) -> int:
     return errors
 
 
+def _check_dup_names(venues: list[VenueConfig]) -> int:
+    """Venue names must be unique (case-insensitive): fetch results, source contexts and the
+    events table's `source` are keyed by name, so two pages under one name parse one page twice."""
+    urls: dict[str, list[str]] = {}
+    for v in venues:
+        urls.setdefault(v.name.lower(), []).append(v.url)
+    bad = {n: u for n, u in urls.items() if len(set(u)) > 1}
+    for n, u in bad.items():
+        print(f"ERROR venue name {n!r} used by {len(u)} urls: {', '.join(u)}")
+    return len(bad)
+
+
 def _check(city: str | None) -> int:
     """Validate cities.yaml, every city's sites file, venue/city agreement, duplicate urls and hooks."""
     try:
@@ -532,6 +544,7 @@ def _check(city: str | None) -> int:
         if n > 1:
             errors += 1
             print(f"ERROR venue {name!r} ({url}) listed {n} times")
+    errors += _check_dup_names(loaded)
     errors += _check_hooks(loaded, partial=city is not None)
     if not errors:
         for c in cities:

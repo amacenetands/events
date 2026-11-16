@@ -193,3 +193,28 @@ def test_recurring_rule_english_unchanged():
     assert all(e.kind == "recurring" for e in evs)
     evs = classify([ev(f"Talk {n}", f"2026-12-1{i}") for i, n in enumerate("ABC")])
     assert all(e.kind == "one_off" for e in evs)
+
+
+def test_tidy_collapse_keeps_session_time():
+    from datetime import date as _d, timedelta as _td
+    from src.tidy import collapse_series
+    T = _d.today()
+    d = lambda n: str(T + _td(days=n))                      # noqa: E731
+    mixed = [ev("Bubble Show", d(n), time=t, source="JL", venue="JL", kind="recurring")
+             for n, t in ((1, "15:00"), (2, "11:00"), (3, "15:00"))]
+    one = [ev("Elf", d(n), time="10:30", source="JL", venue="JL", kind="recurring") for n in (1, 2, 4)]
+    none = [ev("Pigs", d(n), source="JL", venue="JL", kind="recurring") for n in (1, 2, 4)]
+    out = {e.title: e for e in collapse_series(mixed + one + none)}
+    assert (out["Bubble Show"].kind, out["Bubble Show"].time, out["Bubble Show"].times_vary) == ("run", "11:00", True)
+    assert (out["Elf"].time, out["Elf"].times_vary) == ("10:30", False)
+    assert (out["Pigs"].time, out["Pigs"].times_vary) == (None, False)
+
+
+def test_tidy_keeps_cyrillic_titles():
+    from datetime import date as _d, timedelta as _td
+    from src.tidy import is_noise, norm_title, tidy
+    T = _d.today()
+    a = ev("Концерт «Времена года»", str(T + _td(days=1)), source="МФ", venue="МФ")
+    b = ev("Лекция о Малевиче", str(T + _td(days=1)), source="МФ", venue="МФ")
+    assert norm_title(a.title) == "концерт времена года" and not is_noise(a)
+    assert {e.title for e in tidy([a, b], T)} == {a.title, b.title}

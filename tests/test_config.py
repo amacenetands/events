@@ -251,6 +251,10 @@ def test_main_readers_via_config(monkeypatch):
     evs = [Event(title="x", venue=n, date="2030-01-01", url="u", source=n) for n in ("Barbican", "Nope")]
     assert main._stale_venues(evs, 1) == []
     assert asked == [v.url for v in config.all_venues() if v.name == "Barbican"]
+    asked.clear()
+    api = [v.name for v in config.all_venues() if v.fetch.mode == "api"]
+    assert api and main._stale_venues([Event(title="x", venue=api[0], date="2030-01-01", url="u",
+                                             source=api[0])], 1) == [] and asked == []
 
 
 def test_api_sources_registry():
@@ -288,3 +292,32 @@ def test_per_city_sites_files():
     assert rw.range_means_weekly.min_days == 28
     with pytest.raises(ValidationError):
         VenueConfig(name="A", url="u", fix={"range_means_weekly": {"title_re": "("}})
+
+
+def test_check_dup_names_flags_one_name_two_urls(capsys):
+    from src.config import VenueConfig, _check_dup_names
+    a = VenueConfig(name="Abbey", url="https://a.example/concerts")
+    b = VenueConfig(name="abbey", url="https://a.example/events")
+    assert _check_dup_names([a, b]) == 1
+    assert "used by 2 urls" in capsys.readouterr().out
+    assert _check_dup_names([a]) == 0
+
+
+def test_sites_files_have_unique_venue_names():
+    from src.config import _check_dup_names, all_venues
+    assert _check_dup_names(list(all_venues())) == 0
+
+
+def test_step9_spektrix_venues_route_to_spektrix_first():
+    """Step 9: venues whose listing gave 0 events but whose Spektrix API lists them."""
+    from src.config import load_venues
+    from src.fetch.types import FetchResult, FetchStatus
+    from src.sources.html_sites import source_plan
+    vs = {v.name: v for v in load_venues("london")}
+    for n in ("Gate Theatre", "Jacksons Lane", "The Other Palace", "Spitalfields Music", "ICA", "Kings Place"):
+        v = vs[n]
+        assert v.adapter["kind"] == "spektrix" and v.adapter["client"], n
+        body = "" if v.fetch.mode == "api" else "<html>x</html>"
+        fr = FetchResult(FetchStatus.OK, url=v.url, body=body)
+        assert source_plan(v, fr)[0] == "spektrix", n
+    assert vs["Kings Place"].fetch.mode == "api"

@@ -80,6 +80,7 @@ venues:
   about: Classical, jazz, contemporary, cinema, exhibitions.
 - name: Kings Place
   url: https://kingsplace.co.uk/whats-on/
+  adapter: {kind: spektrix, client: kingsplace, domain: ticketing.purchase.kingsplace.co.uk}   # step 9: 0 events from the page, Spektrix API has them
   tags:
   - family
   - daytime
@@ -87,10 +88,8 @@ venues:
   type: concert-hall
   category_hint: concert
   fetch:
-    mode: browser_stealth
+    mode: api                # page is behind a Cloudflare challenge; the public Spektrix API is not
   about: King's Cross N1 — classical, jazz, world, folk, family concerts. Has lunchtime series.
-  disabled: true
-  disabled_reason: Cloudflare JS challenge blocks automated clients
 - name: Cadogan Hall
   url: https://www.cadoganhall.com/whats-on/
   tags:
@@ -202,6 +201,7 @@ venues:
   about: Large gigs, circus, immersive events.
 - name: Spitalfields Music
   url: https://www.spitalfieldsmusic.org.uk/events/
+  adapter: {kind: spektrix, client: spitalfieldsfestival, domain: tickets.spitalfieldsmusic.org.uk}   # step 9: 0 events from the page, Spektrix API has them
   tags:
   - family
   type: concert-hall
@@ -270,6 +270,7 @@ venues:
   about: Pantomime, variety, family shows and community theatre
 - name: ICA
   url: https://www.ica.art/events
+  adapter: {kind: spektrix, client: ica, domain: buy.ica.art}   # step 9: 0 events from the page, Spektrix API has them
   tags:
   - family
   type: arts-centre
@@ -1548,7 +1549,7 @@ venues:
     - .nt-header-tool-bar
     - .nt-footer
   about: National Trust, Richmond — school holiday kids activities, summer outdoor theatre, family trails
-- name: Southwark Cathedral
+- name: Southwark Cathedral What's On
   url: https://cathedral.southwark.anglican.org/whats-on/
   tags:
   - family
@@ -1563,7 +1564,7 @@ venues:
     - .blueimp-gallery
     - .filter-box
   about: Daily choral evensong, free lunchtime concerts, world-class choral music
-- name: Westminster Abbey
+- name: Westminster Abbey Events
   url: https://www.westminster-abbey.org/events
   tags:
   - family
@@ -2924,6 +2925,7 @@ venues:
   about: 'Multi-award-winning fringe theatre — Dalston, 2 spaces, Pay What You Can [test: yes]'
 - name: Gate Theatre
   url: https://www.gatetheatre.co.uk/whats-on/
+  adapter: {kind: spektrix, client: gate, domain: tickets.gatetheatre.co.uk}   # step 9: 0 events from the page, Spektrix API has them
   tags:
   - theatres
   category_hint: theatre
@@ -2986,6 +2988,7 @@ venues:
   about: '265-seat off-West End — under Charing Cross arches [test: yes]'
 - name: The Other Palace
   url: https://theotherpalace.co.uk/shows/
+  adapter: {kind: spektrix, client: theotherpalace, domain: tickets.theotherpalace.co.uk}   # step 9: 0 events from the page, Spektrix API has them
   tags:
   - theatres
   category_hint: theatre
@@ -3074,6 +3077,7 @@ venues:
   about: '200-seat fringe theatre — Marylebone, eclectic programme [test: yes]'
 - name: Jacksons Lane
   url: https://www.jacksonslane.org.uk/whats-on/
+  adapter: {kind: spektrix, client: jacksonslane, domain: tickets.jacksonslane.org.uk}   # step 9: 0 events from the page, Spektrix API has them
   tags:
   - theatres
   category_hint: theatre

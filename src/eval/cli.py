@@ -8,6 +8,7 @@ with a baseline, record LLM replies, capture new gold pages.
   eval --baseline tests/gold/baseline.json [--update-baseline]
   eval --record-llm sadlers-wells [--force]   one live LLM call on the gold page -> llm_reply.json
   eval --restamp-llm sadlers-wells      refresh a reply's text_hash (records unchanged)
+  eval --live [--city C]                latest crawl's per-city fill rates + flagged venues (cache/eval.jsonl)
   eval --capture slug --url URL [--city C] [--keep CSS --items CSS --limit N --json-scripts RX] [--force]
         (page from cache/memory.db; also writes a meta.yaml stub when none exists)
 """
@@ -152,12 +153,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json-scripts", help="regex: keep non-LD <script> blocks matching it (adapter payloads)")
     ap.add_argument("--restamp-llm", metavar="SLUG", help="refresh a reply's text_hash, records unchanged")
     ap.add_argument("--force", action="store_true", help="allow --capture / --record-llm to overwrite")
+    ap.add_argument("--live", action="store_true", help="latest crawl fill rates + flagged venues (§1.7)")
     a = ap.parse_args(argv)
     if a.city:
         from ..config import city_names
         if a.city.lower() not in city_names():
             ap.error(f"unknown city {a.city!r}; known: {', '.join(city_names())}")
 
+    if a.live:
+        from . import live
+        from ..config import city_names
+        rows = [r for c in ([a.city.lower()] if a.city else city_names()) for r in live.latest(c)]
+        print(live.report(rows))
+        return 0
     if a.record_llm:
         print(record_llm(a.record_llm, force=a.force))
         return 0

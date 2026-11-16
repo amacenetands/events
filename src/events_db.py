@@ -167,6 +167,13 @@ def save_crawl(city: str, events: list[Event], tags_by_source: dict[str, list[st
     return crawl_id
 
 
+def source_counts(city: str) -> dict[str, int]:
+    """{source: stored rows} for the city (live eval's fallback previous count)."""
+    init_db()
+    return {r[0]: r[1] for r in _conn.execute(
+        "SELECT source, COUNT(*) FROM events WHERE city=? GROUP BY source", (city,))}
+
+
 def load_events(city: str) -> Loaded:
     init_db()
     rows = _conn.execute(

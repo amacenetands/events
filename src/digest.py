@@ -32,7 +32,8 @@ _STR = {
            "until": "until", "from": "from", "closing": "closing soon", "more": "more",
            "n_one": "one-off", "n_rec": "recurring", "n_runs": "runs/exhibitions", "n_tbc": "dates TBC",
            "kids": "kids", "family": "family", "adults": "adults",
-           "sold": "Sold out (check returns)", "n_sold": "sold out"},
+           "sold": "Sold out (check returns)", "n_sold": "sold out",
+           "health": "Data health", "stale": "Stale (page not refreshed)", "flagged": "Dropped this crawl"},
     "ru": {"today": "Сегодня", "tomorrow": "Завтра", "top": "Лучшее", "also": "Ещё",
            "one_off": "Разовые события", "recurring": "Регулярные", "runs": "Выставки",
            "tbc": "Дата уточняется", "tbc_note": "Не удалось подтвердить даты — проверьте по ссылке.",
@@ -40,7 +41,9 @@ _STR = {
            "until": "до", "from": "с", "closing": "скоро закрывается", "more": "ещё",
            "n_one": "разовых", "n_rec": "регулярных", "n_runs": "выставок/показов", "n_tbc": "дата уточняется",
            "kids": "дети", "family": "семья", "adults": "взрослым",
-           "sold": "Билетов нет (следите за возвратами)", "n_sold": "билетов нет"},
+           "sold": "Билетов нет (следите за возвратами)", "n_sold": "билетов нет",
+           "health": "Состояние данных", "stale": "Устарели (страница не обновлялась)",
+           "flagged": "Просели в последнем обходе"},
 }
 
 
@@ -240,6 +243,18 @@ def coverage_summary(counts: dict[str, int], all_sites: list[str]) -> str:
              "| Source | Events |", "|---|---|"]
     for n in sorted(names, key=lambda n: (counts.get(n, 0), n.lower())):
         lines.append(f"| {n} | {counts.get(n, 0)} |")
+    return "\n".join(lines)
+
+
+def health_footer(stale: list[tuple[str, str]], flagged: list[tuple[str, str]], lang: str = "en") -> str:
+    """Footer: stale venues (name, age) beside the live-eval flagged ones (name, why); '' when both empty."""
+    if not stale and not flagged:
+        return ""
+    lines = ["", "---", f"## {_t(lang, 'health')}", ""]
+    if stale:
+        lines.append(f"- {_t(lang, 'stale')}: " + ", ".join(f"{_esc(n)} ({_esc(a)})" for n, a in stale))
+    if flagged:
+        lines.append(f"- {_t(lang, 'flagged')}: " + ", ".join(f"{_esc(n)} ({_esc(w)})" for n, w in flagged))
     return "\n".join(lines)
 
 
