@@ -30,6 +30,35 @@ venues:
     - .right
     - '#footer'
   about: Dated event listings for primary-school-age kids — arts, music, theatre, attractions
+- name: Kidrated Weekend Roundup
+  url: https://www.kidrated.com/things-to-do/things-to-do-in-london-this-weekend-with-kids-teens/
+  tags:
+  - family
+  type: aggregator
+  category_hint: kids
+  must_determine_venue: true
+  hint: Only extract entries with an explicit calendar date or date range; skip evergreen attractions and places with no dates.
+  skip: true
+  about: 'Tested 2026-11-17: weekend-roundup page, /events/ and /things-to-do/events-festivals/ are evergreen WordPress place/attraction guides with no dates (reducer: thin page, 0 events); no event feed (feed/ empty). Nothing to extract.'
+- name: Time Out London Kids Christmas
+  url: https://www.timeout.com/london/kids/activities/best-london-christmas-activities-for-children
+  tags:
+  - family
+  type: aggregator
+  category_hint: kids
+  must_determine_venue: true
+  hint: Each numbered entry is one event. Title = the event or show name, not the editorial headline. Venue = the named venue/site (not just the neighbourhood). Every dated entry yields exactly ONE row. Entries like 'From 19 Nov to 3 Jan' or 'Nov 21-Jan 3' are a single run with date = start..end ISO range, never two rows (never a separate row for the end date). Skip entries with no dates.
+  about: Time Out editorial list (Article JSON-LD only, no event data). No dedicated kids events listing exists on timeout.com/london/kids.
+  skip: true
+- name: Londonist Kids
+  url: https://londonist.com/london/kids
+  tags:
+  - family
+  type: aggregator
+  category_hint: kids
+  must_determine_venue: true
+  skip: true
+  about: HTML is behind a Cloudflare challenge (403) - not bypassed. https://londonist.com/feed is fetchable RSS but is a general news/article feed (no event dates or venues, no kids category feed) and no rss source kind exists, so not crawled.
 - name: Southbank Centre
   url: https://www.southbankcentre.co.uk/whats-on
   tags:
@@ -3367,3 +3396,526 @@ venues:
   type: venue
   category_hint: kids
   about: Southwark children's theatre
+- name: Phoenix Cinema
+  url: https://www.phoenixcinema.co.uk/PhoenixCinemaLondon.dll/Page?p=281557&m=m&sp=350893
+  tags:
+  - film
+  - cinema
+  - finchley
+  type: cinema
+  category_hint: other
+  hint: 'Only extract SPECIAL events, not regular film showtimes: director/cast Q&As, introductions and talks, live music or live-scored screenings, quizzes, sing-alongs, festivals and seasons events, workshops, family/kids events, community screenings. Skip ordinary screenings of a film with no event attached.'
+  fix:
+    keep_title_re: Q&A|\bintro|\bwith\b|\+|:|festival|presents|sing-?along|quiz|marathon|preview|\blive\b|workshop|\btalk|baby|carers|kids|family|discussion|conversation|premiere|season|retrospective|club
+  about: Finchley independent cinema (charity); server-rendered Admit-One .dll, ~20 films with showtimes, no JSON-LD
+- name: Polish Social and Cultural Association (POSK)
+  url: https://www.posk.org/en/events/
+  tags:
+  - culture
+  - music
+  - film
+  - talks
+  type: cultural-venue
+  category_hint: other
+  about: Hammersmith Polish émigré centre — exhibitions, concerts, theatre, talks; The Events Calendar (tribe) server-rendered, ~48 JSON-LD Event objects/month, Polish-language titles
+- name: Japan Foundation London
+  url: https://lo.jpf.go.jp/whats-on/
+  tags:
+  - culture
+  - film
+  - talks
+  type: cultural-venue
+  category_hint: other
+  about: Japanese cultural institute — screenings, talks, language events; server-rendered list with dated entries (~20 upcoming), post-filter JSON embedded in page, no JSON-LD Event
+  hint: Only extract public events (screenings, talks, workshops, language events) with their own explicit event date. Skip grant/funding calls, job or teacher-training recruitment, application notices and news items.
+- name: Japan House London
+  url: https://www.japanhouselondon.uk/whats-on/
+  tags:
+  - culture
+  - talks
+  type: cultural-venue
+  category_hint: other
+  about: 'Tested 2026-11-17: listing cards are ''Title: | Read more'' with no dates (reducer: 0 records); dates only on detail pages (no machine-readable dates). Not extracted.'
+  skip: true
+- name: Austrian Cultural Forum London
+  url: https://www.acflondon.org/events/
+  tags:
+  - culture
+  - music
+  - talks
+  - film
+  type: cultural-venue
+  category_hint: other
+  about: Knightsbridge Austrian institute — concerts, talks, exhibitions; server-rendered dated list (~10 upcoming), no JSON-LD
+- name: Italian Cultural Institute London
+  url: https://iiclondra.esteri.it/en/gli_eventi/calendario/
+  tags:
+  - culture
+  - talks
+  - film
+  - music
+  type: cultural-venue
+  category_hint: other
+  about: Belgravia Italian institute — exhibitions, lectures, concerts; server-rendered calendar (~10 upcoming) with per-event pages, no JSON-LD
+- name: Institut français / Ciné Lumière
+  url: https://www.institut-francais.org.uk/whats-on/
+  tags:
+  - culture
+  - film
+  - family
+  type: cultural-venue
+  category_hint: other
+  about: South Kensington French institute — Ciné Lumière screenings, talks, kids events; server-rendered WordPress, JSON-LD is breadcrumb/org only, dates in HTML (~10 upcoming; verify card count)
+  fix:
+    drop_title_re: Conversation & Grammar|French courses?|^Course|Beginner|Intermediate|Advanced
+- name: Ukrainian Institute London
+  url: https://uil.org.uk/events/
+  tags:
+  - culture
+  - talks
+  - music
+  type: cultural-venue
+  category_hint: other
+  about: Ukrainian cultural institute — lectures, courses (Kultura/Istoria), concerts; server-rendered WordPress, dated list (~10), JSON-LD graph w/o Event
+- name: Asia House
+  url: https://asiahouse.org/events/
+  tags:
+  - talks
+  - culture
+  type: cultural-venue
+  category_hint: lecture
+  about: Marylebone Asia centre — policy/business talks, arts, literature; server-rendered Events Calendar (tribe markup), ~6 upcoming dated
+  fix:
+    drop_title_re: Corporate Members
+- name: Nehru Centre London
+  url: https://www.nehrucentre.org.uk/events
+  tags:
+  - culture
+  - music
+  - talks
+  type: cultural-venue
+  category_hint: other
+  about: 'Tested 2026-11-17: listing dates ''Tuesday | 17, Nov 2026 | 6:30 PM'' (comma after day) parse as the whole month (1-30 Nov) via LLM and cards adapter; <time datetime> is present. Revisit once the date parser handles ''D, Mon YYYY''.'
+  skip: true
+  adapter:
+    kind: cards
+    card: div.event-mini
+    title: h2.event-mini-title
+    date: time.event-mini-timestamp
+    link: a.link
+    desc: .event-mini-author
+  extract:
+  - adapter
+  hint: Each event carries its own date line ('Tuesday | 17, Nov 2026 | 6:30 PM'); use that date, never the 'This Month' heading.
+- name: Bhavan (Bharatiya Vidya Bhavan) London
+  url: https://www.bhavan.net/events
+  tags:
+  - culture
+  - music
+  - family
+  type: cultural-venue
+  category_hint: other
+  about: West Kensington Indian arts centre — classical dance/music, courses, festivals; server-rendered WordPress, many dated events (~15+), no JSON-LD
+- name: Marx Memorial Library
+  url: https://www.marx-memorial-library.org.uk/events
+  tags:
+  - talks
+  - culture
+  type: cultural-venue
+  category_hint: lecture
+  about: Clerkenwell radical library — lectures, panels, courses; server-rendered, ~7 upcoming dated, no JSON-LD
+- name: Irish Cultural Centre Hammersmith
+  url: https://irishculturalcentre.co.uk/whats-on
+  tags:
+  - culture
+  - music
+  - talks
+  - film
+  type: cultural-venue
+  category_hint: other
+  about: Irish diaspora centre — exhibitions, courses, music, comedy; server-rendered Search&Filter list, ~10+ dated, one JSON-LD block
+- name: EUNIC London (European cultural institutes calendar)
+  url: https://euniclondon.org/eunic-events/list/
+  tags:
+  - culture
+  - film
+  - talks
+  - music
+  type: cultural-venue
+  category_hint: other
+  about: Aggregated calendar of European institutes in London (Czech Centre, Goethe, Cervantes etc., incl. Cloudflare-blocked ones via their public listing); The Events Calendar list view, JSON-LD Event x16 server-rendered, venue per event
+- name: The Hellenic Centre
+  url: https://events.humanitix.com/host/the-hellenic-centre
+  tags:
+  - culture
+  - talks
+  - music
+  type: cultural-venue
+  category_hint: other
+  about: Greek diaspora centre, Paddington St — talks, exhibitions, concerts; ticketing via Humanitix host page, JSON-LD Event x7 server-rendered, helleniccentre.org itself unreachable from curl
+- name: ARC Space
+  url: https://arcspace.london/
+  tags:
+  - ideas
+  - talks
+  - russian
+  type: cultural-venue
+  category_hint: lecture
+  about: Inline `const EVENTS=[{d,time,type,name,sub,price}]` JS array parsed by the js_array adapter (no LLM). Weekly 'Serving the People' rows are pushed by script and not seen. 13 Tottenham Mews W1T; Russian-speaking/intl cultural loft (talks, dinners, concerts, screenings); tickets on Fienta.
+  adapter:
+    kind: js_array
+    var: EVENTS
+    title: name
+    date: d
+    time: time
+    desc: sub
+    price: price
+    url: link
+  extract:
+  - adapter
+  fix:
+    time_default: '19:00'
+- name: New London Architecture (NLA)
+  url: https://www.nla.london/events
+  tags:
+  - architecture
+  - urbanism
+  - talks
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered HTML list, full dates ("Tuesday 17 November 2026", times), many members-only/free; ~15+ upcoming. No JSON-LD.
+- name: The Building Centre
+  url: https://www.buildingcentre.co.uk/events
+  tags:
+  - architecture
+  - design
+  - talks
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered; Current & Upcoming tab plus year archives back to 2000. Lunchtime talks, film club ("Tue 17 Nov 2026, 1 pm - 2 pm"). ~15 upcoming. No JSON-LD.
+- name: The Showroom Gallery
+  url: https://www.theshowroom.org/events
+  tags:
+  - art
+  - ideas
+  - talks
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered; upcoming (~4) plus Events archive with dated entries. Artist talks, panels, workshops (Marylebone/Edgware Rd). No JSON-LD.
+- name: Gasworks
+  url: https://www.gasworks.org.uk/events/
+  tags:
+  - art
+  - talks
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered; "Events" and "Forthcoming Events" blocks, dates like "19 Nov 26". ~3-5 upcoming; small.
+- name: The London Society
+  url: https://londonsociety.org.uk/events/
+  tags:
+  - urbanism
+  - history
+  - talks
+  - walks
+  type: cultural-venue
+  category_hint: lecture
+  about: 'Tested 2026-11-17: site drops the connection (RemoteProtocolError / empty reply) for the pipeline''s HTTP client; not bypassed. schema.org Event JSON-LD (jsonld source) would work if reachable.'
+  skip: true
+- name: Twentieth Century Society
+  url: https://www.c20society.org.uk/events
+  tags:
+  - architecture
+  - talks
+  - walks
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered; event blocks with "19 November 2026" h2 date + title (some HTML escaped inside attribute/JS - check). Lectures, tours. ~5-8 upcoming. No JSON-LD.
+  adapter:
+    kind: cards
+    card: section.listing article
+    title: h2
+    date: p.author
+    link: a
+    desc: p.author
+  extract:
+  - adapter
+  fix:
+    drop_title_re: ^\[online\]
+- name: Royal Society public events
+  url: https://royalsociety.org/science-events-and-lectures/public/
+  tags:
+  - science
+  - lectures
+  - ideas
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered cards with "16 November 2026", Free/ticketed, in-person or livestream. ~10 upcoming. Use /public/ not parent page. No JSON-LD.
+- name: Open City
+  url: https://open-city.org.uk/events
+  tags:
+  - architecture
+  - urbanism
+  - tours
+  type: cultural-venue
+  category_hint: other
+  about: Squarespace; ISO dates in markup, per-event URLs /events/<slug> with ?format=ical available. Architecture tours (Barbican, Golden Lane etc), ~10+ upcoming. Many are tours rather than talks.
+- name: South London Gallery
+  url: https://www.southlondongallery.org/whats-on/
+  tags:
+  - art
+  - talks
+  - family
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered WordPress; dates "22 Nov 2026" etc. Exhibitions + events mixed; ~4-8 upcoming. No JSON-LD.
+- name: Royal College of Art events
+  url: https://www.rca.ac.uk/news-and-events/events/
+  tags:
+  - design
+  - art
+  - talks
+  type: cultural-venue
+  category_hint: lecture
+  about: Server-rendered large page, dates "12 November 2026"; public lectures, talks, open days mixed with admissions events - filter needed. ~15+ upcoming.
+  fix:
+    drop_title_re: Meet the Royal College|One-to-one|open day|admissions|postgraduate|information (session|event)|applicant|virtual
+- name: Rio Cinema
+  url: https://riocinema.org.uk/Rio.dll/Home
+  tags:
+  - film
+  - cinema
+  - dalston
+  type: cinema
+  category_hint: other
+  hint: 'Only extract SPECIAL events, not regular film showtimes: director/cast Q&As, introductions and talks, live music or live-scored screenings, quizzes, sing-alongs, festivals and seasons events, workshops, family/kids events, community screenings. Skip ordinary screenings of a film with no event attached.'
+  fix:
+    keep_title_re: Q&A|\bintro|\bwith\b|\+|:|festival|presents|sing-?along|quiz|marathon|preview|\blive\b|workshop|\btalk|baby|carers|kids|family|discussion|conversation|premiere|season|retrospective|club
+  about: Independent Dalston cinema, ~45 films now playing; server-rendered Admit-One (Rio.dll) pages, no JSON-LD; Book Now links to Rio.dll/Booking; also Rio.dll/WhatsOn
+- name: The Castle Cinema
+  url: https://thecastlecinema.com/calendar/
+  tags:
+  - film
+  - cinema
+  - hackney
+  type: cinema
+  category_hint: other
+  hint: 'Only extract SPECIAL events, not regular film showtimes: director/cast Q&As, introductions and talks, live music or live-scored screenings, quizzes, sing-alongs, festivals and seasons events, workshops, family/kids events, community screenings. Skip ordinary screenings of a film with no event attached.'
+  fix:
+    keep_title_re: Q&A|\bintro|\bwith\b|\+|:|festival|presents|sing-?along|quiz|marathon|preview|\blive\b|workshop|\btalk|baby|carers|kids|family|discussion|conversation|premiere|season|retrospective|club
+  about: Homerton independent cinema; server-rendered calendar by day (Tue 17 Nov...), ~25 day blocks, JSON-LD only MovieTheater not Event; /calendar/film/ and /calendar/event/ sub-lists
+- name: The Garden Cinema
+  url: https://www.thegardencinema.co.uk/
+  tags:
+  - film
+  - cinema
+  - covent-garden
+  type: cinema
+  category_hint: other
+  hint: 'Only extract SPECIAL events, not regular film showtimes: director/cast Q&As, introductions and talks, live music or live-scored screenings, quizzes, sing-alongs, festivals and seasons events, workshops, family/kids events, community screenings. Skip ordinary screenings of a film with no event attached.'
+  fix:
+    keep_title_re: Q&A|\bintro|\bwith\b|\+|:|festival|presents|sing-?along|quiz|marathon|preview|\blive\b|workshop|\btalk|baby|carers|kids|family|discussion|conversation|premiere|season|retrospective|club
+  about: Holborn independent repertory cinema; server-rendered date strip + ~75 /film/<slug>/ links, ~6 weeks ahead; JSON-LD Organization only
+- name: Prince Charles Cinema
+  url: https://princecharlescinema.com/seasons-events/qaintro/
+  tags:
+  - film
+  - cinema
+  - leicester-square
+  type: cinema
+  category_hint: other
+  hint: 'Only extract SPECIAL events, not regular film showtimes: director/cast Q&As, introductions and talks, live music or live-scored screenings, quizzes, sing-alongs, festivals and seasons events, workshops, family/kids events, community screenings. Skip ordinary screenings of a film with no event attached.'
+  fix:
+    keep_title_re: Q&A|\bintro|\bwith\b|\+|:|festival|presents|sing-?along|quiz|marathon|preview|\blive\b|workshop|\btalk|baby|carers|kids|family|discussion|conversation|premiere|season|retrospective|club
+  about: Leicester Sq repertory/cult cinema (sing-alongs, marathons, Q&As); server-rendered per-day showing list, ~48 /film/ links; no Event JSON-LD
+- name: Ciné Lumière (Institut français)
+  url: https://www.institut-francais.org.uk/cine-lumiere/
+  tags:
+  - film
+  - cinema
+  - french
+  - south-kensington
+  type: cinema
+  category_hint: other
+  about: French-language cinema; server-rendered, ~25 dated entries, BreadcrumbList/CollectionPage JSON-LD only
+- name: The Jazz Cafe
+  url: https://www.thejazzcafe.com/whats-on
+  tags:
+  - music
+  - jazz
+  - camden
+  type: cultural-venue
+  category_hint: concert
+  about: Camden jazz/soul/hip-hop live venue; server-rendered, very large list (date block Wed|18|Nov + Tickets and Info), ~250+ upcoming; JSON-LD BarOrPub only; includes DJ club nights
+- name: Cecil Sharp House (EFDSS)
+  url: https://www.folkengland.org/whats-on
+  tags:
+  - music
+  - folk
+  - dance
+  - camden
+  - family
+  type: cultural-venue
+  category_hint: concert
+  about: 'Tested 2026-11-17: folkengland.org/whats-on returns a mis-served/JS-only page (reducer: thin, 0 events; Spektrix detected but unlisted). Revisit with a Spektrix client id.'
+  skip: true
+- name: Daunt Books Events
+  url: https://dauntbooks.co.uk/events/
+  tags:
+  - books
+  - talks
+  type: cultural-venue
+  category_hint: lecture
+  about: Indep bookshop author talks; server-rendered "date | branch" list, ~5 upcoming; some events at Summertown (Oxford) - filter London branches (Marylebone, Holland Park, Hampstead)
+  hint: Only London branches (Marylebone, Holland Park, Hampstead, Belsize Park, Cheapside). Skip Summertown/Oxford events.
+- name: The Horse Hospital
+  url: https://thehorsehospital.com/events
+  tags:
+  - arts
+  - music
+  - film
+  - bloomsbury
+  type: cultural-venue
+  category_hint: other
+  about: Bloomsbury underground arts venue (gigs, film, exhibitions, talks); server-rendered with ICS links, ~50 listed incl. past; JSON-LD only LocalBusiness
+- name: Deptford Cinema
+  url: https://www.deptfordcinema.org/
+  tags:
+  - film
+  - cinema
+  - deptford
+  - community
+  type: cinema
+  category_hint: other
+  about: Volunteer-run no-fixed-address cinema (Brookmill etc); home page lists ~5 upcoming with /new-events/<date>/<slug> links; server-rendered, no Event JSON-LD
+- name: Poplar Union
+  url: https://poplarunion.com/events/
+  tags:
+  - community
+  - family
+  - poplar
+  type: cultural-venue
+  category_hint: other
+  about: Poplar community arts centre; WordPress, ~10 /event/<slug>/ cards with "Next date" (classes, baby/kids sessions, workshops); server-rendered
+- name: Puppet Barge Theatre
+  url: https://www.puppetbarge.com/puppet-shows
+  tags:
+  - family
+  - puppets
+  - little-venice
+  type: cultural-venue
+  category_hint: kids
+  about: 'Tested 2026-11-17: one page per show, 0 current dated events extracted (1 past).'
+  skip: true
+- name: Hoxton Hall
+  url: https://hoxtonhall.co.uk/
+  tags:
+  - arts
+  - community
+  - hoxton
+  type: cultural-venue
+  category_hint: other
+  about: Victorian music hall arts centre; home page server-renders ~11 hoxtonhall.ticketsolve.com/ticketbooth/shows/<id> links with dates; /whats-on and ticketsolve index are JS-only SPA
+- name: Bernie Grant Arts Centre
+  url: https://www.berniegrantcentre.co.uk/
+  tags:
+  - arts
+  - theatre
+  - tottenham
+  - family
+  type: cultural-venue
+  category_hint: other
+  about: 'Tested 2026-11-17: home page only; 0 events extracted (thin page, no whats-on listing; Spektrix detected but unlisted).'
+  skip: true
+- name: Artsadmin / Toynbee Studios
+  url: https://www.artsadmin.co.uk/whats-on/
+  tags:
+  - arts
+  - performance
+  - dance
+  - aldgate
+  type: cultural-venue
+  category_hint: other
+  about: Toynbee Studios programme; WordPress, filter by date; 1-3 upcoming; /events/<slug>/ pages, one JSON-LD block; low volume
+- name: St George's Hanover Square
+  url: https://www.stgeorgeshanoversquare.org/Events.aspx
+  tags:
+  - music
+  - classical
+  type: church
+  category_hint: concert
+  about: Mayfair Organ Concerts (Tue 1.10pm) + Hanover Square Lunchtime Concerts (Wed 1.10pm) free; evening ticketed concerts (Eventbrite links). ~16 upcoming to Dec. Server-rendered ASP.NET list with dates/times/programmes; no JSON-LD.
+- name: St Pancras Church Lunchtime Concerts
+  url: https://www.stpancraschurch.org/concerts
+  tags:
+  - music
+  - classical
+  type: church
+  category_hint: concert
+  about: Free lunchtime recitals Tue and Thu 1.10pm (RCM/Trinity Laban/Talent Unlimited) plus occasional evening/Thu 2pm. 9 upcoming. Wix page, full text list in HTML ("Tuesday 17 Nov 2026 1.10pm Title").
+- name: St Olave Hart Street
+  url: https://saintolave.com/
+  tags:
+  - music
+  - classical
+  type: church
+  category_hint: concert
+  about: Free lunchtime concerts Wed and Thu 1pm (chamber/piano), evensong, carol services. ~5 upcoming per month. WordPress; one post per concert (/index.php/YYYY/MM/DD/lunchtime-concerts-...), homepage lists the week; /wp-json/wp/v2/posts works.
+- name: St Michael Cornhill Organ Recitals
+  url: https://www.st-michaels.org.uk/organ-recitals/
+  tags:
+  - music
+  - classical
+  type: church
+  category_hint: concert
+  about: Mondays 1pm organ recitals (50 min, free). Homepage "Coming Up" lists next dates; monthly programme PDFs at /wp-content/uploads/YYYY/MM/Lunchtime-Organ-Music-*.pdf. WordPress, thin text.
+- name: Bloomsbury Central Baptist Church Organ Recitals
+  url: https://www.bloomsbury.org.uk/about-us/music-at-bloomsbury/organ-recitals/
+  tags:
+  - music
+  - classical
+  - weekend
+  type: church
+  category_hint: concert
+  about: WEEKEND DAYTIME - last Saturday of month 4pm free organ recital (not Jan/Aug/Dec); next 28 Nov (performer TBC). Static year list, server-rendered, 1 upcoming only. Same church hosts Fever/candlelight promoter concerts - exclude.
+  hint: Only the free last-Saturday 4pm organ recitals and organ days listed in the year programme. Skip Fever/candlelight promoter concerts.
+  fix:
+    time_default: '16:00'
+- name: City Music Society
+  url: https://citymusicsociety.org/
+  tags:
+  - music
+  - classical
+  type: aggregator
+  must_determine_venue: true
+  category_hint: concert
+  about: Free Thursday 1.05pm lunchtime concerts, mostly St Bartholomew the Great; next 19 Nov, 14 Jan 2027. Static server-rendered; JSON-LD x1; sparse (2 upcoming).
+- name: Holy Sepulchre London (Music-at-Hill)
+  url: https://hsl.church/upcoming-events
+  tags:
+  - music
+  - classical
+  type: church
+  category_hint: concert
+  about: Weekly Fri 1pm Music-at-Hill Midtown lunchtime concert (recurring, undated on page; ACNY 15375 event 1322109) + Songs from the Viaduct Thu evenings (3 Dec 7pm) + 27 Nov evening concert. Squarespace; ?format=json works; ACNY listing at achurchnearyou.com/church/15375/service-and-events. Low yield.
+  hint: Only concerts and music events (Music-at-Hill lunchtime concerts, Songs from the Viaduct, evening concerts). Skip services, remembrance services, lectures, teas and social events.
+  fix:
+    drop_title_re: Service of|Lecture|Tea\b|WATCH THIS SPACE|Thanksgiving|Remembrance
+- name: Holy Trinity Sloane Square
+  url: https://sloanechurch.org/events/
+  tags:
+  - music
+  - classical
+  type: church
+  category_hint: concert
+  about: Choral society concerts, EVENINGS (7-7.30pm) Thu-Sat plus Sun 6 Dec 6pm. 6 upcoming. WordPress, server-rendered list, detail pages with tickettailor links; no weekday lunchtime. Evening-only, low priority.
+- name: One City London (City of London visitor events)
+  url: https://onecitylondon.com/wp-json/wp/v2/event?per_page=100
+  tags:
+  - music
+  - aggregator
+  type: aggregator
+  must_determine_venue: true
+  category_hint: concert
+  about: 'Tested 2026-11-17: WP REST event posts are venue/offer promos (rooftop bars, DJ nights, food offers) with no event dates (acf empty); reducer: thin, 0 events. Not usable.'
+  skip: true
+  hint: Only music - concerts, recitals, carol services and choral events in City of London churches and halls. Skip food and drink offers, tours, exhibitions and shopping promotions.

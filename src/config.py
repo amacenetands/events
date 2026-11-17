@@ -193,10 +193,11 @@ class FixCfg(_Strict):
     date_order: Literal["dmy", "mdy", "ymd"] = "dmy"
     url_pattern: Optional[str] = None          # event URLs not matching → listing URL
     drop_title_re: Optional[str] = None        # drop events whose title matches (case-insensitive)
+    keep_title_re: Optional[str] = None        # keep only events whose title matches (case-insensitive)
     byday: Optional[list[int]] = None          # force these weekdays (0=Mon) on every run/series
     weekly: Optional[dict[str, list[int]]] = None   # title regex → weekdays, e.g. {"WordPlay": [4]}
 
-    _re = field_validator("url_pattern", "drop_title_re")(_check_regex)
+    _re = field_validator("url_pattern", "drop_title_re", "keep_title_re")(_check_regex)
     _days = field_validator("byday")(_check_days)
 
     @field_validator("time_default")

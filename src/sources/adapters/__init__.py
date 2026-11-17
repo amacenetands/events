@@ -12,7 +12,7 @@ def _load_all() -> None:
     if _loaded:
         return
     _loaded = True
-    from . import cards, json_adapter, auto  # noqa: F401  (register built-ins)
+    from . import cards, json_adapter, js_array, auto  # noqa: F401  (register built-ins)
     from . import venues
     for m in pkgutil.iter_modules(venues.__path__):
         importlib.import_module(f"{venues.__name__}.{m.name}")

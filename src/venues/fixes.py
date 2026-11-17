@@ -3,6 +3,7 @@ before the venue's post_build hook). `date_order` is the exception: it must reac
 parser, so build._specs passes it to normalize. Order:
 
     drop_title_re  drop events whose title matches (re.search, case-insensitive)
+    keep_title_re  drop events whose title does not match (special-events-only cinemas)
     url_pattern    event URLs that do not match fall back to the listing URL
     weekly         title regex (re.search, case-insensitive; anchor with ^) -> weekdays on
                    runs/series ({"^WordPlay": [4]}), start moved like byday; one-offs
@@ -91,6 +92,9 @@ def _one(e: Event, cfg: VenueConfig, listing: str, ctx) -> Event | None:
     if fx.drop_title_re and re.search(fx.drop_title_re, e.title, re.I):
         _bump(ctx, "fix.drop_title_re")
         return None
+    if fx.keep_title_re and not re.search(fx.keep_title_re, e.title, re.I):
+        _bump(ctx, "fix.keep_title_re")
+        return None
     if fx.url_pattern and e.url != listing and not re.search(fx.url_pattern, e.url):
         e = e.model_copy(update={"url": listing})
         _bump(ctx, "fix.url_pattern")
@@ -145,7 +149,7 @@ def apply_fixes(cfg: VenueConfig, events: list[Event], ctx) -> list[Event]:
     a failing fix leaves that event as built and logs one error line per venue."""
     events = unmap_urls(cfg, events, ctx)
     fx = cfg.fix
-    if not (fx.drop_title_re or fx.url_pattern or fx.time_default or fx.weekly or fx.byday
+    if not (fx.drop_title_re or fx.keep_title_re or fx.url_pattern or fx.time_default or fx.weekly or fx.byday
             or fx.range_means_weekly):
         return events
     listing = cfg.resolved_url(ctx.today.year)

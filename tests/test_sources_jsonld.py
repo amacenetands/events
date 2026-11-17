@@ -210,3 +210,10 @@ def test_matches_recorded_output(slug):
     html = (FIX / f"jsonld_{slug}.html").read_text()
     got = sorted(_key(e) for e in build_events(_records(html, cfg), cfg, _ctx()))   # incl. anchor URL fill
     assert got == EXPECTED["jsonld"][slug]
+
+
+def test_itemlist_wrapped_events():
+    from src.sources.jsonld import event_nodes
+    html = ('<script type="application/ld+json">{"@type":"ItemList","itemListElement":['
+            '{"@type":"ListItem","position":0,"item":{"@type":"Event","name":"A","startDate":"2026-12-01T19:00:00"}}]}</script>')
+    assert [n["name"] for n in event_nodes(html)] == ["A"]

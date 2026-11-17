@@ -37,13 +37,16 @@ def _is_event(node: dict) -> bool:
 
 
 def _walk(data: Any) -> Iterator[dict]:
-    """Top-level dicts, top-level arrays (ATG) and @graph members."""
+    """Top-level dicts, top-level arrays (ATG), @graph members and ItemList items."""
     if isinstance(data, list):
         for x in data:
             yield from _walk(x)
     elif isinstance(data, dict):
         if isinstance(data.get("@graph"), list):
             yield from _walk(data["@graph"])
+        elif isinstance(data.get("itemListElement"), list):     # ItemList of ListItem{item: Event} (Humanitix)
+            for el in data["itemListElement"]:
+                yield from _walk(el.get("item", el) if isinstance(el, dict) else el)
         else:
             yield data
 

@@ -210,3 +210,12 @@ def test_apply_fixes_stored_skips_rows_the_latest_crawl_built():
     assert out[0] is enriched                               # built by the latest crawl: untouched
     assert out[1].byday == [4] and out[1].kind == "recurring"   # disabled venue: fixed even with new id
     assert out[2].byday == [5]                              # older crawl's row: fixed
+
+
+def test_keep_title_re():
+    ctx = _ctx()
+    evs = _build(_cfg(keep_title_re=r"\bQ&A\b|sing-?along"),
+                 RawEvent(title="Plain Film", date_text="20 Nov 2026"),
+                 RawEvent(title="Film + Q&A", date_text="21 Nov 2026"),
+                 RawEvent(title="Grease Sing-along", date_text="22 Nov 2026"), ctx=ctx)
+    assert [e.title for e in evs] == ["Film + Q&A", "Grease Sing-along"] and ctx.stats["fix.keep_title_re"] == 1
